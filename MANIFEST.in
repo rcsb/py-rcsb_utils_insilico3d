@@ -1,0 +1,7 @@
+#
+# File: py-rcsb_utils_insilico3d/MANIFEST.in
+#
+include HISTORY.txt
+include requirements.txt
+include README.md
+#

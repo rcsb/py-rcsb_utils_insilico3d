@@ -1,0 +1,7 @@
+rcsb.utils.io >= 1.16
+rcsb.utils.chemref >= 0.78
+rcsb.utils.config >= 0.35
+rcsb.utils.seq >= 0.63
+rcsb.utils.taxonomy >= 0.37
+rcsb.utils.multiproc >= 0.18
+chembl-webresource-client >= 0.10.2
