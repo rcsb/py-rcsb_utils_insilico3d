@@ -27,19 +27,17 @@ logger = logging.getLogger(__name__)
 
 class AlphaFoldModelMetadataWorker(object):
     """A skeleton class that implements the interface expected by the multiprocessing
-    for calculating non-polymer instance ligand and target neighbor interactions --
+    for extracting metadata from mmCIF model files.
     """
 
     def __init__(self, **kwargs):
-        
-        self.__aFMP = AlphaFoldModelProvider()  # Is this the proper place/way to initialize this class? Or should init as class(object) instead?
-        # Or should this be initialized in AlphaFoldModelMetadataProvider class below only?
-
+        self.__aFMP = AlphaFoldModelProvider()  # Is this the proper place/way to initialize this class? Or initialize in AlphaFoldModelMetadataProvider class below only?
+        self.__dirPath = self.__aFMP.__dirPath
         _ = kwargs
         # self.__commonU = DictMethodCommonUtils()
-                        
-        # self.__mU = MarshalUtil(workPath=self.__dirPath)
-        self.__mU = MarshalUtil()  # Should workPath be defined up here, or down below for each species directory?
+
+        self.__mU = MarshalUtil(workPath=self.__dirPath)
+        # self.__mU = MarshalUtil()  # Should workPath be defined up here, or down below for each species directory?
 
         # Need to define and/or create metadata cache files for each species below...or elsewhere...
         # Can loop over each species directory by retrieving each species model lists incrementally in '__extractAlphaFoldMetadata()' method below
@@ -82,13 +80,13 @@ class AlphaFoldModelMetadataWorker(object):
 
     def __getMmCifMetadata(self, procName, modelFile):
         """Internal method return a dictionary of mmCIF model metadata.
-        
+
         Args:
             modelFile (str): path to mmCIF model file to extract metadata from (as either .cif or .cif.gz; but, avoid including the same model twice in both formats)
             procName (str): worker process name (?)
 
         Returns:
-            (dict): dictionary of extracted metadata for the provided model file, in the following structure: 
+            (dict): dictionary of extracted metadata for the provided model file, in the following structure:
                     {dataContainerEntryName: [{categoryName: [{attributeName: ...}], ...}], ...}
 
         """
@@ -98,7 +96,7 @@ class AlphaFoldModelMetadataWorker(object):
         #   - float_metadata_tokens_to_extract = ['_ma_qa_metric_local.metric_value']
         #   - string_metadata_tokens_to_extract = ['_entry.id', '_entity_poly.pdbx_seq_one_letter_code', '_entity_poly.pdbx_seq_one_letter_code_can']
         # Add: separate method to return tokens and values for common tokens between all AF models
-        
+
         rD = {}
         catNameList = [
             "entry", "af_target_ref_db_details", "ma_target_ref_db_details", "entity", "entity_poly", "ma_qa_metric_global",
@@ -126,48 +124,49 @@ class AlphaFoldModelMetadataWorker(object):
 class AlphaFoldModelMetadataProvider(StashableBase):
     """Generators and accessors for mmCIF model metadata extraction."""
 
-    def __init__(self, cachePath=None, useCache=False, **kwargs):
+    def __init__(self, cachePath=None, useCache=False, speciesModelDir=None, **kwargs):
         # Set default useCache=True ...?
 
-        # TODO: Determine proper way and place in code to initialize AlphaFoldModelProvider() class, and if it should be initialized as class(object) instead
+        # modelGroup: name of the species directory of model files to process
+
+        # TODO: Determine proper way and place in code to initialize AlphaFoldModelProvider() class
         # TODO: Figure out declaration of cachePath and dirPath
         # TODO: Also determine necessity of using super(class) below
-        # TODO: Determine appropriate default setting to use for "useCache" 
-        
-        self.__aFMP = AlphaFoldModelProvider()  # Is this the proper place/way to initialize this class? Or should init as class(object) instead?
-        # self.__rpP = RepositoryProvider(cfgOb=self.__cfgOb, numProc=self.__numProc, fileLimit=self.__fileLimit, cachePath=self.__cachePath)
+        # TODO: Determine appropriate default setting to use for "useCache"
 
-        self.__version = __version__
-        self.__fileLimit = kwargs.get("fileLimit", None)
-        self.__numProc = kwargs.get("numProc", 2)
-        self.__chunkSize = kwargs.get("chunkSize", 10)
+        try:
+            self.__aFMP = AlphaFoldModelProvider()  # Is this the proper place/way to initialize this class?
 
+            self.__version = __version__
+            # self.__fileLimit = kwargs.get("fileLimit", None)
+            self.__numProc = kwargs.get("numProc", 2)
+            self.__chunkSize = kwargs.get("chunkSize", 10)
 
-        # self.__dirPath = self.__aFMP.__dirPath  # Don't do this, since want to work in species-specific directories, not the same base directory as AlphaFoldModelProvider
+            self.__speciesModelDir = speciesModelDir
+            self.__speciesName = self.__speciesModelDir.split("/")[-1]
 
-        # Below if-else condition only added to try to follow previous example usage, specifically to support the unique "super(class)" declaration below;
-        # but, if it's not necessary to create the super class (or, if it can be created with the dirPath of the alphaFoldModelProvider class),
-        # then OK to collapse this and remove "dirName" definition and usage.
-        if cachePath:
-            self.__cachePath = cachePath
-        else:
-            self.__cachePath = self.__aFMP.__cachePath
+            if cachePath:
+                self.__cachePath = cachePath
+            else:
+                self.__cachePath = self.__aFMP.__dirPath
 
-        dirName = "neighbor-interactions"
-        self.__dirPath = os.path.join(cachePath, dirName)
-        # Below is setting DIRNAME to CACHE PATH--Is that what we want here? A model-specific cache path within the base species cache path?
-        super(AlphaFoldModelMetadataProvider, self).__init__(self.__cachePath, [dirName])  # Not sure if necessary or how to use this, nor why dirName must be specified as non-path...
+            self.__dirPath = self.__speciesModelDir
 
+            super(AlphaFoldModelMetadataProvider, self).__init__(self.__cachePath, [self.__speciesName])
 
-        # This was commented out in previous exmaple usage...if deemed OK to set default to True in method(parameter) declaration above, then keep this here too
-        useCache = kwargs.get("useCache", True)
+            # This was commented out in previous exmaple usage...if deemed OK to set default to True in method(parameter) declaration above, then keep this here too
+            useCache = kwargs.get("useCache", True)
 
-        #  - Configuration for stash services -
-        #    Local target directory name to be stashed.  (subdir of dirPath)
+            #  - Configuration for stash services -
+            #    Local target directory name to be stashed.  (subdir of dirPath)
 
-        self.__mU = MarshalUtil(workPath=self.__dirPath)
+            self.__mU = MarshalUtil(workPath=self.__dirPath)
 
-        self.__metadataD = self.__reload(fmt="pickle", useCache=useCache)
+            self.__metadataD = self.__reload(fmt="pickle", useCache=useCache)
+
+        except Exception as e:
+            # May occur if 'speciesModelDir' is not specified in instantiation
+            logger.exception("Failing with %s", str(e))
 
     def testCache(self, minCount=1):
         try:
@@ -196,7 +195,7 @@ class AlphaFoldModelMetadataProvider(StashableBase):
             tS = time.strftime("%Y %m %d %H:%M:%S", time.localtime())
             # dtS = datetime.datetime.now().isoformat()
             tD = self.__extractAlphaFoldMetadata(numProc=self.__numProc, chunkSize=self.__chunkSize, updateOnly=updateOnly)
-            self.__metadataD = {"version": self.__version, "created": tS, "entries": tD}
+            self.__metadataD = {"version": self.__version, "created": tS, "entries": tD, "species": self.__speciesName}
             kwargs = {"indent": indent} if fmt == "json" else {"pickleProtocol": 4}
             targetFilePath = self.__getTargetFilePath(fmt=fmt)
             ok = self.__mU.doExport(targetFilePath, self.__metadataD, fmt=fmt, **kwargs)
@@ -229,7 +228,7 @@ class AlphaFoldModelMetadataProvider(StashableBase):
 
     def __getTargetFilePath(self, fmt="pickle"):
         ext = "pic" if fmt == "pickle" else "json"
-        pth = os.path.join(self.__dirPath, "alphafold-model-metadata." + ext)
+        pth = os.path.join(self.__dirPath, self.__speciesName + "-model-metadata." + ext)
         return pth
 
     def __extractAlphaFoldMetadata(self, numProc=2, chunkSize=10, updateOnly=False):
@@ -242,7 +241,7 @@ class AlphaFoldModelMetadataProvider(StashableBase):
             updateOnly (bool): only extract and update metadata for new entries.  Defaults to False.
 
         Returns:
-            (dict): dictionary of extracted metadata for the provided model file, in the following structure: 
+            (dict): dictionary of extracted metadata for the provided model file, in the following structure:
                     {dataContainerEntryName: [{categoryName: [{attributeName: ...}], ...}], ...}
         """
         updateDate = datetime.datetime.now().isoformat()
@@ -256,8 +255,8 @@ class AlphaFoldModelMetadataProvider(StashableBase):
             logger.info("Reusing (%d) entries", len(exD))
             rD = self.__metadataD["entries"] if "entries" in self.__metadataD else {}
         #
-        inputModelDirs = self.__aFMP.getSpeciesDirList()
-        modelFileList = self.__aFMP.getModelFileList(inputPathList=inputModelDirs)
+        modelFileList = self.__aFMP.getModelFileList(inputPathList=[self.__speciesModelDir])
+
         logger.info("Starting with %d entries numProc %d updateOnly (%r)", len(modelFileList), self.__numProc, updateOnly)
         #
         rWorker = AlphaFoldModelMetadataWorker()
