@@ -1,8 +1,10 @@
 ##
-#  File:           AlphaFoldModelProvider.py
-#  Date:           12-Aug-2021 dwp
+# File:    AlphaFoldModelProvider.py
+# Author:  Dennis Piehl
+# Date:    23-Aug-2021
 #
-#  Updated:
+# Update:
+#
 #
 ##
 """
@@ -62,6 +64,7 @@ class AlphaFoldModelProvider:
             alphaFoldFtpHost = kwargs.get("alphaFoldFtpHost", "ftp.ebi.ac.uk")
             alphaFoldFtpDataPath = kwargs.get("alphaFoldFtpDataPath", "/pub/databases/alphafold/")
             alphaFoldFtpLatestDataList = os.path.join(alphaFoldFtpDataPath, "download_metadata.json")
+            alphaFoldRequestedSpeciesFileList = kwargs.get("alphaFoldRequestedSpeciesFileList", [])
 
             ftpU = FtpUtil()
             ftpU.connect(alphaFoldFtpHost)
@@ -79,6 +82,7 @@ class AlphaFoldModelProvider:
                 cacheD = self.__mU.doImport(self.__speciesDataCacheFile, fmt="json")
                 createdDate = cacheD["created"]
                 oD = cacheD["data"]
+                cacheSpeciesFileList = [sF for sF in oD]
 
                 logger.info("Checking consistency of cached data with data available on FTP")
                 for speciesData in lDL:
@@ -86,13 +90,20 @@ class AlphaFoldModelProvider:
                         speciesFile = speciesData["archive_name"]
                         speciesFileSize = int(speciesData["size_bytes"])
                         speciesNumModels = int(speciesData["num_predicted_structures"])
+                        # If a specific list of species files was requested, only check those (i.e., skip over any that weren't requested)
+                        if (alphaFoldRequestedSpeciesFileList and speciesFile not in alphaFoldRequestedSpeciesFileList):
+                            logger.info("Skipping species file not specifically requested in provided arguments: %s", speciesFile)
+                            continue
+                        if speciesFile not in cacheSpeciesFileList:
+                            logger.error("Species archive data file %s on FTP server not found in local cache.", speciesFile)
+                            continue
                         cacheSpeciesFile = oD[speciesFile]["archive_file_path"]
                         cacheSpeciesDir = oD[speciesFile]["data_directory"]
                         cacheSpeciesFileExists = os.path.exists(cacheSpeciesFile)
                         cacheSpeciesFileSize = os.path.getsize(cacheSpeciesFile)
                         cacheSpeciesNumModels = len([f for f in os.listdir(cacheSpeciesDir) if f.endswith(".cif.gz")])
                         if not cacheSpeciesFileExists:
-                            logger.warning("Missing species archive data file for %s, which is available on FTP server.", speciesFile)
+                            logger.warning("Species archive data file %s not found at cached path %s", speciesFile, cacheSpeciesFile)
                         if cacheSpeciesFileSize != speciesFileSize:
                             logger.warning("Species archive data file %s not up-to-date with file available on FTP server.", speciesFile)
                         if cacheSpeciesNumModels != speciesNumModels:
@@ -100,8 +111,7 @@ class AlphaFoldModelProvider:
                                 "Missing some or all of the bundled model files for species archive %s as available on FTP server (found %d / %d model files)",
                                 speciesFile, cacheSpeciesNumModels, speciesNumModels)
                     except Exception as e:
-                        logger.info("Failing on checking of cache data for %s from FTP server.", speciesData["archive_name"])
-                        logger.exception("Failing with %s", str(e))
+                        logger.exception("Failing on checking of cache data for %s from FTP server, with message:\n%s", speciesData["archive_name"], str(e))
 
             else:
                 logger.info("Refetching all up-to-date files from FTP server.")
@@ -111,13 +121,19 @@ class AlphaFoldModelProvider:
                     try:
                         sD = copy.deepcopy(speciesData)
                         speciesFile = speciesData["archive_name"]
+
+                        # If a specific list of species files was requested, only check those (i.e., skip over any that weren't requested)
+                        if (alphaFoldRequestedSpeciesFileList and speciesFile not in alphaFoldRequestedSpeciesFileList):
+                            logger.info("Skipping species file not specifically requested in provided arguments: %s", speciesFile)
+                            continue
+
                         speciesFilePath = os.path.join(alphaFoldFtpDataPath, speciesFile)
                         speciesDataDumpDir = os.path.join(self.__dirPath, speciesFile.split('.')[0])
                         fU.mkdir(speciesDataDumpDir)
-                        sD.update({"data_directory": speciesDataDumpDir, "archive_file_path": speciesFilePath})
-
                         speciesFileDumpPath = os.path.join(speciesDataDumpDir, speciesFile)
+
                         logger.info("speciesFileDumpPath %r", speciesFileDumpPath)
+                        sD.update({"data_directory": speciesDataDumpDir, "archive_file_path": speciesFileDumpPath})
 
                         logger.info("Fetching file %s from FTP server to local path %s", speciesFilePath, speciesFileDumpPath)
                         ok = ftpU.get(speciesFilePath, speciesFileDumpPath)
@@ -132,8 +148,7 @@ class AlphaFoldModelProvider:
                             cacheD["data"].update({speciesFile: sD})
 
                     except Exception as e:
-                        logger.info("Failing on fetching and expansion of file %s from FTP server.", speciesData["archive_name"])
-                        logger.exception("Failing with %s", str(e))
+                        logger.exception("Failing on fetching and expansion of file %s from FTP server, with message:\n%s", speciesData["archive_name"], str(e))
 
                 createdDate = cacheD["created"]
                 oD = cacheD["data"]
@@ -146,7 +161,7 @@ class AlphaFoldModelProvider:
         return oD, createdDate
 
     def getSpeciesDirList(self):
-        speciesDirList = [k["data_directory"] for k in self.__oD]
+        speciesDirList = [self.__oD[k]["data_directory"] for k in self.__oD]
 
         return speciesDirList
 
@@ -154,19 +169,25 @@ class AlphaFoldModelProvider:
         """Method to get the data path list of directories/collections of model mmCIF files.
 
         Args:
-            inputPathList (list): list of paths to directories containing model mmCIF files to return.
+            inputPathList (list): Optional (and recommended) list of paths to directories containing model mmCIF files to return.
+                                  If not provided, method will retrieve all cached species data paths, so all model files from all species will be returned in a single list;
+                                  thus, it's recommended to provide a list of specific species directory to break the returned model list down into more manageable parts.
 
         Returns:
             (list): list of model mmCIF file paths (only matches ".cif.gz" files)
         """
 
-        inputPathList = inputPathList if inputPathList else []
+        if not inputPathList:
+            inputPathList = self.getSpeciesDirList()
 
         modelFileList = []
 
         for modelDir in inputPathList:
-            mmCifModels = glob.glob(os.path.join(modelDir, "*.cif.gz"))  # + glob.glob(os.path.join(modelDir, "*.cif")) # ONLY MATCH .GZ FILES TO ENSURE ONLY ONE FILE PER MODEL
-            modelFileList += mmCifModels
+            try:
+                mmCifModels = glob.glob(os.path.join(modelDir, "*.cif.gz"))  # + glob.glob(os.path.join(modelDir, "*.cif")) # ONLY MATCH .GZ FILES TO ENSURE ONLY ONE FILE PER MODEL
+                modelFileList += mmCifModels
+            except Exception as e:
+                logger.exception("Failing with %s", str(e))
 
         # Add: Return as list of ABSOLUTE paths, not just relative to glob command
         return modelFileList

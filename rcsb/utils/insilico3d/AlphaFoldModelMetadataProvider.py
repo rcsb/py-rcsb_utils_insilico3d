@@ -1,10 +1,13 @@
 ##
-#  File:           AlphaFoldModelMetadataProvider.py
-#  Date:           12-Aug-2021 dwp
+# File:    AlphaFoldModelMetadataProvider.py
+# Author:  Dennis Piehl
+# Date:    23-Aug-2021
 #
-#  Updated:
+# Update:
+#
 #
 ##
+
 """
 Generators and accessors for Alpha Fold mmCIF model metadata.
 

@@ -1,8 +1,10 @@
 ##
-#  File:           SwissModelProvider.py
-#  Date:           20-Aug-2021 dwp
+# File:    SwissModelProvider.py
+# Author:  Dennis Piehl
+# Date:    23-Aug-2021
 #
-#  Updated:
+# Update:
+#
 #
 ##
 """
