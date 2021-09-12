@@ -12,6 +12,7 @@
 Generators and accessors for Alpha Fold mmCIF model metadata.
 
 """
+# pylint: disable=fixme
 
 import datetime
 import logging

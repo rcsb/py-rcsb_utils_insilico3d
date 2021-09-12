@@ -18,10 +18,12 @@ __email__ = "dennis.piehl@rcsb.org"
 __license__ = "Apache 2.0"
 
 import logging
+
 # import os
 
 from rcsb.utils.insilico3d.AlphaFoldModelProvider import AlphaFoldModelProvider
 from rcsb.utils.insilico3d.AlphaFoldModelMetadataProvider import AlphaFoldModelMetadataProvider
+
 # from rcsb.utils.config.ConfigUtil import ConfigUtil
 
 # HERE = os.path.abspath(os.path.dirname(__file__))
@@ -48,7 +50,10 @@ class AlphaFoldModelWorkflow(object):
         # logger.info("Configuration file path %s", self.__configPath)
         self.__tiP = AlphaFoldModelMetadataProvider(
             # self.__cachePath,
-            useCache=self.__useCache, speciesModelDir=self.__speciesModelDir, numProc=self.__numProc, chunkSize=self.__chunkSize
+            useCache=self.__useCache,
+            speciesModelDir=self.__speciesModelDir,
+            numProc=self.__numProc,
+            chunkSize=self.__chunkSize,
         )
 
     def update(self, incremental=True):
