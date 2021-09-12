@@ -13,14 +13,13 @@ Generators and accessors for Alpha Fold mmCIF model metadata.
 
 """
 
+import datetime
 import logging
 import os.path
 import time
-import datetime
 
 from rcsb.utils.insilico3d import __version__
 from rcsb.utils.insilico3d.AlphaFoldModelProvider import AlphaFoldModelProvider
-# from rcsb.utils.dictionary.DictMethodCommonUtils import DictMethodCommonUtils, LigandTargetInstance
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.StashableBase import StashableBase
 from rcsb.utils.multiproc.MultiProcUtil import MultiProcUtil
@@ -35,7 +34,7 @@ class AlphaFoldModelMetadataWorker(object):
 
     def __init__(self, **kwargs):
         self.__aFMP = AlphaFoldModelProvider()  # Is this the proper place/way to initialize this class? Or initialize in AlphaFoldModelMetadataProvider class below only?
-        self.__dirPath = self.__aFMP.__dirPath
+        self.__dirPath = self.__aFMP.getCacheDirPath()
         _ = kwargs
         # self.__commonU = DictMethodCommonUtils()
 
@@ -60,6 +59,7 @@ class AlphaFoldModelMetadataWorker(object):
             diagList (list): list of unique diagnostics
         """
         _ = workingDir
+        _ = optionsD
         successList = []
         failList = []
         retList = []
@@ -102,8 +102,16 @@ class AlphaFoldModelMetadataWorker(object):
 
         rD = {}
         catNameList = [
-            "entry", "af_target_ref_db_details", "ma_target_ref_db_details", "entity", "entity_poly", "ma_qa_metric_global",
-            "ma_qa_metric_local", "pdbx_audit_revision_details", "pdbx_audit_revision_history"]
+            "entry",
+            "af_target_ref_db_details",
+            "ma_target_ref_db_details",
+            "entity",
+            "entity_poly",
+            "ma_qa_metric_global",
+            "ma_qa_metric_local",
+            "pdbx_audit_revision_details",
+            "pdbx_audit_revision_history",
+        ]
 
         try:
             modelObj = self.__mU.doImport(modelFile, fmt="mmcif")
@@ -151,7 +159,7 @@ class AlphaFoldModelMetadataProvider(StashableBase):
             if cachePath:
                 self.__cachePath = cachePath
             else:
-                self.__cachePath = self.__aFMP.__dirPath
+                self.__cachePath = self.__aFMP.getCacheDirPath()
 
             self.__dirPath = self.__speciesModelDir
 
@@ -234,6 +242,9 @@ class AlphaFoldModelMetadataProvider(StashableBase):
         pth = os.path.join(self.__dirPath, self.__speciesName + "-model-metadata." + ext)
         return pth
 
+    def getEntries(self):
+        return []
+
     def __extractAlphaFoldMetadata(self, numProc=2, chunkSize=10, updateOnly=False):
         """Prepare multiprocessor queue and workers for extracting metadata for all AlphaFold mmCIF model files.
         Called by generate() method -> __extractAlphaFoldMetadata() -> Specifies use of workerMethod="extractMmCifMetadata()"
@@ -280,8 +291,8 @@ class AlphaFoldModelMetadataProvider(StashableBase):
     def convert(self, fmt1="json", fmt2="pickle"):
         #
         targetFilePath = self.__getTargetFilePath(fmt=fmt1)
-        self.__neighborD = self.__mU.doImport(targetFilePath, fmt=fmt1)
+        neighborD = self.__mU.doImport(targetFilePath, fmt=fmt1)
         #
         targetFilePath = self.__getTargetFilePath(fmt=fmt2)
-        ok = self.__mU.doExport(targetFilePath, self.__neighborD, fmt=fmt2, pickleProtocol=4)
+        ok = self.__mU.doExport(targetFilePath, neighborD, fmt=fmt2, pickleProtocol=4)
         return ok

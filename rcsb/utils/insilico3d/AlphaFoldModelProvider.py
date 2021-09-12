@@ -46,6 +46,9 @@ class AlphaFoldModelProvider:
         else:
             return False
 
+    def getCacheDirPath(self):
+        return self.__dirPath
+
     def __reload(self, **kwargs):
         """Reload cached list of species-specific AlphaFold model data files and check FTP server for updated data sets,
         or re-download latest versions of all species-specific model data sets from FTP server.
