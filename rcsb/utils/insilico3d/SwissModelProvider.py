@@ -13,16 +13,13 @@ Accessors for SWISS-MODEL 3D Models (PDB).
 """
 
 import datetime
+import glob
 import logging
 import os.path
 import time
-from pathlib import Path
-# import copy
-import glob
 
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
-from rcsb.utils.io.FtpUtil import FtpUtil
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +76,7 @@ class SwissModelProvider:
                 "Mycobacterium tuberculosis": "83332",
                 "Pseudomonas aeruginosa": "208964",
                 "Staphylococcus aureus": "93061",
-                "Plasmodium falciparum": "36329"
+                "Plasmodium falciparum": "36329",
             }
             ok = False
             fU = FileUtil()
@@ -95,8 +92,8 @@ class SwissModelProvider:
                 logger.info("Checking consistency of cached data with data available on FTP")
                 for species in swissModelSpeciesDataIdDict:
                     try:
-                        speciesCoordFile = swissModelSpeciesDataIdDict[species]+"_coords.tar.gz"
-                        speciesCoordFilePath = os.path.join(swissModelBaseUrl, swissModelSpeciesDataIdDict[species]+"_coords.tar.gz")
+                        speciesCoordFile = swissModelSpeciesDataIdDict[species] + "_coords.tar.gz"
+                        speciesCoordFilePath = os.path.join(swissModelBaseUrl, swissModelSpeciesDataIdDict[species] + "_coords.tar.gz")
                         speciesFileSize = int(fU.size(speciesCoordFile))
                         cacheSpeciesFile = oD[speciesCoordFile]["archive_file_path"]
                         cacheSpeciesFileExists = os.path.exists(cacheSpeciesFile)
@@ -117,9 +114,9 @@ class SwissModelProvider:
                     try:
                         # sD = copy.deepcopy(speciesData)
                         speciesId = swissModelSpeciesDataIdDict[species]
-                        speciesCoordFile = speciesId+"_coords.tar.gz"
+                        speciesCoordFile = speciesId + "_coords.tar.gz"
                         speciesCoordFilePath = os.path.join(swissModelBaseUrl, speciesCoordFile)
-                        speciesDataDumpDir = os.path.join(self.__dirPath, species.replace(" ", "_")+"_"+speciesId)
+                        speciesDataDumpDir = os.path.join(self.__dirPath, species.replace(" ", "_") + "_" + speciesId)
                         fU.mkdir(speciesDataDumpDir)
                         sD = {"species": species, "id": speciesId, "data_directory": speciesDataDumpDir, "archive_file_path": speciesCoordFilePath}
 

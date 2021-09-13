@@ -1,2 +1,3 @@
 # RCSB_UTILS_INSILICO3D HISTORY
    2-Aug-2021  - V0.10 Created module
+  12-Sep-2021  - V0.11 Updates for CI pipeline

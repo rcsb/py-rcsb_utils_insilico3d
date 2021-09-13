@@ -46,6 +46,9 @@ class AlphaFoldModelProvider:
         else:
             return False
 
+    def getCacheDirPath(self):
+        return self.__dirPath
+
     def __reload(self, **kwargs):
         """Reload cached list of species-specific AlphaFold model data files and check FTP server for updated data sets,
         or re-download latest versions of all species-specific model data sets from FTP server.
@@ -91,7 +94,7 @@ class AlphaFoldModelProvider:
                         speciesFileSize = int(speciesData["size_bytes"])
                         speciesNumModels = int(speciesData["num_predicted_structures"])
                         # If a specific list of species files was requested, only check those (i.e., skip over any that weren't requested)
-                        if (alphaFoldRequestedSpeciesFileList and speciesFile not in alphaFoldRequestedSpeciesFileList):
+                        if alphaFoldRequestedSpeciesFileList and speciesFile not in alphaFoldRequestedSpeciesFileList:
                             logger.info("Skipping species file not specifically requested in provided arguments: %s", speciesFile)
                             continue
                         if speciesFile not in cacheSpeciesFileList:
@@ -109,7 +112,10 @@ class AlphaFoldModelProvider:
                         if cacheSpeciesNumModels != speciesNumModels:
                             logger.warning(
                                 "Missing some or all of the bundled model files for species archive %s as available on FTP server (found %d / %d model files)",
-                                speciesFile, cacheSpeciesNumModels, speciesNumModels)
+                                speciesFile,
+                                cacheSpeciesNumModels,
+                                speciesNumModels,
+                            )
                     except Exception as e:
                         logger.exception("Failing on checking of cache data for %s from FTP server, with message:\n%s", speciesData["archive_name"], str(e))
 
@@ -123,12 +129,12 @@ class AlphaFoldModelProvider:
                         speciesFile = speciesData["archive_name"]
 
                         # If a specific list of species files was requested, only check those (i.e., skip over any that weren't requested)
-                        if (alphaFoldRequestedSpeciesFileList and speciesFile not in alphaFoldRequestedSpeciesFileList):
+                        if alphaFoldRequestedSpeciesFileList and speciesFile not in alphaFoldRequestedSpeciesFileList:
                             logger.info("Skipping species file not specifically requested in provided arguments: %s", speciesFile)
                             continue
 
                         speciesFilePath = os.path.join(alphaFoldFtpDataPath, speciesFile)
-                        speciesDataDumpDir = os.path.join(self.__dirPath, speciesFile.split('.')[0])
+                        speciesDataDumpDir = os.path.join(self.__dirPath, speciesFile.split(".")[0])
                         fU.mkdir(speciesDataDumpDir)
                         speciesFileDumpPath = os.path.join(speciesDataDumpDir, speciesFile)
 
@@ -146,6 +152,7 @@ class AlphaFoldModelProvider:
 
                         if ok:
                             cacheD["data"].update({speciesFile: sD})
+                            fU.remove(speciesFileDumpPath)
 
                     except Exception as e:
                         logger.exception("Failing on fetching and expansion of file %s from FTP server, with message:\n%s", speciesData["archive_name"], str(e))
