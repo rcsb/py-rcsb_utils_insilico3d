@@ -100,13 +100,14 @@ class AlphaFoldModelProvider:
                         if speciesFile not in cacheSpeciesFileList:
                             logger.error("Species archive data file %s on FTP server not found in local cache.", speciesFile)
                             continue
-                        cacheSpeciesFile = oD[speciesFile]["archive_file_path"]
+                        # cacheSpeciesFile = oD[speciesFile]["archive_file_path"]
                         cacheSpeciesDir = oD[speciesFile]["data_directory"]
-                        cacheSpeciesFileExists = os.path.exists(cacheSpeciesFile)
-                        cacheSpeciesFileSize = os.path.getsize(cacheSpeciesFile)
-                        cacheSpeciesNumModels = len([f for f in os.listdir(cacheSpeciesDir) if f.endswith(".cif.gz")])
-                        if not cacheSpeciesFileExists:
-                            logger.warning("Species archive data file %s not found at cached path %s", speciesFile, cacheSpeciesFile)
+                        cacheSpeciesDirExists = os.path.exists(cacheSpeciesDir)
+                        cacheSpeciesFileSize = oD[speciesFile]["size_bytes"]
+                        cacheSpeciesNumModels = oD[speciesFile]["num_predicted_structures"]
+                        # cacheSpeciesNumModels = len([f for f in os.listdir(cacheSpeciesDir) if f.endswith(".cif.gz")])
+                        if not cacheSpeciesDirExists:
+                            logger.warning("Species archive data directory for %s not found at cached path %s", speciesFile, cacheSpeciesDir)
                         if cacheSpeciesFileSize != speciesFileSize:
                             logger.warning("Species archive data file %s not up-to-date with file available on FTP server.", speciesFile)
                         if cacheSpeciesNumModels != speciesNumModels:
@@ -207,28 +208,3 @@ class AlphaFoldModelProvider:
 
     def getSpeciesDataCacheFilePath(self):
         return self.__speciesDataCacheFile
-
-    # def hasFeature(self, modelId):
-    #     return modelId in self.__oD
-
-    # def getFeature(self, modelId, featureKey):
-    #     try:
-    #         return self.__oD[modelId][featureKey]
-    #     except Exception:
-    #         return None
-
-    # def __parseAlphaFoldModelData(self, filePath):
-    #     """Parse AlphaFold model mmCIF file
-
-    #     Args:
-    #         filePath (str): mmCIF model data file
-
-    #     Returns:
-    #         (dict, string): AlphaFold model data dictionary, model version string
-    #     """
-    #     try:
-    #         oD = {}
-    #         version = None
-    #     except Exception as e:
-    #         logger.exception("Failing with %s", str(e))
-    #     return True
