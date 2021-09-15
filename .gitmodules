@@ -1,0 +1,3 @@
+[submodule "rcsb/utils/modbase_utils"]
+	path = rcsb/utils/modbase_utils
+	url = https://github.com/rcsb/modbase_utils.git
