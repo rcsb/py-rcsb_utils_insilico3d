@@ -5,7 +5,9 @@
 #
 # Update:
 #
-#
+# To do:
+# - For cache json file, use the species names as keys, not the tar file name
+# - Use .items() for iterating over dicts
 ##
 """
 Accessors for SWISS-MODEL 3D Models (PDB).
@@ -44,8 +46,8 @@ class SwissModelProvider:
             return False
 
     def __reload(self, **kwargs):
-        """Reload cached list of species-specific SWISS-MODEL model data files and check FTP server for updated data sets,
-        or re-download latest versions of all species-specific model data sets from FTP server.
+        """Reload cached list of species-specific SWISS-MODEL model data files and check server for updated data sets,
+        or re-download latest versions of all species-specific model data sets from server.
 
         Returns:
             oD (dict): dictionary of cached/downloaded species model data sets with general metadata about each data set (local data path, size, # files, ...)
@@ -89,12 +91,12 @@ class SwissModelProvider:
                 createdDate = cacheD["created"]
                 oD = cacheD["data"]
 
-                logger.info("Checking consistency of cached data with data available on FTP")
+                logger.info("Checking consistency of cached data with data available on server")
                 for species in swissModelSpeciesDataIdDict:
                     try:
                         speciesCoordFile = swissModelSpeciesDataIdDict[species] + "_coords.tar.gz"
-                        speciesCoordFilePath = os.path.join(swissModelBaseUrl, swissModelSpeciesDataIdDict[species] + "_coords.tar.gz")
-                        speciesFileSize = int(fU.size(speciesCoordFile))
+                        speciesCoordFilePath = os.path.join(swissModelBaseUrl, speciesCoordFile)
+                        speciesFileSize = int(fU.size(speciesCoordFilePath))
                         cacheSpeciesFile = oD[speciesCoordFile]["archive_file_path"]
                         cacheSpeciesFileExists = os.path.exists(cacheSpeciesFile)
                         cacheSpeciesFileSize = os.path.getsize(cacheSpeciesFile)
@@ -107,7 +109,7 @@ class SwissModelProvider:
                         logger.exception("Failing with %s", str(e))
 
             else:
-                logger.info("Refetching all up-to-date files over HTTP.")
+                logger.info("Refetching all files from server.")
                 cacheD = {}
                 cacheD.update({"created": startDateTime, "data": {}})
                 for species in swissModelSpeciesDataIdDict:
@@ -169,8 +171,11 @@ class SwissModelProvider:
         modelFileList = []
 
         for modelDir in inputPathList:
-            pdbModels = glob.glob(os.path.join(modelDir, "*.pdb"))
-            modelFileList += pdbModels
+            try:
+                modelFiles = glob.glob(os.path.join(modelDir, "*.pdb"))
+                modelFileList += modelFiles
+            except Exception as e:
+                logger.exception("Failing with %s", str(e))
 
         # Add: Return as list of ABSOLUTE paths, not just relative to glob command
         return modelFileList
@@ -183,15 +188,6 @@ class SwissModelProvider:
 
     def getSpeciesDataCacheFilePath(self):
         return self.__speciesDataCacheFile
-
-    # def hasFeature(self, modelId):
-    #     return modelId in self.__oD
-
-    # def getFeature(self, modelId, featureKey):
-    #     try:
-    #         return self.__oD[modelId][featureKey]
-    #     except Exception:
-    #         return None
 
     # def __parseSwissModelData(self, filePath):
     #     """Parse SWISS-MODEL model PDB file

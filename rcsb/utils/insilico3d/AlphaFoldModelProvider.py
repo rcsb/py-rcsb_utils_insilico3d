@@ -6,6 +6,9 @@
 # Update:
 #
 #
+# To do:
+# - For cache json file, use the species names as keys, not the tar file name
+# - Use .items() for iterating over dicts
 ##
 """
 Accessors for AlphaFold 3D Models (mmCIF).
@@ -100,12 +103,10 @@ class AlphaFoldModelProvider:
                         if speciesFile not in cacheSpeciesFileList:
                             logger.error("Species archive data file %s on FTP server not found in local cache.", speciesFile)
                             continue
-                        # cacheSpeciesFile = oD[speciesFile]["archive_file_path"]
                         cacheSpeciesDir = oD[speciesFile]["data_directory"]
                         cacheSpeciesDirExists = os.path.exists(cacheSpeciesDir)
                         cacheSpeciesFileSize = oD[speciesFile]["size_bytes"]
                         cacheSpeciesNumModels = oD[speciesFile]["num_predicted_structures"]
-                        # cacheSpeciesNumModels = len([f for f in os.listdir(cacheSpeciesDir) if f.endswith(".cif.gz")])
                         if not cacheSpeciesDirExists:
                             logger.warning("Species archive data directory for %s not found at cached path %s", speciesFile, cacheSpeciesDir)
                         if cacheSpeciesFileSize != speciesFileSize:
@@ -121,7 +122,7 @@ class AlphaFoldModelProvider:
                         logger.exception("Failing on checking of cache data for %s from FTP server, with message:\n%s", speciesData["archive_name"], str(e))
 
             else:
-                logger.info("Refetching all up-to-date files from FTP server.")
+                logger.info("Refetching all files from server.")
                 cacheD = {}
                 cacheD.update({"created": startDateTime, "data": {}})
                 for speciesData in lDL:
@@ -182,7 +183,7 @@ class AlphaFoldModelProvider:
                                   thus, it's recommended to provide a list of specific species directory to break the returned model list down into more manageable parts.
 
         Returns:
-            (list): list of model mmCIF file paths (only matches ".cif.gz" files)
+            (list): list of model mmCIF file paths (only matches compressed ".cif.gz" files, to ensure only one file per model)
         """
 
         if not inputPathList:
@@ -192,7 +193,7 @@ class AlphaFoldModelProvider:
 
         for modelDir in inputPathList:
             try:
-                mmCifModels = glob.glob(os.path.join(modelDir, "*.cif.gz"))  # + glob.glob(os.path.join(modelDir, "*.cif")) # ONLY MATCH .GZ FILES TO ENSURE ONLY ONE FILE PER MODEL
+                mmCifModels = glob.glob(os.path.join(modelDir, "*.cif.gz"))
                 modelFileList += mmCifModels
             except Exception as e:
                 logger.exception("Failing with %s", str(e))
