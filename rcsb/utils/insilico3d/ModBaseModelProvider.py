@@ -192,6 +192,8 @@ class ModBaseModelProvider:
             (list): list of absolute model file paths (only matches "*.pdb.xz" files)
         """
 
+        modelFileList = []
+
         if speciesDataDir:
             try:
                 modelFiles = glob.glob(os.path.join(speciesDataDir, "model", "*.pdb.xz"))

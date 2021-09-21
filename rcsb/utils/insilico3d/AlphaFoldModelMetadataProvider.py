@@ -289,11 +289,11 @@ class AlphaFoldModelMetadataProvider(StashableBase):
         logger.info("Completed with multi-proc status %r failures %r total entries with data (%d)", ok, len(failList), len(rD))
         return rD
 
-    def convert(self, fmt1="json", fmt2="pickle"):
-        #
-        targetFilePath = self.__getTargetFilePath(fmt=fmt1)
-        neighborD = self.__mU.doImport(targetFilePath, fmt=fmt1)
-        #
-        targetFilePath = self.__getTargetFilePath(fmt=fmt2)
-        ok = self.__mU.doExport(targetFilePath, neighborD, fmt=fmt2, pickleProtocol=4)
-        return ok
+    # def convert(self, fmt1="json", fmt2="pickle"):
+    #     #
+    #     targetFilePath = self.__getTargetFilePath(fmt=fmt1)
+    #     neighborD = self.__mU.doImport(targetFilePath, fmt=fmt1)
+    #     #
+    #     targetFilePath = self.__getTargetFilePath(fmt=fmt2)
+    #     ok = self.__mU.doExport(targetFilePath, neighborD, fmt=fmt2, pickleProtocol=4)
+    #     return ok
