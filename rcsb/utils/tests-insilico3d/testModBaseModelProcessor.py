@@ -35,7 +35,8 @@ from ModBaseModelProcessor import ModBaseModelProcessor
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
+# logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
 logger = logging.getLogger()
 
 
@@ -72,9 +73,9 @@ class ModBaseModelProcessorTests(unittest.TestCase):
             ok = True if len(speciesDirList) > 0 else False
             self.assertTrue(ok)
             speciesModelDir = speciesDirList[0]
-            speciesPdbModelFileList = mP.getSpeciesPdbModelFileList(speciesDataDir=speciesModelDir)[0:10]
-            print(speciesPdbModelFileList)
-            print(self.__cachePath)
+            speciesPdbModelFileList = mP.getSpeciesPdbModelFileList(speciesDataDir=speciesModelDir)[0:20]
+            # print(speciesPdbModelFileList)
+            # print(self.__cachePath)
             mPr = ModBaseModelProcessor(cachePath=self.__cachePath, useCache=False, numProc=2, fileLimit=self.__fileLimit,
                                         speciesModelDir=speciesModelDir, speciesPdbModelFileList=speciesPdbModelFileList)
             ok = mPr.generate(updateOnly=False)
