@@ -47,12 +47,12 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
     def testFetchAlphaFoldModels(self):
-        aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=False, alphaFoldRequestedSpeciesFileList=["UP000008816_93061_STAA8.tar"])
+        aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=False, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
         ok = aFMP.testCache()
         self.assertTrue(ok)
 
     def testReloadCache(self):
-        aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesFileList=["UP000008816_93061_STAA8.tar"])
+        aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
         speciesDirList = aFMP.getSpeciesDirList()
         ok = True if len(speciesDirList) > 0 else False
         self.assertTrue(ok)
