@@ -124,9 +124,9 @@ class ModBaseModelWorker(object):
             str: path to converted (and gzipped) mmCIF file if successful; otherwise None
         """
         try:
-            with open(pdbFile) as fh:
+            with open(pdbFile, "r", encoding="utf-8") as fh:
                 sF = modbase.read_pdb(fh)
-            with open(mmCifOutFile, "w") as fh:
+            with open(mmCifOutFile, "w", encoding="utf-8") as fh:
                 sF.write_mmcif(fh, alignmentFile)
             mmCifOutFileZ = mmCifOutFile + ".gz"
             ok = self.__fU.compress(inpPath=mmCifOutFile, outPath=mmCifOutFileZ)
