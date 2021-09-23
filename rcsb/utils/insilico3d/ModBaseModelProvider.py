@@ -12,6 +12,11 @@ Accessors for ModBase 3D Models (PDB).
 
 """
 
+__docformat__ = "google en"
+__author__ = "Dennis Piehl"
+__email__ = "dennis.piehl@rcsb.org"
+__license__ = "Apache 2.0"
+
 import datetime
 import logging
 import os.path

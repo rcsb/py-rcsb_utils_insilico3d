@@ -5,16 +5,24 @@
 #
 # Update:
 #
-#
+# - pylint: disable=fixme
+# - If conversion fails due to alignment file issue, try converting without alignment
+# - Review category names generated in CIF to use the same aa in AlphaFold models
+# - Add mkdssp calculation
+# - Add removal of downloaded and processed cache files when done testing
+# - Add check that converted files are consistent with mmCIF dictionaries
 ##
 
 """
 Processors for converting ModBase PDB models into mmCIF format.
 
 """
-# pylint: disable=fixme
 
-import datetime
+__docformat__ = "google en"
+__author__ = "Dennis Piehl"
+__email__ = "dennis.piehl@rcsb.org"
+__license__ = "Apache 2.0"
+
 import logging
 import os.path
 import time
@@ -23,17 +31,15 @@ import collections
 # from rcsb.utils.insilico3d import __version__
 # import rcsb.utils.modbase_utils.modbase_pdb_to_cif as modbase
 import modbase_pdb_to_cif as modbase
-# from ModBaseModelProvider import ModBaseModelProvider
 
-# from rcsb.utils.insilico3d.ModBaseModelProvider import ModBaseModelProvider
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FileUtil import FileUtil
-from rcsb.utils.io.StashableBase import StashableBase
 from rcsb.utils.multiproc.MultiProcUtil import MultiProcUtil
 
 logger = logging.getLogger(__name__)
 
 ModBaseEntry = collections.namedtuple("ModBaseEntry", ["name", "model", "alignment"])
+
 
 class ModBaseModelWorker(object):
     """A skeleton class that implements the interface expected by the multiprocessing
@@ -42,14 +48,15 @@ class ModBaseModelWorker(object):
 
     def __init__(self, **kwargs):
         _ = kwargs
-        self.__fU = FileUtil()
+        self.__workPath = kwargs.get("workPath", None)
+        self.__fU = FileUtil(workPath=self.__workPath)
 
     def convert(self, dataList, procName, optionsD, workingDir):
         """Enumerate ModBase PDB model files for conversion to mmCIF.
 
         Args:
             dataList (list): list of model (and alignment) files to convert, each stored as a dict
-            procName (str): worker process name (?)
+            procName (str): worker process name
             optionsD (dict): dictionary of additional options that worker can access
             workingDir (str): path to working directory
 
@@ -68,40 +75,31 @@ class ModBaseModelWorker(object):
         try:
             for modelE in dataList:
                 convertedCifFileZ = None
+                alignmentFileUsed = None
+                # calculatedDssp = False
                 modelNameRoot, pdbFileZ, alignFileZ = modelE.name, modelE.model, modelE.alignment
-                # fnRoot = self.__fU.getFileName(pdbFileZ).split(".pdb")[0]
-                # print('\n',modelNameRoot,'\n')
                 # First unzip pdb and alignmet files
                 pF = self.__fU.uncompress(pdbFileZ, outputDir=workingDir)
                 aF = self.__fU.uncompress(alignFileZ, outputDir=workingDir)
                 if pF.endswith(".pdb") and aF.endswith(".xml"):
-                    # fnRoot = self.__fU.getFileName(pF).split(".pdb")[0]
-                    # print('\n',fnRoot,'\n')
                     cF = os.path.join(workingDir, modelNameRoot + ".cif")
-
-                    # Then perform conversion
-                    # ok = self.__convertPdbToCif(procName=procName, pdbFile=pF, alignmentFile=aF, mmCifOutFile=cF)
-                    try:
-                        with open(pF) as fh:
-                            sF = modbase.read_pdb(fh)
-                        with open(cF, "w") as fh:
-                            sF.write_mmcif(fh, aF)
-                        # retList.append((modelE, True))
-                        # Next zip the cif file
-                        cifFileZ = cF + ".gz"
-                        ok = self.__fU.compress(inpPath=cF, outPath=cifFileZ)
-                        if ok:
+                    # Then attempt the conversion with alignment
+                    convertedCifFileZ = self.__convertPdbToCif(procName=procName, pdbFile=pF, alignmentFile=aF, mmCifOutFile=cF)
+                    if convertedCifFileZ:
+                        alignmentFileUsed = alignFileZ
+                        successList.append(modelE)
+                    else:
+                        # If fails, attempt the conversion without alignment
+                        convertedCifFileZ = self.__convertPdbToCif(procName=procName, pdbFile=pF, alignmentFile=None, mmCifOutFile=cF)
+                        if convertedCifFileZ:
                             successList.append(modelE)
-                            convertedCifFileZ = cifFileZ
-                    except Exception as e:
-                        logger.exception("Failing for data items %s, with %s", modelE, str(e))
 
+                    print('\n', convertedCifFileZ, alignmentFileUsed)
                     # Last remove the unzipped pdb, alignment and cif files
-                    ok = self.__fU.remove(pF)
-                    ok = self.__fU.remove(aF)
-                    ok = self.__fU.remove(cF)
-
-                retList.append((modelE, convertedCifFileZ))
+                    self.__fU.remove(pF)
+                    self.__fU.remove(aF)
+                    self.__fU.remove(cF)
+                retList.append((modelE, convertedCifFileZ, alignmentFileUsed))
 
             failList = sorted(set(dataList) - set(successList))
             if failList:
@@ -117,23 +115,28 @@ class ModBaseModelWorker(object):
         """Internal method to convert a ModBase PDB file to mmCIF format, using the alignment information.
 
         Args:
-            procName (str): worker process name (?)
+            procName (str): worker process name
             pdbFile (str): path to PDB model file to convert
             alignmentFile (str): path to ModBase alignment file for the corresponding model file
             mmCifOutFile (str): path to which to write mmCIF model file
 
         Returns:
-            bool: True for success or False otherwise
+            str: path to converted (and gzipped) mmCIF file if successful; otherwise None
+            
+            # bool: True if alignment file was used; False if converted without alignment
         """
         try:
             with open(pdbFile) as fh:
                 sF = modbase.read_pdb(fh)
             with open(mmCifOutFile, "w") as fh:
                 sF.write_mmcif(fh, alignmentFile)
-            return True
+            mmCifOutFileZ = mmCifOutFile + ".gz"
+            ok = self.__fU.compress(inpPath=mmCifOutFile, outPath=mmCifOutFileZ)
+            if ok:
+                return mmCifOutFileZ
         except Exception as e:
-            logger.exception("%s failing on file %s with %s", procName, pdbFile, str(e))
-            return False
+            # logger.exception("%s failing on PDB file %s and alignment file %s, with %s", procName, pdbFile, alignmentFile, str(e))
+            logger.debug("%s failing on PDB file %s and alignment file %s, with %s", procName, pdbFile, alignmentFile, str(e))
 
 
 class ModBaseModelProcessor(object):
@@ -141,32 +144,23 @@ class ModBaseModelProcessor(object):
 
     def __init__(self, cachePath=None, useCache=False, speciesModelDir=None, speciesPdbModelFileList=None, **kwargs):
         try:
-            # self.__version = __version__
             self.__version = "0.12"
+            # self.__version = __version__
             self.__numProc = kwargs.get("numProc", 2)
             self.__chunkSize = kwargs.get("chunkSize", 10)
-
+            
             self.__speciesModelDir = speciesModelDir
             self.__speciesName = self.__speciesModelDir.split("/")[-1]
-
-            self.__cachePath = cachePath
-            # print("modBaseModelProcessor__cachePath", self.__cachePath)
-
-            # print("modBaseModelProcessor__speciesModelDir", self.__speciesModelDir)
             self.__speciesPdbModelFileList = speciesPdbModelFileList if speciesPdbModelFileList else []
 
-            # This was commented out in previous exmaple usage
-            # useCache = kwargs.get("useCache", True)
+            self.__cachePath = cachePath if cachePath else self.__getModelCachePath()
 
-            #  - Configuration for stash services -
-            #    Local target directory name to be stashed.  (subdir of dirPath)
             self.__mU = MarshalUtil(workPath=self.__speciesModelDir)
             self.__fU = FileUtil(workPath=self.__speciesModelDir)
             
-            ok = self.reload(fmt="pickle", useCache=useCache)
+            self.__modelD = self.__reload(fmt="pickle", useCache=useCache)
 
         except Exception as e:
-            # May occur if 'speciesModelDir' is not specified in instantiation
             logger.exception("Failing with %s", str(e))
 
     def testCache(self, minCount=1):
@@ -180,7 +174,7 @@ class ModBaseModelProcessor(object):
             pass
         return False
 
-    def getEntries(self):
+    def getModelsCif(self):
         """Return a list of model root names for which models that have been successfully converted to mmCIF.
 
         Returns:
@@ -213,7 +207,7 @@ class ModBaseModelProcessor(object):
                 "species": self.__speciesName,
                 "speciesModelDir": self.__speciesModelDir,
                 "modelsCif": mD,
-                "modelFailed": failD,
+                "modelsFailed": failD,
                 }
             kwargs = {"indent": indent} if fmt == "json" else {"pickleProtocol": 4}
             modelCachePath = self.__getModelCachePath(fmt=fmt)
@@ -237,21 +231,18 @@ class ModBaseModelProcessor(object):
             #
             if useCache and self.__mU.exists(modelCachePath):
                 modelD = self.__mU.doImport(modelCachePath, fmt=fmt)
-                # if fmt != "pickle":
-                #     for _, cD in modelD["modelsCif"].items():
-                #         cD["nearestNeighbors"] = [LigandTargetInstance(*neighbor) for neighbor in nD["nearestNeighbors"]]
         except Exception as e:
             logger.exception("Failing with %s", str(e))
         #
         return modelD
 
+    def getCachePath(self):
+        return self.__cachePath
+
     def __getModelCachePath(self, fmt="pickle"):
         ext = "pic" if fmt == "pickle" else "json"
         pth = os.path.join(self.__speciesModelDir, self.__speciesName + "-model-data." + ext)
         return pth
-
-    # def getEntries(self):
-    #     return []
 
     def __convertModBasePdb(self, numProc=2, chunkSize=10, updateOnly=False):
         """Prepare multiprocessor queue and workers for converting all ModBase PDB model files to mmCIF, using alignment files.
@@ -262,21 +253,19 @@ class ModBaseModelProcessor(object):
             updateOnly (bool): only convert new or previously-failed models.  Defaults to False.
 
         Returns:
-            (dict): dictionary of successfully-converted mmCIF models, in the following structure:
-                    {modelNameRoot: pathToGzippedCifFile, ...}
-            (dict): dictionary of ModBase models for which conversion failed, in the following structure:
-                    {modelNameRoot: {"model": pathToCompressedPDBModelFile, "alignment": pathToCompressedAlignmentFile}, ...}
+            mD (dict): dictionary of successfully-converted mmCIF models, in the following structure:
+                       {modelNameRoot: {"model": pathToGzippedCifFile, "alignment": pathToCompressedAlignmentFile}, ...}
+            failD (dict): dictionary of ModBase models for which conversion failed, in the following structure:
+                          {modelNameRoot: {"model": pathToCompressedPDBModelFile, "alignment": pathToCompressedAlignmentFile}, ...}
         """
-        # updateDate = datetime.datetime.now().isoformat()
         mD = {}
         failD = {}
         exD = {}
-        # fU = FileUtil()
         #
         # updateOnly - will reuse any existing data loaded when this is instantiated
         #              otherwise the cache context is cleared before the calculation.
         if updateOnly:
-            exD = {k: True for k in self.getEntries()}
+            exD = {k: True for k in self.getModelsCif()}
             logger.info("Reusing (%d) already converted mmCIF models", len(exD))
             mD = self.__modelD["modelsCif"] if "modelsCif" in self.__modelD else {}
         #
@@ -291,32 +280,28 @@ class ModBaseModelProcessor(object):
 
         logger.info("Starting with %d models, numProc %d, updateOnly (%r)", len(modelList), self.__numProc, updateOnly)
         #
-        rWorker = ModBaseModelWorker()
+        rWorker = ModBaseModelWorker(workPath=self.__speciesModelDir)
         mpu = MultiProcUtil(verbose=True)
-        # optD = {"updateDate": updateDate}  # Not needed, unless storing cache...
-        # mpu.setOptions(optD)  # Not needed, unless storing cache...
         mpu.set(workerObj=rWorker, workerMethod="convert")
         mpu.setWorkingDir(workingDir=self.__speciesModelDir)
         ok, failList, resultList, _ = mpu.runMulti(dataList=modelList, numProc=numProc, numResults=1, chunkSize=chunkSize)
-        # The resultList from above is a list of lists (# of sublists determined by numResults, and the return statement in convert method above)
         if failList:
             logger.info("mmCIF conversion failures (%d): %r", len(failList), failList)
         #
-        for (model, convertedCifFileZ) in resultList[0]:
+        for (model, convertedCifFileZ, alignmentFileUsed) in resultList[0]:
             if convertedCifFileZ:
-                mD[model.name] = convertedCifFileZ
+                mD[model.name] = {"model": convertedCifFileZ, "alignment": alignmentFileUsed}
             else:
                 failD[model.name] = {"model": model.model, "alignment": model.alignment}
-            # mD[(entry.model, entry.alignment)] = eResult
         #
         logger.info("Completed with multi-proc status %r, failures %r, total models with data (%d)", ok, len(failList), len(mD))
-        # print("\n\nSUCCESSES")
-        # for k,v in mD.items():
-        #     print(k,'\t', v)
-        # print("\n\nFAILURES")
-        # for k,v in failD.items():
-        #     print(k,'\n\t', v)
-        # for i in failList:
-        #     print(i)
         return mD, failD
 
+    def convertJsonPickle(self, fmt1="json", fmt2="pickle"):
+        # Keep method name as "convertJsonPickle" instead of "convert", to avoid complications from using the other "convert" for MPU method above
+        modelCachePath = self.__getModelCachePath(fmt=fmt1)
+        self.__modelD = self.__mU.doImport(modelCachePath, fmt=fmt1)
+        #
+        modelCachePath = self.__getModelCachePath(fmt=fmt2)
+        ok = self.__mU.doExport(modelCachePath, self.__modelD, fmt=fmt2, pickleProtocol=4)
+        return ok

@@ -30,13 +30,10 @@ from ModBaseModelProcessor import ModBaseModelProcessor
 # from rcsb.utils.insilico3d.ModBaseModelProvider import ModBaseModelProvider
 # from rcsb.utils.insilico3d.ModBaseModelProcessor import ModBaseModelProcessor
 
-# from rcsb.utils.config.ConfigUtil import ConfigUtil
-
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 
-# logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
 logger = logging.getLogger()
 
 
@@ -45,15 +42,9 @@ class ModBaseModelProcessorTests(unittest.TestCase):
     buildTestingCache = True
 
     def setUp(self):
-        # mockTopPath = os.path.join(TOPDIR, "rcsb", "mock-data")
         self.__cachePath = os.path.join(HERE, "test-output", "CACHE")
-        # configPath = os.path.join(mockTopPath, "config", "dbload-setup-example.yml")
-        # self.__configName = "site_info_configuration"
         self.__startTime = time.time()
         logger.info("Starting %s at %s", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()))
-        self.__fileLimit = None if platform.system() == "Darwin" else 5
-        #
-        # self.__cfgOb = ConfigUtil(configPath=configPath, defaultSectionName=self.__configName, mockTopPath=mockTopPath)
 
     def tearDown(self):
         unitS = "MB" if platform.system() == "Darwin" else "GB"
@@ -74,40 +65,24 @@ class ModBaseModelProcessorTests(unittest.TestCase):
             self.assertTrue(ok)
             speciesModelDir = speciesDirList[0]
             speciesPdbModelFileList = mP.getSpeciesPdbModelFileList(speciesDataDir=speciesModelDir)[0:20]
-            # print(speciesPdbModelFileList)
-            # print(self.__cachePath)
-            mPr = ModBaseModelProcessor(cachePath=self.__cachePath, useCache=False, numProc=2, fileLimit=self.__fileLimit,
-                                        speciesModelDir=speciesModelDir, speciesPdbModelFileList=speciesPdbModelFileList)
+            mPr = ModBaseModelProcessor(useCache=False, numProc=2, speciesModelDir=speciesModelDir, speciesPdbModelFileList=speciesPdbModelFileList)
             ok = mPr.generate(updateOnly=False)
-            # self.assertTrue(ok)
-            # ok = mPr.generate(updateOnly=True)
-            # self.assertTrue(ok)
-            # ok = mPr.reload()
-            # self.assertTrue(ok)
-            # ok = mPr.testCache(minCount=self.__fileLimit if self.__fileLimit else 30)
-            # self.assertTrue(ok)
+            self.assertTrue(ok)
+            ok = mPr.generate(updateOnly=True)
+            self.assertTrue(ok)
+            ok = mPr.reload()
+            self.assertTrue(ok)
+            ok = mPr.testCache(minCount=10)
+            self.assertTrue(ok)
             #
-            # mPr = ModBaseModelProcessor(self.__cachePath, useCache=True, cfgOb=self.__cfgOb, configName=self.__configName, numProc=2)
-            # ok = mPr.testCache(minCount=self.__fileLimit if self.__fileLimit else 30)
-            # self.assertTrue(ok)
+            processedModelCachePath = mPr.getCachePath()
+            mPr = ModBaseModelProcessor(cachePath=processedModelCachePath, useCache=True, numProc=2,
+                                        speciesModelDir=speciesModelDir, speciesPdbModelFileList=speciesPdbModelFileList)
+            ok = mPr.testCache(minCount=10)
+            self.assertTrue(ok)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
             self.fail()
-
-    # @unittest.skipIf(skipFlag, "Long test")
-    # def testStashRemote(self):
-    #     try:
-    #         mPr = ModBaseModelProcessor(self.__cachePath, useCache=True, cfgOb=self.__cfgOb, configName=self.__configName, numProc=2, fileLimit=self.__fileLimit)
-    #         ok = mPr.testCache()
-    #         self.assertTrue(ok)
-    #         ok = mPr.restore(self.__cfgOb, self.__configName, remotePrefix=None, useGit=True, useStash=True)
-    #         self.assertTrue(ok)
-    #         ok = mPr.reload()
-    #         self.assertTrue(ok)
-    #         #
-    #     except Exception as e:
-    #         logger.exception("Failing with %s", str(e))
-    #         self.fail()
 
 
 def modelProcessorSuite():
