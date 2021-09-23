@@ -206,7 +206,7 @@ class ModBaseModelProcessor(object):
                 "speciesModelDir": self.__speciesModelDir,
                 "modelsCif": mD,
                 "modelsFailed": failD,
-                }
+            }
             kwargs = {"indent": indent} if fmt == "json" else {"pickleProtocol": 4}
             modelCachePath = self.__getModelCachePath(fmt=fmt)
             ok = self.__mU.doExport(modelCachePath, self.__modelD, fmt=fmt, **kwargs)
@@ -272,7 +272,7 @@ class ModBaseModelProcessor(object):
         for pFZ in pdbModelFileList:
             modelNameRoot = self.__fU.getFileName(pFZ).split(".pdb.xz")[0]
             if modelNameRoot not in mD:
-                aFZ = os.path.join(self.__speciesModelDir,  "alignment", modelNameRoot + ".ali.xml.xz")
+                aFZ = os.path.join(self.__speciesModelDir, "alignment", modelNameRoot + ".ali.xml.xz")
                 modelE = ModBaseEntry(name=modelNameRoot, model=pFZ, alignment=aFZ)
                 modelList.append(modelE)
 
