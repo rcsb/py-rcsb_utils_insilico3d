@@ -70,26 +70,23 @@ class ModBaseModelProvider:
             # Example URLs:
             #  https://salilab.org/modbase-download/projects/genomes/H_sapiens/2020/Homo_sapiens_2020.tar
             #  https://salilab.org/modbase-download/projects/genomes/H_sapiens/2020/Homo_sapiens_2020.summary.txt
-            #  https://salilab.org/modbase-download/projects/genomes/A_thaliana/2021/a_thaliana_2021.tar
-            #  https://salilab.org/modbase-download/projects/genomes/A_thaliana/2021/a_thaliana_2021.summary.txt
-            #  https://salilab.org/modbase-download/projects/genomes/S_aureus/2008/staph_aureus.tar
             modBaseSpeciesDataPathDict = kwargs.get("modBaseSpeciesDataPathDict", {
                 "Homo sapiens": "H_sapiens/2020/Homo_sapiens_2020.tar",
-                # "Homo sapiens": {
+                "Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar",
+                "Panicum virgatum": "P_virgatum/2021/p_virgatum_2021.tar",
+                "Arabidopsis thaliana": "A_thaliana/2021/a_thaliana_2021.tar",
+                # "Saccharomyces cerevisiae": "S_cerevisiae/2017/s_cerevisiae_2017.tar",
+                # "Mus musculus": "M_musculus/2017/m_musculus_2017.tar",
+                # "Caenorhabditis elegans": "C_elegans/2017/c_elegans_2017.tar",
+                # "Escherichia coli": "E_coli/2016/e_coli_2016.tar",
+                # "Drosophila melanogaster": "D_melanogaster/2017/d_melanogaster_2017.tar",
+                # "Mycobacterium tuberculosis": "M_tuberculosis/2018/m_tuberculosis_2018.tar",
+                # "Pseudomonas aeruginosa": "P_aeruginosa/2017/p_aeruginosa_2017.tar",
+                # "Plasmodium falciparum": "P_falciparum/2015/Pfalciparum_2015.tar",
+                # ...many more available...
+                # "Alternative structure": {
                 #     "models": "H_sapiens/2020/Homo_sapiens_2020.tar",
                 #     "summary": "H_sapiens/2020/Homo_sapiens_2020.summary.txt"},
-                # "Mus musculus": "10090",
-                # "Caenorhabditis elegans": "6239",
-                # "Escherichia coli": "83333",
-                "Arabidopsis thaliana": "A_thaliana/2021/a_thaliana_2021.tar",
-                # "Drosophila melanogaster": "7227",
-                # "Saccharomyces cerevisiae": "559292",
-                # "Schizosaccharomyces pombe": "284812",
-                # "Caulobacter vibrioides": "190650",
-                # "Mycobacterium tuberculosis": "83332",
-                # "Pseudomonas aeruginosa": "208964",
-                "Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar",
-                # "Plasmodium falciparum": "36329",
             })
 
             fU = FileUtil()

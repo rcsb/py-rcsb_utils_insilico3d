@@ -16,6 +16,11 @@ Accessors for AlphaFold 3D Models (mmCIF).
 
 """
 
+__docformat__ = "google en"
+__author__ = "Dennis Piehl"
+__email__ = "dennis.piehl@rcsb.org"
+__license__ = "Apache 2.0"
+
 import datetime
 import logging
 import os.path
@@ -82,7 +87,7 @@ class AlphaFoldModelProvider:
             latestDataListDumpPath = os.path.join(self.__dirPath, alphaFoldFtpLatestDataList.split("/")[-1])
             ok = ftpU.get(alphaFoldFtpLatestDataList, latestDataListDumpPath)
             lDL = self.__mU.doImport(latestDataListDumpPath, fmt="json")
-            
+
             # If a specific list of species files was requested, only iterate over those
             if alphaFoldRequestedSpeciesList:
                 alphaFoldSpeciesDataList = [s for s in lDL if s['species'] in alphaFoldRequestedSpeciesList]

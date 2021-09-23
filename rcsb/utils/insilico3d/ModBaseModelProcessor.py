@@ -28,9 +28,9 @@ import os.path
 import time
 import collections
 
-# from rcsb.utils.insilico3d import __version__
-# import rcsb.utils.modbase_utils.modbase_pdb_to_cif as modbase
-import modbase_pdb_to_cif as modbase
+from rcsb.utils.insilico3d import __version__
+import rcsb.utils.modbase_utils.modbase_pdb_to_cif as modbase
+# import modbase_pdb_to_cif as modbase
 
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FileUtil import FileUtil
@@ -122,8 +122,6 @@ class ModBaseModelWorker(object):
 
         Returns:
             str: path to converted (and gzipped) mmCIF file if successful; otherwise None
-            
-            # bool: True if alignment file was used; False if converted without alignment
         """
         try:
             with open(pdbFile) as fh:
@@ -144,11 +142,11 @@ class ModBaseModelProcessor(object):
 
     def __init__(self, cachePath=None, useCache=False, speciesModelDir=None, speciesPdbModelFileList=None, **kwargs):
         try:
-            self.__version = "0.12"
-            # self.__version = __version__
+            # self.__version = "0.12"
+            self.__version = __version__
             self.__numProc = kwargs.get("numProc", 2)
             self.__chunkSize = kwargs.get("chunkSize", 10)
-            
+
             self.__speciesModelDir = speciesModelDir
             self.__speciesName = self.__speciesModelDir.split("/")[-1]
             self.__speciesPdbModelFileList = speciesPdbModelFileList if speciesPdbModelFileList else []
@@ -157,7 +155,7 @@ class ModBaseModelProcessor(object):
 
             self.__mU = MarshalUtil(workPath=self.__speciesModelDir)
             self.__fU = FileUtil(workPath=self.__speciesModelDir)
-            
+
             self.__modelD = self.__reload(fmt="pickle", useCache=useCache)
 
         except Exception as e:
