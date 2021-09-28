@@ -1,7 +1,7 @@
 ##
 # File:    testModBaseModelProvider.py
 # Author:  Dennis Piehl
-# Date:    15-Sep-2021
+# Date:    27-Sep-2021
 #
 # Update:
 #
@@ -25,6 +25,7 @@ import time
 import unittest
 
 from rcsb.utils.insilico3d.ModBaseModelProvider import ModBaseModelProvider
+# from ModBaseModelProvider import ModBaseModelProvider
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(HERE))
@@ -47,19 +48,33 @@ class ModBaseModelProviderTests(unittest.TestCase):
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
     def testFetchModBaseModels(self):
-        mP = ModBaseModelProvider(cachePath=self.__cachePath, useCache=False, modBaseSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"})
-        ok = mP.testCache()
+        mProv = ModBaseModelProvider(
+            cachePath=self.__cachePath,
+            useCache=False,
+            modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
+        )
+        ok = mProv.testCache()
         self.assertTrue(ok)
 
     def testReloadCache(self):
-        mP = ModBaseModelProvider(cachePath=self.__cachePath, useCache=True, modBaseSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"})
-        speciesDirList = mP.getSpeciesDirList()
+        mProv = ModBaseModelProvider(
+            cachePath=self.__cachePath,
+            useCache=True,
+            modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
+        )
+        speciesDirList = mProv.getSpeciesDirList()
         ok = True if len(speciesDirList) > 0 else False
         self.assertTrue(ok)
-
-        speciesPdbModelFileList = mP.getSpeciesPdbModelFileList(speciesDataDir=speciesDirList[0])
+        #
+        speciesPdbModelFileList = mProv.getSpeciesPdbModelFileList(speciesDataDir=speciesDirList[0])
         ok = True if len(speciesPdbModelFileList) > 0 else False
         self.assertTrue(ok)
+        #
+        # Now delete test cache data
+        speciesNameList = mProv.getSpeciesNameList()
+        for species in speciesNameList:
+            ok = mProv.removeSpeciesDataDir(speciesName=species)
+            self.assertTrue(ok)
 
 
 def fetchModBaseModels():

@@ -1,10 +1,18 @@
 ##
 # File:    ModBaseModelProvider.py
 # Author:  Dennis Piehl
-# Date:    15-Sep-2021
+# Date:    27-Sep-2021
 #
 # Update:
 #
+#
+# Get species model-directory mtime:
+#    datetime.datetime.fromtimestamp(os.path.getmtime('GENSCAN00000000006_2.pdb.xz')).isoformat()
+# OR get datetime from server using request.head of remote or local file.
+#     r = requests.head('https://salilab.org/modbase-download/projects/genomes/H_sapiens/2020/Homo_sapiens_2020.tar')
+#     modDateTime = r.headers['Last-Modified']
+#      ^ This above is probably sufficient and better for purposes here
+#     modDateTimeIso = datetime.datetime.strptime(modDateTime, '%a, %d %b %Y %H:%M:%S %Z').isoformat()
 #
 ##
 """
@@ -22,6 +30,7 @@ import logging
 import os.path
 import time
 import glob
+import requests
 
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
@@ -39,6 +48,7 @@ class ModBaseModelProvider:
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
+        self.__fU = FileUtil(workPath=self.__dirPath)
 
         self.__oD, self.__createdDate = self.__reload(**kwargs)
 
@@ -59,6 +69,7 @@ class ModBaseModelProvider:
             oD (dict): dictionary of cached/downloaded species model data sets with general metadata about each data set (local data path, size, # files, ...)
             createdDate (str): timestamp in isoformat of when the data cache was last created
         """
+
         try:
             oD = None
             createdDate = None
@@ -70,27 +81,14 @@ class ModBaseModelProvider:
             # Example URLs:
             #  https://salilab.org/modbase-download/projects/genomes/H_sapiens/2020/Homo_sapiens_2020.tar
             #  https://salilab.org/modbase-download/projects/genomes/H_sapiens/2020/Homo_sapiens_2020.summary.txt
-            modBaseSpeciesDataPathDict = kwargs.get("modBaseSpeciesDataPathDict", {
+            modBaseServerSpeciesDataPathDict = kwargs.get("modBaseServerSpeciesDataPathDict", {
                 "Homo sapiens": "H_sapiens/2020/Homo_sapiens_2020.tar",
-                "Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar",
                 "Panicum virgatum": "P_virgatum/2021/p_virgatum_2021.tar",
                 "Arabidopsis thaliana": "A_thaliana/2021/a_thaliana_2021.tar",
-                # "Saccharomyces cerevisiae": "S_cerevisiae/2017/s_cerevisiae_2017.tar",
-                # "Mus musculus": "M_musculus/2017/m_musculus_2017.tar",
-                # "Caenorhabditis elegans": "C_elegans/2017/c_elegans_2017.tar",
-                # "Escherichia coli": "E_coli/2016/e_coli_2016.tar",
-                # "Drosophila melanogaster": "D_melanogaster/2017/d_melanogaster_2017.tar",
-                # "Mycobacterium tuberculosis": "M_tuberculosis/2018/m_tuberculosis_2018.tar",
-                # "Pseudomonas aeruginosa": "P_aeruginosa/2017/p_aeruginosa_2017.tar",
-                # "Plasmodium falciparum": "P_falciparum/2015/Pfalciparum_2015.tar",
-                # ...many more available...
-                # "Alternative structure": {
-                #     "models": "H_sapiens/2020/Homo_sapiens_2020.tar",
-                #     "summary": "H_sapiens/2020/Homo_sapiens_2020.summary.txt"},
+                # "Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar",  # Used for tests only
             })
 
-            fU = FileUtil()
-            fU.mkdir(self.__dirPath)
+            self.__fU.mkdir(self.__dirPath)
 
             logger.info("useCache %r self.__speciesDataCacheFile %r", useCache, self.__speciesDataCacheFile)
             if useCache and self.__mU.exists(self.__speciesDataCacheFile):
@@ -100,15 +98,19 @@ class ModBaseModelProvider:
                 oD = cacheD["data"]
 
                 logger.info("Checking consistency of cached data with data available on server")
-                for species, path in modBaseSpeciesDataPathDict.items():
+                for species, path in modBaseServerSpeciesDataPathDict.items():
                     try:
                         speciesFilePath = os.path.join(modBaseBaseUrl, path)
-                        speciesFileSize = int(fU.size(speciesFilePath))
+                        speciesFileSize = int(self.__fU.size(speciesFilePath))
+                        speciesFileHeadResp = requests.head(speciesFilePath)
+                        # speciesFileModDate = speciesFileHeadResp.headers['Last-Modified']
+                        speciesFileModDate = datetime.datetime.strptime(speciesFileHeadResp.headers["Last-Modified"], "%a, %d %b %Y %H:%M:%S %Z").isoformat()
                         cacheSpeciesDir = oD[species]["dataDirectory"]
                         cacheSpeciesFileSize = oD[species]["archiveFileSizeBytes"]
+                        cacheSpeciesFileModDate = oD[species]["lastModified"]
                         if not os.path.exists(cacheSpeciesDir):
                             logger.warning("Missing archive data for species %s from server: %s", species, path)
-                        if cacheSpeciesFileSize != speciesFileSize:
+                        if cacheSpeciesFileSize != speciesFileSize or cacheSpeciesFileModDate != speciesFileModDate:
                             logger.warning("Cached archive data for species %s not up-to-date with data archive on server: %s", species, path)
                     except Exception as e:
                         logger.info("Failing on checking of cache data for species %s: %s", species, path)
@@ -118,29 +120,32 @@ class ModBaseModelProvider:
                 logger.info("Refetching all files from server.")
                 cacheD = {}
                 cacheD.update({"created": startDateTime, "data": {}})
-                for species, path in modBaseSpeciesDataPathDict.items():
+                for species, path in modBaseServerSpeciesDataPathDict.items():
                     try:
                         speciesFileName = path.rsplit("/", maxsplit=1)[-1]
                         speciesFilePath = os.path.join(modBaseBaseUrl, path)
-                        speciesFileSize = int(fU.size(speciesFilePath))
+                        speciesFileSize = int(self.__fU.size(speciesFilePath))
+                        speciesFileHeadResp = requests.head(speciesFilePath)
+                        # speciesFileModDate = speciesFileHeadResp.headers['Last-Modified']
+                        speciesFileModDate = datetime.datetime.strptime(speciesFileHeadResp.headers["Last-Modified"], "%a, %d %b %Y %H:%M:%S %Z").isoformat()
                         speciesDataDumpDir = os.path.join(self.__dirPath, species.replace(" ", "_"))
-                        fU.mkdir(speciesDataDumpDir)
+                        self.__fU.mkdir(speciesDataDumpDir)
                         speciesFileDumpPath = os.path.join(speciesDataDumpDir, speciesFileName)
                         sD = {
                             "speciesName": species,
                             "archiveFileName": speciesFileName,
                             "archiveFileSizeBytes": speciesFileSize,
+                            "lastModified": speciesFileModDate,
                             "dataDirectory": speciesDataDumpDir,
                         }
-
                         logger.info("Fetching file %s from server to local path %s", speciesFilePath, speciesFileDumpPath)
-                        ok = fU.get(speciesFilePath, speciesFileDumpPath)
-                        ok = fU.unbundleTarfile(speciesFileDumpPath, dirPath=speciesDataDumpDir)
+                        ok = self.__fU.get(speciesFilePath, speciesFileDumpPath)
+                        ok = self.__fU.unbundleTarfile(speciesFileDumpPath, dirPath=speciesDataDumpDir)
                         logger.info("Completed fetch (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
 
                         if ok:
                             cacheD["data"].update({species: sD})
-                            fU.remove(speciesFileDumpPath)
+                            self.__fU.remove(speciesFileDumpPath)
 
                     except Exception as e:
                         logger.info("Failing on fetching and expansion of file for species %s: %s", species, path)
@@ -155,6 +160,11 @@ class ModBaseModelProvider:
             logger.exception("Failing with %s", str(e))
 
         return oD, createdDate
+
+    def getSpeciesNameList(self):
+        """Return a list of species names/keys for all cached species data directories."""
+        speciesNameList = [k for k in self.__oD]
+        return speciesNameList
 
     def getSpeciesDirList(self):
         """Return a list of paths to all species data directories."""
@@ -214,8 +224,55 @@ class ModBaseModelProvider:
     def getSpeciesDataCacheFilePath(self):
         return self.__speciesDataCacheFile
 
-    def removePdbModelFiles(self):
-        # logger.info("Clearing PDB files from extracted tar bundle...")
-        # for pdbDumpFile in Path(speciesDataDumpDir).glob("*.pdb.gz"):
-        #     pdbDumpFile.unlink()
-        return
+    def getSpeciesConversionDict(self, speciesName=None):
+        """Returns a dictionary containing necessary data for converting PDBs to mmCIF in ModBaseModelProcessor class."""
+
+        speciesConversionDict = {}
+        if speciesName:
+            speciesConversionDict["speciesName"] = speciesName
+            speciesDataDir = self.__oD[speciesName]["dataDirectory"]
+            speciesConversionDict["speciesModelDir"] = speciesDataDir
+            speciesConversionDict["lastModified"] = self.__oD[speciesName]["lastModified"]
+            speciesConversionDict["speciesPdbModelFileList"] = self.getSpeciesPdbModelFileList(speciesDataDir=speciesDataDir)
+        return speciesConversionDict
+
+    def removePdbModelDir(self, speciesDataDir=None):
+        """Remove the directory containing PDB model files for a given species directory."""
+
+        ok = False
+        if speciesDataDir:
+            try:
+                speciesPdbModelDir = os.path.join(speciesDataDir, "model")
+                ok = self.__fU.remove(speciesPdbModelDir)
+            except Exception as e:
+                logger.exception("Failing with %s", str(e))
+        return ok
+
+    def removeAlignmentDir(self, speciesDataDir=None):
+        """Remove the directory containing alignment files for a given species directory."""
+
+        ok = False
+        if speciesDataDir:
+            try:
+                speciesAlignmentDir = os.path.join(speciesDataDir, "alignment")
+                ok = self.__fU.remove(speciesAlignmentDir)
+            except Exception as e:
+                logger.exception("Failing with %s", str(e))
+        return ok
+
+    def removeSpeciesDataDir(self, speciesName=None):
+        """"Remove an entire species data directory (and its corresponding cache file entry),
+        provided the species name as stored in the cache file."""
+
+        ok = False
+        if speciesName:
+            try:
+                cacheD = self.__mU.doImport(self.__speciesDataCacheFile, fmt="json")
+                dataD = cacheD["data"]
+                speciesDataD = dataD.pop(speciesName)
+                ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=3)
+                speciesDataDir = speciesDataD["dataDirectory"]
+                ok = self.__fU.remove(speciesDataDir)
+            except Exception as e:
+                logger.exception("Failing with %s", str(e))
+        return ok
