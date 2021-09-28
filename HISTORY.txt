@@ -2,4 +2,4 @@
    2-Aug-2021  - V0.10 Created module
   12-Sep-2021  - V0.11 Updates for CI pipeline
   21-Sep-2021  - V0.12 Add ModBaseModelProvider and ModBaseModelProcessor classes
-  27-Sep-2021  - V0.13 Fixes to ModBase classes
+  27-Sep-2021  - V0.13 Fixes and improvements to ModBase classes

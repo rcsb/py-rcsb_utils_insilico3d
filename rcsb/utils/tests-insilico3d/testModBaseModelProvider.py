@@ -25,7 +25,6 @@ import time
 import unittest
 
 from rcsb.utils.insilico3d.ModBaseModelProvider import ModBaseModelProvider
-# from ModBaseModelProvider import ModBaseModelProvider
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(HERE))

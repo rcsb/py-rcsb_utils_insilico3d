@@ -6,14 +6,6 @@
 # Update:
 #
 #
-# Get species model-directory mtime:
-#    datetime.datetime.fromtimestamp(os.path.getmtime('GENSCAN00000000006_2.pdb.xz')).isoformat()
-# OR get datetime from server using request.head of remote or local file.
-#     r = requests.head('https://salilab.org/modbase-download/projects/genomes/H_sapiens/2020/Homo_sapiens_2020.tar')
-#     modDateTime = r.headers['Last-Modified']
-#      ^ This above is probably sufficient and better for purposes here
-#     modDateTimeIso = datetime.datetime.strptime(modDateTime, '%a, %d %b %Y %H:%M:%S %Z').isoformat()
-#
 ##
 """
 Accessors for ModBase 3D Models (PDB).

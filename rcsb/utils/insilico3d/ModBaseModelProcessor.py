@@ -5,8 +5,8 @@
 #
 # Update:
 #
+# To Do:
 # - pylint: disable=fixme
-# - Review category names generated in CIF to use the same aa in AlphaFold models
 # - Add mkdssp calculation
 # - Add check that converted files are consistent with mmCIF dictionaries
 ##
@@ -27,7 +27,6 @@ import time
 import collections
 
 import rcsb.utils.modbase_utils.modbase_pdb_to_cif as modbase
-# import modbase_pdb_to_cif as modbase
 from rcsb.utils.insilico3d import __version__
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FileUtil import FileUtil

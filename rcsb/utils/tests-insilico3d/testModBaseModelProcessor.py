@@ -26,8 +26,6 @@ import unittest
 
 from rcsb.utils.insilico3d.ModBaseModelProvider import ModBaseModelProvider
 from rcsb.utils.insilico3d.ModBaseModelProcessor import ModBaseModelProcessor
-# from ModBaseModelProvider import ModBaseModelProvider
-# from ModBaseModelProcessor import ModBaseModelProcessor
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
