@@ -1,14 +1,14 @@
 ##
 # File:    testModBaseModelProcessor.py
 # Author:  Dennis Piehl
-# Date:    21-Sep-2021
+# Date:    27-Sep-2021
 #
 # Update:
 #
 #
 ##
 """
-Tests for generators and accessors for non-polymer instance target interactions
+Tests for processors for converting ModBase PDB models to mmCIF format.
 
 """
 
@@ -24,9 +24,6 @@ import resource
 import time
 import unittest
 
-
-# from ModBaseModelProvider import ModBaseModelProvider
-# from ModBaseModelProcessor import ModBaseModelProcessor
 from rcsb.utils.insilico3d.ModBaseModelProvider import ModBaseModelProvider
 from rcsb.utils.insilico3d.ModBaseModelProcessor import ModBaseModelProcessor
 
@@ -53,33 +50,54 @@ class ModBaseModelProcessorTests(unittest.TestCase):
         endTime = time.time()
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
-    def testModBaseModelProcessorBootstrap(self):
-        """Test case: generate and load neighbor and occupancy data"""
+    def testModBaseModelProcessor(self):
+        """Test case: retrieve ModBase PDB model files and convert to mmCIF"""
         try:
-            # mP = ModBaseModelProvider(cachePath=self.__cachePath, useCache=False, modBaseSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"})
-            mP = ModBaseModelProvider(cachePath=self.__cachePath, useCache=True, modBaseSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"})
-            ok = mP.testCache()
+            mProv = ModBaseModelProvider(
+                cachePath=self.__cachePath,
+                # useCache=True,
+                useCache=False,
+                modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
+            )
+            ok = mProv.testCache()
             self.assertTrue(ok)
-            speciesDirList = mP.getSpeciesDirList()
-            ok = True if len(speciesDirList) > 0 else False
+            speciesNameList = mProv.getSpeciesNameList()
+            # print(speciesNameList, '\n\n\n')
+            ok = True if len(speciesNameList) > 0 else False
             self.assertTrue(ok)
-            speciesModelDir = speciesDirList[0]
-            speciesPdbModelFileList = mP.getSpeciesPdbModelFileList(speciesDataDir=speciesModelDir)[0:20]
-            mPr = ModBaseModelProcessor(useCache=False, numProc=2, speciesModelDir=speciesModelDir, speciesPdbModelFileList=speciesPdbModelFileList)
-            ok = mPr.generate(updateOnly=False)
+            speciesConversionDict = mProv.getSpeciesConversionDict(speciesName=speciesNameList[0])
+            speciesConversionDict["speciesPdbModelFileList"] = speciesConversionDict["speciesPdbModelFileList"][0:20]
+            ok = True if len(speciesConversionDict["speciesPdbModelFileList"]) > 0 else False
             self.assertTrue(ok)
-            ok = mPr.generate(updateOnly=True)
+            mProc = ModBaseModelProcessor(
+                useCache=False,
+                numProc=2,
+                speciesD=speciesConversionDict,
+            )
+            ok = mProc.generate(updateOnly=False)
             self.assertTrue(ok)
-            ok = mPr.reload()
+            ok = mProc.generate(updateOnly=True)
             self.assertTrue(ok)
-            ok = mPr.testCache(minCount=10)
+            ok = mProc.reload()
+            self.assertTrue(ok)
+            ok = mProc.testCache(minCount=10)
             self.assertTrue(ok)
             #
-            processedModelCachePath = mPr.getCachePath()
-            mPr = ModBaseModelProcessor(cachePath=processedModelCachePath, useCache=True, numProc=2,
-                                        speciesModelDir=speciesModelDir, speciesPdbModelFileList=speciesPdbModelFileList)
-            ok = mPr.testCache(minCount=10)
+            processedModelCachePath = mProc.getCachePath()
+            mProc = ModBaseModelProcessor(
+                cachePath=processedModelCachePath,
+                useCache=True,
+                numProc=2,
+                speciesD=speciesConversionDict,
+            )
+            ok = mProc.testCache(minCount=10)
             self.assertTrue(ok)
+            #
+            ok = mProv.removePdbModelDir(speciesDataDir=speciesConversionDict["speciesModelDir"])
+            self.assertTrue(ok)
+            ok = mProv.removeAlignmentDir(speciesDataDir=speciesConversionDict["speciesModelDir"])
+            self.assertTrue(ok)
+            #
         except Exception as e:
             logger.exception("Failing with %s", str(e))
             self.fail()
@@ -87,7 +105,7 @@ class ModBaseModelProcessorTests(unittest.TestCase):
 
 def modelProcessorSuite():
     suiteSelect = unittest.TestSuite()
-    suiteSelect.addTest(ModBaseModelProcessorTests("testModBaseModelProcessorBootstrap"))
+    suiteSelect.addTest(ModBaseModelProcessorTests("testModBaseModelProcessor"))
     return suiteSelect
 
 

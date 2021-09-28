@@ -10,6 +10,11 @@
 # - For cache json file, use the species names as keys, not the tar file name
 # - Use .items() for iterating over dicts
 # - Change the way of using 'alphaFoldRequestedSpeciesFileList' to the way done in ModBaseModelProvider
+# - Change category data item name, '_ma_qa_metric_global.metric_value' to '_ma_qa_metric_global.value' (or await the change on AF end)
+# - Add the following data items to MA dictionary:
+#   _ma_target_ref_db_details.ncbi_taxonomy_id    9606
+#   _ma_target_ref_db_details.organism_scientific "Homo sapiens"
+
 ##
 """
 Accessors for AlphaFold 3D Models (mmCIF).

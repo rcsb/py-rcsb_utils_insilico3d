@@ -1,15 +1,13 @@
 ##
 # File:    ModBaseModelProcessor.py
 # Author:  Dennis Piehl
-# Date:    16-Sep-2021
+# Date:    27-Sep-2021
 #
 # Update:
 #
+# To Do:
 # - pylint: disable=fixme
-# - If conversion fails due to alignment file issue, try converting without alignment
-# - Review category names generated in CIF to use the same aa in AlphaFold models
 # - Add mkdssp calculation
-# - Add removal of downloaded and processed cache files when done testing
 # - Add check that converted files are consistent with mmCIF dictionaries
 ##
 
@@ -28,10 +26,8 @@ import os.path
 import time
 import collections
 
-from rcsb.utils.insilico3d import __version__
 import rcsb.utils.modbase_utils.modbase_pdb_to_cif as modbase
-# import modbase_pdb_to_cif as modbase
-
+from rcsb.utils.insilico3d import __version__
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.multiproc.MultiProcUtil import MultiProcUtil
@@ -84,13 +80,13 @@ class ModBaseModelWorker(object):
                 if pF.endswith(".pdb") and aF.endswith(".xml"):
                     cF = os.path.join(workingDir, modelNameRoot + ".cif")
                     # Then attempt the conversion with alignment
-                    convertedCifFileZ = self.__convertPdbToCif(procName=procName, pdbFile=pF, alignmentFile=aF, mmCifOutFile=cF)
+                    convertedCifFileZ = self.__convertPdbToCif(procName=procName, pdbFile=pF, alignmentFile=aF, mmCifOutFile=cF, optionsD=optionsD)
                     if convertedCifFileZ:
                         alignmentFileUsed = alignFileZ
                         successList.append(modelE)
                     else:
                         # If fails, attempt the conversion without alignment
-                        convertedCifFileZ = self.__convertPdbToCif(procName=procName, pdbFile=pF, alignmentFile=None, mmCifOutFile=cF)
+                        convertedCifFileZ = self.__convertPdbToCif(procName=procName, pdbFile=pF, alignmentFile=None, mmCifOutFile=cF, optionsD=optionsD)
                         if convertedCifFileZ:
                             successList.append(modelE)
 
@@ -111,21 +107,25 @@ class ModBaseModelWorker(object):
 
         return successList, retList, diagList
 
-    def __convertPdbToCif(self, procName, pdbFile, alignmentFile, mmCifOutFile):
-        """Internal method to convert a ModBase PDB file to mmCIF format, using the alignment information.
+    def __convertPdbToCif(self, procName, pdbFile, alignmentFile, mmCifOutFile, optionsD):
+        """Internal method to convert a ModBase PDB file to mmCIF format.
 
         Args:
             procName (str): worker process name
             pdbFile (str): path to PDB model file to convert
             alignmentFile (str): path to ModBase alignment file for the corresponding model file
             mmCifOutFile (str): path to which to write mmCIF model file
+            optionsD (dict): additional options/parameters to use in conversion
 
         Returns:
             str: path to converted (and gzipped) mmCIF file if successful; otherwise None
         """
+
         try:
+            species = optionsD.get("species")
+            speciesModDate = optionsD.get("speciesModDate")
             with open(pdbFile, "r", encoding="utf-8") as fh:
-                sF = modbase.read_pdb(fh)
+                sF = modbase.read_pdb(fh, organism_name=species, moddate=speciesModDate)
             with open(mmCifOutFile, "w", encoding="utf-8") as fh:
                 sF.write_mmcif(fh, alignmentFile)
             mmCifOutFileZ = mmCifOutFile + ".gz"
@@ -140,16 +140,28 @@ class ModBaseModelWorker(object):
 class ModBaseModelProcessor(object):
     """Generators and accessors for ModBase model files."""
 
-    def __init__(self, cachePath=None, useCache=False, speciesModelDir=None, speciesPdbModelFileList=None, **kwargs):
+    def __init__(self, cachePath=None, useCache=False, speciesD=None, **kwargs):
+        """Initialize ModBaseModelProcessor object.
+
+        Args:
+            cachePath (str): path to species-specific cache file containing list of processed model files.
+            useCache (bool): whether to use the existing data cache or re-run conversion process
+            speciesD (dict): dictionary containing the following necessary key:value pairs for conversion:
+                             "speciesModelDir": path to species data directory
+                             "lastModified": last modified date of the downloaded species archive tarball
+                             "speciesName": name of the species as it is stored in the ModBaseModelProvider cache
+                             "speciesPdbModelFileList": list of the PDB model files to convert
+        """
+
         try:
-            # self.__version = "0.12"
             self.__version = __version__
             self.__numProc = kwargs.get("numProc", 2)
             self.__chunkSize = kwargs.get("chunkSize", 10)
 
-            self.__speciesModelDir = speciesModelDir
-            self.__speciesName = self.__speciesModelDir.split("/")[-1]
-            self.__speciesPdbModelFileList = speciesPdbModelFileList if speciesPdbModelFileList else []
+            self.__speciesModelDir = speciesD.get("speciesModelDir")
+            self.__speciesModDate = speciesD.get("lastModified", None)
+            self.__speciesName = speciesD.get("speciesName")
+            self.__speciesPdbModelFileList = speciesD.get("speciesPdbModelFileList", [])
 
             self.__cachePath = cachePath if cachePath else self.__getModelCachePath()
 
@@ -203,6 +215,7 @@ class ModBaseModelProcessor(object):
                 "version": self.__version,
                 "created": tS,
                 "species": self.__speciesName,
+                "archiveModDate": self.__speciesModDate,
                 "speciesModelDir": self.__speciesModelDir,
                 "modelsCif": mD,
                 "modelsFailed": failD,
@@ -239,7 +252,8 @@ class ModBaseModelProcessor(object):
 
     def __getModelCachePath(self, fmt="pickle"):
         ext = "pic" if fmt == "pickle" else "json"
-        pth = os.path.join(self.__speciesModelDir, self.__speciesName + "-model-data." + ext)
+        speciesNameNoSpace = self.__speciesName.replace(" ", "_")
+        pth = os.path.join(self.__speciesModelDir, speciesNameNoSpace + "-model-data." + ext)
         return pth
 
     def __convertModBasePdb(self, numProc=2, chunkSize=10, updateOnly=False):
@@ -280,6 +294,8 @@ class ModBaseModelProcessor(object):
         #
         rWorker = ModBaseModelWorker(workPath=self.__speciesModelDir)
         mpu = MultiProcUtil(verbose=True)
+        optD = {"species": self.__speciesName, "speciesModDate": self.__speciesModDate}
+        mpu.setOptions(optD)
         mpu.set(workerObj=rWorker, workerMethod="convert")
         mpu.setWorkingDir(workingDir=self.__speciesModelDir)
         ok, failList, resultList, _ = mpu.runMulti(dataList=modelList, numProc=numProc, numResults=1, chunkSize=chunkSize)
