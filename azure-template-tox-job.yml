@@ -139,6 +139,32 @@ jobs:
       - script: pip install -r requirements.txt
         displayName: "Install dependencies"
       #
+      - script: |
+          cd ~
+          git clone https://github.com/PDB-REDO/libcifpp.git
+          cd libcifpp
+          mkdir build
+          cd build
+          cmake ..
+          cmake --build . --config Release
+          ctest -C Release
+          cmake --install .
+        displayName: "Install libcifpp"
+      #
+      - script: |
+          cd ~
+          git clone https://github.com/PBD-REDO/dssp.git
+          cd dssp
+          mkdir build
+          cd build
+          cmake ..
+          cmake --build . --config Release
+          ctest -C Release
+          cmake --install .
+        displayName: "Install DSSP"
+      #
+      - script: which mkdssp
+        displayName: "Check mkdssp"
       #
       - task: DownloadSecureFile@1
         name: oelicense
