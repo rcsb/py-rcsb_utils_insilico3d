@@ -56,6 +56,10 @@ jobs:
             displayName: "Install bison"
           - script: which bison
             displayName: "Check bison"
+          - script: brew install boost
+            displayName: "Install boost"
+          - script: which boost
+            displayName: "Check boost"
       # ----------------------------------------------
       - ${{ if startsWith(parameters.os, 'linux') }}:
           - script: lsb_release -a
