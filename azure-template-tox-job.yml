@@ -157,7 +157,7 @@ jobs:
       #
       - script: |
           cd ~
-          git clone https://github.com/PBD-REDO/dssp.git
+          git clone https://github.com/PDB-REDO/dssp.git
           cd dssp
           mkdir build
           cd build
