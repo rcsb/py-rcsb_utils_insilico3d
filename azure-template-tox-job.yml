@@ -163,7 +163,6 @@ jobs:
           cd build
           cmake ..
           cmake --build . --config Release
-          ctest -C Release
           cmake --install .
         displayName: "Install DSSP"
       #
