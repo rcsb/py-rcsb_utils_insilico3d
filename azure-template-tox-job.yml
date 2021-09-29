@@ -57,9 +57,7 @@ jobs:
           - script: which bison
             displayName: "Check bison"
           - script: brew install boost
-            displayName: "Install boost"
-          - script: which boost
-            displayName: "Check boost"
+            displayName: "Install boost libraries"
       # ----------------------------------------------
       - ${{ if startsWith(parameters.os, 'linux') }}:
           - script: lsb_release -a
@@ -79,6 +77,8 @@ jobs:
             displayName: "Install flex"
           - script: sudo apt-get install bison
             displayName: "Install bison"
+          - script: sudo apt-get install libboost-all-dev
+            displayName: "Install boost libraries"
       #
       - ? ${{ if and(contains(parameters.fixtures, 'mysql'), startsWith(parameters.os, 'linux')) }}
         : - bash: |
