@@ -55,14 +55,12 @@ class ModBaseModelProcessorTests(unittest.TestCase):
         try:
             mProv = ModBaseModelProvider(
                 cachePath=self.__cachePath,
-                # useCache=True,
                 useCache=False,
                 modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
             )
             ok = mProv.testCache()
             self.assertTrue(ok)
             speciesNameList = mProv.getSpeciesNameList()
-            # print(speciesNameList, '\n\n\n')
             ok = True if len(speciesNameList) > 0 else False
             self.assertTrue(ok)
             speciesConversionDict = mProv.getSpeciesConversionDict(speciesName=speciesNameList[0])
