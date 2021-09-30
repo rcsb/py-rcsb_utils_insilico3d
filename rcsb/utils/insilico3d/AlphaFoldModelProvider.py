@@ -1,20 +1,16 @@
 ##
 # File:    AlphaFoldModelProvider.py
 # Author:  Dennis Piehl
-# Date:    23-Aug-2021
+# Date:    30-Sep-2021
 #
 # Update:
 #
 #
 # To do:
-# - For cache json file, use the species names as keys, not the tar file name
-# - Use .items() for iterating over dicts
-# - Change the way of using 'alphaFoldRequestedSpeciesFileList' to the way done in ModBaseModelProvider
 # - Change category data item name, '_ma_qa_metric_global.metric_value' to '_ma_qa_metric_global.value' (or await the change on AF end)
 # - Add the following data items to MA dictionary:
 #   _ma_target_ref_db_details.ncbi_taxonomy_id    9606
 #   _ma_target_ref_db_details.organism_scientific "Homo sapiens"
-
 ##
 """
 Accessors for AlphaFold 3D Models (mmCIF).
@@ -49,6 +45,8 @@ class AlphaFoldModelProvider:
         self.__cachePath = kwargs.get("cachePath", "./CACHE-insilico3d-models")
         self.__dirPath = os.path.join(self.__cachePath, "AlphaFold")
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
+        self.__dividedDataPath = os.path.join(self.__cachePath, "divided")
+        self.__dividedDataCacheFile = os.path.join(self.__cachePath, "AlphaFold-model-data.json")
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
 
@@ -95,7 +93,7 @@ class AlphaFoldModelProvider:
 
             # If a specific list of species files was requested, only iterate over those
             if alphaFoldRequestedSpeciesList:
-                alphaFoldSpeciesDataList = [s for s in lDL if s['species'] in alphaFoldRequestedSpeciesList]
+                alphaFoldSpeciesDataList = [s for s in lDL if s["species"] in alphaFoldRequestedSpeciesList]
             else:
                 alphaFoldSpeciesDataList = lDL
 
@@ -110,15 +108,16 @@ class AlphaFoldModelProvider:
                 logger.info("Checking consistency of cached data with data available on FTP")
                 for speciesData in alphaFoldSpeciesDataList:
                     try:
+                        speciesName = speciesData["species"]
                         speciesFile = speciesData["archive_name"]
                         speciesFileSize = int(speciesData["size_bytes"])
                         speciesNumModels = int(speciesData["num_predicted_structures"])
-                        if speciesFile not in cacheSpeciesFileList:
+                        if speciesName not in cacheSpeciesFileList:
                             logger.error("Species archive data file %s on FTP server not found in local cache.", speciesFile)
                             continue
-                        cacheSpeciesDir = oD[speciesFile]["data_directory"]
-                        cacheSpeciesFileSize = oD[speciesFile]["size_bytes"]
-                        cacheSpeciesNumModels = oD[speciesFile]["num_predicted_structures"]
+                        cacheSpeciesDir = oD[speciesName]["data_directory"]
+                        cacheSpeciesFileSize = oD[speciesName]["size_bytes"]
+                        cacheSpeciesNumModels = oD[speciesName]["num_predicted_structures"]
                         if not os.path.exists(cacheSpeciesDir):
                             logger.warning("Species archive data directory for %s not found at cached path %s", speciesFile, cacheSpeciesDir)
                         if cacheSpeciesFileSize != speciesFileSize:
@@ -140,9 +139,10 @@ class AlphaFoldModelProvider:
                 for speciesData in alphaFoldSpeciesDataList:
                     try:
                         sD = copy.deepcopy(speciesData)
-                        speciesFile = speciesData["archive_name"]
+                        speciesName = sD["species"]
+                        speciesFile = sD["archive_name"]
                         speciesFilePath = os.path.join(alphaFoldFtpDataPath, speciesFile)
-                        speciesDataDumpDir = os.path.join(self.__dirPath, speciesFile.split(".")[0])
+                        speciesDataDumpDir = os.path.join(self.__dirPath, speciesName.replace(" ", "_"))
                         fU.mkdir(speciesDataDumpDir)
                         speciesFileDumpPath = os.path.join(speciesDataDumpDir, speciesFile)
                         sD.update({"data_directory": speciesDataDumpDir, "archive_file_path": speciesFileDumpPath})
@@ -157,7 +157,7 @@ class AlphaFoldModelProvider:
                             pdbDumpFile.unlink()
 
                         if ok:
-                            cacheD["data"].update({speciesFile: sD})
+                            cacheD["data"].update({speciesName: sD})
                             fU.remove(speciesFileDumpPath)
 
                     except Exception as e:
@@ -212,3 +212,47 @@ class AlphaFoldModelProvider:
 
     def getSpeciesDataCacheFilePath(self):
         return self.__speciesDataCacheFile
+
+    def reorganizeModelFiles(self):
+        """Move model files from organism-wide model listing to hashed directory structure
+        using last two letters of UniProt ID"""
+
+        try:
+            fU = FileUtil()
+            speciesDirList = self.getSpeciesDirList()
+            newModelDirD = {}
+            for speciesDir in speciesDirList:
+                modelFileList = self.getModelFileList(inputPathList=[speciesDir])
+                for model in modelFileList:
+                    modelName = fU.getFileName(model)
+                    uniProtID = modelName.split(".cif.gz")[0].split("-")[1]
+                    last2 = uniProtID[-2:]
+                    destDir = os.path.join(self.__dividedDataPath, last2)
+                    if not fU.exists(destDir):
+                        fU.mkdir(destDir)
+                    destModelPath = os.path.join(destDir, modelName)
+                    fU.put(model, destModelPath)
+                    newModelDirD[modelName] = destModelPath
+            self.__mU.doExport(self.__dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
+            return True
+        except Exception as e:
+            logger.exception("Failing with %s", str(e))
+            return False
+
+    def removeSpeciesDataDir(self, speciesName=None):
+        """"Remove an entire species data directory (and its corresponding cache file entry),
+        provided the species name as stored in the cache file."""
+
+        ok = False
+        fU = FileUtil()
+        if speciesName:
+            try:
+                cacheD = self.__mU.doImport(self.__speciesDataCacheFile, fmt="json")
+                dataD = cacheD["data"]
+                speciesDataD = dataD.pop(speciesName)
+                ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=3)
+                speciesDataDir = speciesDataD["data_directory"]
+                ok = fU.remove(speciesDataDir)
+            except Exception as e:
+                logger.exception("Failing with %s", str(e))
+        return ok

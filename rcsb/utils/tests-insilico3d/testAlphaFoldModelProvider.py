@@ -1,7 +1,7 @@
 ##
 # File:    testAlphaFoldModelProvider.py
 # Author:  Dennis Piehl
-# Date:    23-Aug-2021
+# Date:    30-Sep-2021
 #
 # Update:
 #
@@ -25,6 +25,7 @@ import time
 import unittest
 
 from rcsb.utils.insilico3d.AlphaFoldModelProvider import AlphaFoldModelProvider
+# from AlphaFoldModelProvider import AlphaFoldModelProvider
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(HERE))
@@ -61,11 +62,21 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         ok = True if len(speciesModelFileList) > 0 else False
         self.assertTrue(ok)
 
+    def testReorganizeAlphaFoldModels(self):
+        aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
+        ok = aFMP.testCache()
+        self.assertTrue(ok)
+        ok = aFMP.reorganizeModelFiles()
+        self.assertTrue(ok)
+        ok = aFMP.removeSpeciesDataDir(speciesName="Staphylococcus aureus")
+        self.assertTrue(ok)
+
 
 def fetchAlphaFoldModels():
     suiteSelect = unittest.TestSuite()
     suiteSelect.addTest(AlphaFoldModelProviderTests("testFetchAlphaFoldModels"))
     suiteSelect.addTest(AlphaFoldModelProviderTests("testReloadCache"))
+    suiteSelect.addTest(AlphaFoldModelProviderTests("testReorganizeAlphaFoldModels"))
     return suiteSelect
 
 
