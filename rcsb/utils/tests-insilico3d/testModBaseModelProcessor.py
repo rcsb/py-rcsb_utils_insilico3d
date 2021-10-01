@@ -26,6 +26,8 @@ import unittest
 
 from rcsb.utils.insilico3d.ModBaseModelProvider import ModBaseModelProvider
 from rcsb.utils.insilico3d.ModBaseModelProcessor import ModBaseModelProcessor
+# from ModBaseModelProvider import ModBaseModelProvider
+# from ModBaseModelProcessor import ModBaseModelProcessor
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
@@ -50,12 +52,22 @@ class ModBaseModelProcessorTests(unittest.TestCase):
         endTime = time.time()
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
+    def testModBaseModelProvider(self):
+        """Test case: retrieve ModBase PDB model files"""
+        mProv = ModBaseModelProvider(
+            cachePath=self.__cachePath,
+            useCache=False,
+            modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
+        )
+        ok = mProv.testCache()
+        self.assertTrue(ok)
+
     def testModBaseModelProcessor(self):
-        """Test case: retrieve ModBase PDB model files and convert to mmCIF"""
+        """Test case: convert ModBase PDB models to mmCIF"""
         try:
             mProv = ModBaseModelProvider(
                 cachePath=self.__cachePath,
-                useCache=False,
+                useCache=True,
                 modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
             )
             ok = mProv.testCache()
@@ -100,10 +112,25 @@ class ModBaseModelProcessorTests(unittest.TestCase):
             logger.exception("Failing with %s", str(e))
             self.fail()
 
+    def testReorganizeModels(self):
+        mProv = ModBaseModelProvider(
+            cachePath=self.__cachePath,
+            useCache=True,
+            modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
+        )
+        ok = mProv.testCache()
+        self.assertTrue(ok)
+        ok = mProv.reorganizeModelFiles()
+        self.assertTrue(ok)
+        ok = mProv.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
+        self.assertTrue(ok)
+
 
 def modelProcessorSuite():
     suiteSelect = unittest.TestSuite()
+    suiteSelect.addTest(ModBaseModelProcessorTests("testModBaseModelProvider"))
     suiteSelect.addTest(ModBaseModelProcessorTests("testModBaseModelProcessor"))
+    suiteSelect.addTest(ModBaseModelProcessorTests("testReorganizeModels"))
     return suiteSelect
 
 

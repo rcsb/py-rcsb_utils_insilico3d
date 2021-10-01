@@ -68,8 +68,13 @@ class ModBaseModelProviderTests(unittest.TestCase):
         speciesPdbModelFileList = mProv.getSpeciesPdbModelFileList(speciesDataDir=speciesDirList[0])
         ok = True if len(speciesPdbModelFileList) > 0 else False
         self.assertTrue(ok)
-        #
-        # Now delete test cache data
+
+    def testDeleteCache(self):
+        mProv = ModBaseModelProvider(
+            cachePath=self.__cachePath,
+            useCache=True,
+            modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
+        )
         speciesNameList = mProv.getSpeciesNameList()
         for species in speciesNameList:
             ok = mProv.removeSpeciesDataDir(speciesName=species)
@@ -80,6 +85,7 @@ def fetchModBaseModels():
     suiteSelect = unittest.TestSuite()
     suiteSelect.addTest(ModBaseModelProviderTests("testFetchModBaseModels"))
     suiteSelect.addTest(ModBaseModelProviderTests("testReloadCache"))
+    suiteSelect.addTest(ModBaseModelProviderTests("testDeleteCache"))
     return suiteSelect
 
 

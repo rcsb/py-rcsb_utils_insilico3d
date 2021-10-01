@@ -62,13 +62,13 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         ok = True if len(speciesModelFileList) > 0 else False
         self.assertTrue(ok)
 
-    def testReorganizeAlphaFoldModels(self):
+    def testReorganizeModels(self):
         aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
         ok = aFMP.testCache()
         self.assertTrue(ok)
         ok = aFMP.reorganizeModelFiles()
         self.assertTrue(ok)
-        ok = aFMP.removeSpeciesDataDir(speciesName="Staphylococcus aureus")
+        ok = aFMP.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
         self.assertTrue(ok)
 
 
@@ -76,7 +76,7 @@ def fetchAlphaFoldModels():
     suiteSelect = unittest.TestSuite()
     suiteSelect.addTest(AlphaFoldModelProviderTests("testFetchAlphaFoldModels"))
     suiteSelect.addTest(AlphaFoldModelProviderTests("testReloadCache"))
-    suiteSelect.addTest(AlphaFoldModelProviderTests("testReorganizeAlphaFoldModels"))
+    suiteSelect.addTest(AlphaFoldModelProviderTests("testReorganizeModels"))
     return suiteSelect
 
 
