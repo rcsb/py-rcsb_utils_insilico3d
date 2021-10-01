@@ -259,7 +259,7 @@ class SwissModelProvider:
                 logger.exception("Failing with %s", str(e))
         return ok
 
-    def removeSpeciesDataDir(self, speciesName=None):
+    def removeSpeciesDataDir(self, speciesName=None, updateCache=True):
         """"Remove an entire species data directory (and its corresponding cache file entry),
         provided the species name as stored in the cache file."""
 
@@ -269,7 +269,8 @@ class SwissModelProvider:
                 cacheD = self.__mU.doImport(self.__speciesDataCacheFile, fmt="json")
                 dataD = cacheD["data"]
                 speciesDataD = dataD.pop(speciesName)
-                ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=3)
+                if updateCache:
+                    ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=3)
                 speciesDataDir = speciesDataD["dataDirectory"]
                 ok = self.__fU.remove(speciesDataDir)
             except Exception as e:

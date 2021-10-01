@@ -215,7 +215,7 @@ class AlphaFoldModelProvider:
 
     def reorganizeModelFiles(self):
         """Move model files from organism-wide model listing to hashed directory structure
-        using last two letters of UniProt ID"""
+        using last two characters of UniProt ID"""
 
         try:
             fU = FileUtil()
@@ -226,8 +226,10 @@ class AlphaFoldModelProvider:
                 for model in modelFileList:
                     modelName = fU.getFileName(model)
                     uniProtID = modelName.split(".cif.gz")[0].split("-")[1]
-                    last2 = uniProtID[-2:]
-                    destDir = os.path.join(self.__dividedDataPath, last2)
+                    first2 = uniProtID[0:2]
+                    mid2 = uniProtID[2:4]
+                    last2 = uniProtID[4:6]
+                    destDir = os.path.join(self.__dividedDataPath, first2, mid2, last2)
                     if not fU.exists(destDir):
                         fU.mkdir(destDir)
                     destModelPath = os.path.join(destDir, modelName)
@@ -239,7 +241,7 @@ class AlphaFoldModelProvider:
             logger.exception("Failing with %s", str(e))
             return False
 
-    def removeSpeciesDataDir(self, speciesName=None):
+    def removeSpeciesDataDir(self, speciesName=None, updateCache=True):
         """"Remove an entire species data directory (and its corresponding cache file entry),
         provided the species name as stored in the cache file."""
 
@@ -250,7 +252,8 @@ class AlphaFoldModelProvider:
                 cacheD = self.__mU.doImport(self.__speciesDataCacheFile, fmt="json")
                 dataD = cacheD["data"]
                 speciesDataD = dataD.pop(speciesName)
-                ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=3)
+                if updateCache:
+                    ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=3)
                 speciesDataDir = speciesDataD["data_directory"]
                 ok = fU.remove(speciesDataDir)
             except Exception as e:

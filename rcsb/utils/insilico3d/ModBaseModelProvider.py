@@ -38,6 +38,8 @@ class ModBaseModelProvider:
         self.__cachePath = kwargs.get("cachePath", "./CACHE-insilico3d-models")
         self.__dirPath = os.path.join(self.__cachePath, "ModBase")
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
+        self.__dividedDataPath = os.path.join(self.__cachePath, "divided")
+        self.__dividedDataCacheFile = os.path.join(self.__cachePath, "ModBase-model-data.json")
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
         self.__fU = FileUtil(workPath=self.__dirPath)
@@ -252,7 +254,7 @@ class ModBaseModelProvider:
                 logger.exception("Failing with %s", str(e))
         return ok
 
-    def removeSpeciesDataDir(self, speciesName=None):
+    def removeSpeciesDataDir(self, speciesName=None, updateCache=True):
         """"Remove an entire species data directory (and its corresponding cache file entry),
         provided the species name as stored in the cache file."""
 
@@ -262,9 +264,43 @@ class ModBaseModelProvider:
                 cacheD = self.__mU.doImport(self.__speciesDataCacheFile, fmt="json")
                 dataD = cacheD["data"]
                 speciesDataD = dataD.pop(speciesName)
-                ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=3)
+                if updateCache:
+                    ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=3)
                 speciesDataDir = speciesDataD["dataDirectory"]
                 ok = self.__fU.remove(speciesDataDir)
             except Exception as e:
                 logger.exception("Failing with %s", str(e))
         return ok
+
+    def reorganizeModelFiles(self):
+        """Move model files from organism-wide model listing to hashed directory structure
+        using last two characters of the filename (NCBI ID), excluing the run number suffix."""
+
+        try:
+            fU = FileUtil()
+            speciesDirList = self.getSpeciesDirList()
+            newModelDirD = {}
+            for speciesDir in speciesDirList:
+                modelFileList = self.getModelFileList(inputPathList=[speciesDir])
+                for model in modelFileList:
+                    modelName = fU.getFileName(model)
+                    modelNameBase = modelName.split('.cif')[0]
+                    if "_" in modelNameBase[0:5] or modelNameBase.startswith("ENS"):
+                        modelNameBaseHash = modelNameBase.split(".")[0]
+                    else:
+                        modelNameBaseHash = modelNameBase.split("_")[0]
+                    sixCharHash = modelNameBaseHash[-6:]
+                    first2 = sixCharHash[0:2]
+                    mid2 = sixCharHash[2:4]
+                    last2 = sixCharHash[4:6]
+                    destDir = os.path.join(self.__dividedDataPath, first2, mid2, last2)
+                    if not fU.exists(destDir):
+                        fU.mkdir(destDir)
+                    destModelPath = os.path.join(destDir, modelName)
+                    fU.put(model, destModelPath)
+                    newModelDirD[modelName] = destModelPath
+            self.__mU.doExport(self.__dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
+            return True
+        except Exception as e:
+            logger.exception("Failing with %s", str(e))
+            return False
