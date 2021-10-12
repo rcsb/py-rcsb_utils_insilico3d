@@ -26,8 +26,6 @@ import unittest
 
 from rcsb.utils.insilico3d.SwissModelProvider import SwissModelProvider
 from rcsb.utils.insilico3d.SwissModelProcessor import SwissModelProcessor
-# from SwissModelProvider import SwissModelProvider
-# from SwissModelProcessor import SwissModelProcessor
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
@@ -52,16 +50,6 @@ class SwissModelProcessorTests(unittest.TestCase):
         endTime = time.time()
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
-    # def testSwissModelProvider(self):
-    #     """Test case: retrieve SWISS-MODEL PDB model files"""
-    #     mProv = SwissModelProvider(
-    #         cachePath=self.__cachePath,
-    #         useCache=False,
-    #         swissModelServerSpeciesDataPathDict={"Staphylococcus aureus": "93061_coords.tar.gz"}
-    #     )
-    #     ok = mProv.testCache()
-    #     self.assertTrue(ok)
-
     def testSwissModelProcessor(self):
         """Test case: convert SWISS-MODEL PDB models to mmCIF"""
         try:
@@ -74,7 +62,7 @@ class SwissModelProcessorTests(unittest.TestCase):
             ok = mProv.testCache()
             self.assertTrue(ok)
             #
-            # Next test reload data for processing
+            # Next test reloading data and processing
             mProv = SwissModelProvider(
                 cachePath=self.__cachePath,
                 useCache=True,
@@ -87,7 +75,7 @@ class SwissModelProcessorTests(unittest.TestCase):
             self.assertTrue(ok)
             speciesConversionDict = mProv.getSpeciesConversionDict(speciesName=speciesNameList[0])
             speciesConversionDict["speciesPdbModelFileList"] = speciesConversionDict["speciesPdbModelFileList"][0:300]
-            logger.info("speciesConversionDict['speciesPdbModelFileList'] %s", speciesConversionDict["speciesPdbModelFileList"])
+            # logger.info("speciesConversionDict['speciesPdbModelFileList'] %s", speciesConversionDict["speciesPdbModelFileList"])
             ok = True if len(speciesConversionDict["speciesPdbModelFileList"]) > 0 else False
             self.assertTrue(ok)
             mProc = SwissModelProcessor(
@@ -127,31 +115,10 @@ class SwissModelProcessorTests(unittest.TestCase):
             logger.exception("Failing with %s", str(e))
             self.fail()
 
-    # def testReorganizeModels(self):
-    #     mProv = SwissModelProvider(
-    #         cachePath=self.__cachePath,
-    #         useCache=True,
-    #         swissModelServerSpeciesDataPathDict={"Staphylococcus aureus": "93061_coords.tar.gz"}
-    #     )
-    #     ok = mProv.testCache()
-    #     self.assertTrue(ok)
-    #     ok = mProv.reorganizeModelFiles()
-    #     self.assertTrue(ok)
-    #     ok = mProv.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
-    #     self.assertTrue(ok)
-
-    # def testSwissModelProcessorAll(self):
-    #     self.testSwissModelProvider()
-    #     self.testSwissModelProcessor()
-    #     self.testReorganizeModels()
-
 
 def modelProcessorSuite():
     suiteSelect = unittest.TestSuite()
-    # suiteSelect.addTest(SwissModelProcessorTests("testSwissModelProvider"))
     suiteSelect.addTest(SwissModelProcessorTests("testSwissModelProcessor"))
-    # suiteSelect.addTest(SwissModelProcessorTests("testReorganizeModels"))
-    # suiteSelect.addTest(SwissModelProcessorTests("testSwissModelProcessorAll"))
     return suiteSelect
 
 

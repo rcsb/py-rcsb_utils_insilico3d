@@ -25,7 +25,6 @@ import time
 import unittest
 
 from rcsb.utils.insilico3d.SwissModelProvider import SwissModelProvider
-# from SwissModelProvider import SwissModelProvider
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(HERE))
@@ -47,7 +46,8 @@ class SwissModelProviderTests(unittest.TestCase):
         endTime = time.time()
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
-    def testFetchSwissModels(self):
+    def testSwissModelProvider(self):
+        # First test fetching model archive
         mProv = SwissModelProvider(
             cachePath=self.__cachePath,
             useCache=False,
@@ -55,8 +55,8 @@ class SwissModelProviderTests(unittest.TestCase):
         )
         ok = mProv.testCache()
         self.assertTrue(ok)
-
-    def testReloadCache(self):
+        #
+        # Next test reloading the cache
         mProv = SwissModelProvider(
             cachePath=self.__cachePath,
             useCache=True,
@@ -69,8 +69,8 @@ class SwissModelProviderTests(unittest.TestCase):
         speciesPdbModelFileList = mProv.getSpeciesPdbModelFileList(speciesDataDir=speciesDirList[0])
         ok = True if len(speciesPdbModelFileList) > 0 else False
         self.assertTrue(ok)
-
-    def testDeleteCache(self):
+        #
+        # Last test deleting the cache
         mProv = SwissModelProvider(
             cachePath=self.__cachePath,
             useCache=True,
@@ -81,12 +81,47 @@ class SwissModelProviderTests(unittest.TestCase):
             ok = mProv.removeSpeciesDataDir(speciesName=species)
             self.assertTrue(ok)
 
+    # def testFetchSwissModels(self):
+    #     mProv = SwissModelProvider(
+    #         cachePath=self.__cachePath,
+    #         useCache=False,
+    #         swissModelServerSpeciesDataPathDict={"Staphylococcus aureus": "93061_coords.tar.gz"}
+    #     )
+    #     ok = mProv.testCache()
+    #     self.assertTrue(ok)
+
+    # def testReloadCache(self):
+    #     mProv = SwissModelProvider(
+    #         cachePath=self.__cachePath,
+    #         useCache=True,
+    #         swissModelServerSpeciesDataPathDict={"Staphylococcus aureus": "93061_coords.tar.gz"}
+    #     )
+    #     speciesDirList = mProv.getSpeciesDirList()
+    #     ok = True if len(speciesDirList) > 0 else False
+    #     self.assertTrue(ok)
+    #     #
+    #     speciesPdbModelFileList = mProv.getSpeciesPdbModelFileList(speciesDataDir=speciesDirList[0])
+    #     ok = True if len(speciesPdbModelFileList) > 0 else False
+    #     self.assertTrue(ok)
+
+    # def testDeleteCache(self):
+    #     mProv = SwissModelProvider(
+    #         cachePath=self.__cachePath,
+    #         useCache=True,
+    #         swissModelServerSpeciesDataPathDict={"Staphylococcus aureus": "93061_coords.tar.gz"}
+    #     )
+    #     speciesNameList = mProv.getSpeciesNameList()
+    #     for species in speciesNameList:
+    #         ok = mProv.removeSpeciesDataDir(speciesName=species)
+    #         self.assertTrue(ok)
+
 
 def fetchSwissModels():
     suiteSelect = unittest.TestSuite()
-    suiteSelect.addTest(SwissModelProviderTests("testFetchSwissModels"))
-    suiteSelect.addTest(SwissModelProviderTests("testReloadCache"))
-    suiteSelect.addTest(SwissModelProviderTests("testDeleteCache"))
+    suiteSelect.addTest(SwissModelProviderTests("testSwissModelProvider"))
+    # suiteSelect.addTest(SwissModelProviderTests("testFetchSwissModels"))
+    # suiteSelect.addTest(SwissModelProviderTests("testReloadCache"))
+    # suiteSelect.addTest(SwissModelProviderTests("testDeleteCache"))
     return suiteSelect
 
 

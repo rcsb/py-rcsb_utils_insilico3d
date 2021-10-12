@@ -25,7 +25,6 @@ import time
 import unittest
 
 from rcsb.utils.insilico3d.AlphaFoldModelProvider import AlphaFoldModelProvider
-# from AlphaFoldModelProvider import AlphaFoldModelProvider
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(HERE))
@@ -47,36 +46,64 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         endTime = time.time()
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
-    def testFetchAlphaFoldModels(self):
+    def testAlphaFoldModelProvider(self):
+        # First test fetching model archive
         aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=False, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
         ok = aFMP.testCache()
         self.assertTrue(ok)
-
-    def testReloadCache(self):
+        #
+        # Next test reloading the cache
         aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
         speciesDirList = aFMP.getSpeciesDirList()
         ok = True if len(speciesDirList) > 0 else False
         self.assertTrue(ok)
-
+        #
         speciesModelFileList = aFMP.getModelFileList(inputPathList=speciesDirList)
         ok = True if len(speciesModelFileList) > 0 else False
         self.assertTrue(ok)
-
-    def testReorganizeModels(self):
+        #
+        # Next test reorganizing model file directory structure
         aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
         ok = aFMP.testCache()
         self.assertTrue(ok)
         ok = aFMP.reorganizeModelFiles()
         self.assertTrue(ok)
+        #
+        # Last test deleting the cache
         ok = aFMP.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
         self.assertTrue(ok)
+
+    # def testFetchAlphaFoldModels(self):
+    #     aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=False, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
+    #     ok = aFMP.testCache()
+    #     self.assertTrue(ok)
+
+    # def testReloadCache(self):
+    #     aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
+    #     speciesDirList = aFMP.getSpeciesDirList()
+    #     ok = True if len(speciesDirList) > 0 else False
+    #     self.assertTrue(ok)
+
+    #     speciesModelFileList = aFMP.getModelFileList(inputPathList=speciesDirList)
+    #     ok = True if len(speciesModelFileList) > 0 else False
+    #     self.assertTrue(ok)
+
+    # def testReorganizeModels(self):
+    #     aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
+    #     ok = aFMP.testCache()
+    #     self.assertTrue(ok)
+    #     ok = aFMP.reorganizeModelFiles()
+    #     self.assertTrue(ok)
+    #     ok = aFMP.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
+    #     self.assertTrue(ok)
 
 
 def fetchAlphaFoldModels():
     suiteSelect = unittest.TestSuite()
-    suiteSelect.addTest(AlphaFoldModelProviderTests("testFetchAlphaFoldModels"))
-    suiteSelect.addTest(AlphaFoldModelProviderTests("testReloadCache"))
-    suiteSelect.addTest(AlphaFoldModelProviderTests("testReorganizeModels"))
+    suiteSelect.addTest(AlphaFoldModelProviderTests("testAlphaFoldModelProvider"))
+    # suiteSelect.addTest(AlphaFoldModelProviderTests("testFetchAlphaFoldModels"))
+    # suiteSelect.addTest(AlphaFoldModelProviderTests("testReloadCache"))
+    # suiteSelect.addTest(AlphaFoldModelProviderTests("testReorganizeModels"))
     return suiteSelect
 
 

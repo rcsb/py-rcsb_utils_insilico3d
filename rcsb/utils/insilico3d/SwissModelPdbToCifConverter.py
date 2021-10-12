@@ -21,7 +21,6 @@ __license__ = "Apache 2.0"
 
 import datetime
 import logging
-# import os.path
 
 from rcsb.utils.modbase_utils.modbase_pdb_to_cif import CifLoop, three_to_one, one_to_three
 from rcsb.utils.io.FileUtil import FileUtil
@@ -34,9 +33,7 @@ class SwissModelPdbToCifConverter:
 
     def __init__(self, **kwargs):
         self.__cachePath = kwargs.get("cachePath", "./CACHE-insilico3d-models")
-        # self.__workPath = os.path.join(self.__cachePath, "SWISS-MODEL", "tmp")
         self.__fU = FileUtil(workPath=self.__cachePath)
-        # self.__fU.mkdir(self.__workPath)
         #
         # Initialize all attributes
         self.pdbRead = False
@@ -61,7 +58,6 @@ class SwissModelPdbToCifConverter:
         return bool(readOk and writeOk)
 
     def readPdb(self, pdbFileIn, **kwargs):
-        # Make sure to initialize all attributes here to be sure none are leftover and used for the next file
         self.organism = kwargs.get("organism", self.organism)
         self.uniProtId = kwargs.get("uniProtId", self.uniProtId)
         self.pdbRead = False
@@ -89,10 +85,10 @@ class SwissModelPdbToCifConverter:
                     elif line.startswith('JRNL     '):
                         self.jrnl.append(line.strip())
                         # Then process these separately to get References, Disclaimers, etc.
-                        # OR, just copy and paste the details organized by MAXIT
+                        # For now, just print out pre-organized citation information (assuming citation details won't change for a while)
                     elif line.startswith('REMARK'):
                         self.remarks.append(line.strip())
-                    elif line.startswith('ATOM') or line.startswith('HETATM'):  # how to handle hetatoms later? see model O07325
+                    elif line.startswith('ATOM') or line.startswith('HETATM'):
                         self.atoms.append(line)
             # NOT ALL SWISS-MODEL models are single chain
             self.atomSiteParsedList, self.atomTypeElements = self.__parseAtomSites()
@@ -169,11 +165,10 @@ class SwissModelPdbToCifConverter:
         return targetAlignD, templateAlignD, offAlignD
 
     def __parseAtomSites(self):
-        # Modify this to accept a list of chain_ids
         atomSiteParsedList = []
         chainIds = [letter for letter in "ABCDEFGHIJKLMNOPQRSTUVWXYZ"]
         atomTypeElements = set()
-        entityId = 1  # This should be defined earlier up and to a self.* attribute
+        entityId = self.targetEntityId
         resNum = 1
         chainIdx = 0
         ordinal = 1
@@ -437,7 +432,7 @@ VAL 'L-peptide linking' VALINE 'C5 H11 N O2' 117.148""")
                 for i, val in enumerate(pSeq):
                     lp.write(f"{self.templateEntityId} {i+1} {one_to_three[val]} n")
             for i, val in enumerate(self.structureResidueD["pdbRes3Letter"]):
-                if self.structureResidueD["pdbChainIds"][i] == "A":  # Only write out chain A? (That's what Maxit does...)
+                if self.structureResidueD["pdbChainIds"][i] == "A":  # Only write out chain A
                     lp.write(f'{self.targetEntityId} {self.structureResidueD["pdbSeqIds"][i]} {val} n')
 
     def __writePdbxPolySeqScheme(self):
@@ -528,7 +523,7 @@ VAL 'L-peptide linking' VALINE 'C5 H11 N O2' 117.148""")
             lp.write("2 1 1 %s" % self.alignTarget["oneLetterWithGaps"])
 
     def __writeAssembly(self):
-        # Should this be looped over for each chain, as done in 'struct_asym' below?
+        # This may need to be looped over for each chain, as done in 'struct_asym' below
         with self.loop(
                 'ma_struct_assembly',
                 ['ordinal_id', 'assembly_id', 'entity_id', 'asym_id', 'seq_id_begin', 'seq_id_end']) as lp:

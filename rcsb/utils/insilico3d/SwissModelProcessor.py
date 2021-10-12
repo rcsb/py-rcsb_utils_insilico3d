@@ -26,7 +26,6 @@ import os.path
 import time
 import collections
 
-# from SwissModelPdbToCifConverter import SwissModelPdbToCifConverter
 from rcsb.utils.insilico3d.SwissModelPdbToCifConverter import SwissModelPdbToCifConverter
 from rcsb.utils.insilico3d import __version__
 from rcsb.utils.io.MarshalUtil import MarshalUtil
