@@ -26,8 +26,8 @@ import os.path
 import time
 import collections
 
-from SwissModelPdbToCifConverter import SwissModelPdbToCifConverter
-# from rcsb.utils.insilico3d.SwissModelPdbToCifConverter import SwissModelPdbToCifConverter
+# from SwissModelPdbToCifConverter import SwissModelPdbToCifConverter
+from rcsb.utils.insilico3d.SwissModelPdbToCifConverter import SwissModelPdbToCifConverter
 from rcsb.utils.insilico3d import __version__
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FileUtil import FileUtil
@@ -123,6 +123,7 @@ class SwissModelWorker(object):
         try:
             species = optionsD.get("species")
             ok = swissModelConverter.convertPdbToCif(pdbFileIn=pdbFile, cifFileOut=mmCifOutFile, organism=species, uniProtId=uniProtId)
+            assert ok
             mmCifOutFileZ = mmCifOutFile + ".gz"
             ok = self.__fU.compress(inpPath=mmCifOutFile, outPath=mmCifOutFileZ)
             if ok:
@@ -163,8 +164,7 @@ class SwissModelProcessor(object):
             self.__mU = MarshalUtil(workPath=self.__speciesModelDir)
             self.__fU = FileUtil(workPath=self.__speciesModelDir)
 
-            # self.__modelD = self.__reload(fmt="pickle", useCache=useCache)
-            self.__modelD = self.__reload(fmt="json", useCache=useCache)
+            self.__modelD = self.__reload(fmt="pickle", useCache=useCache)
 
         except Exception as e:
             logger.exception("Failing with %s", str(e))
@@ -192,8 +192,7 @@ class SwissModelProcessor(object):
             pass
         return []
 
-    # def generate(self, updateOnly=False, fmt="pickle", indent=0):
-    def generate(self, updateOnly=False, fmt="json", indent=0):
+    def generate(self, updateOnly=False, fmt="pickle", indent=0):
         """Generate converted mmCIF models from SwissModel PDB files.
 
         Args:
@@ -225,13 +224,11 @@ class SwissModelProcessor(object):
             logger.exception("Failing with %s", str(e))
         return ok
 
-    # def reload(self, fmt="pickle", useCache=True):
-    def reload(self, fmt="json", useCache=True):
+    def reload(self, fmt="pickle", useCache=True):
         self.__modelD = self.__reload(fmt=fmt, useCache=useCache)
         return self.__modelD is not None
 
-    # def __reload(self, fmt="pickle", useCache=True):
-    def __reload(self, fmt="json", useCache=True):
+    def __reload(self, fmt="pickle", useCache=True):
         """Reload from the current cache directory."""
         try:
             modelCachePath = self.__getModelCachePath(fmt=fmt)
@@ -249,8 +246,7 @@ class SwissModelProcessor(object):
     def getCachePath(self):
         return self.__cachePath
 
-    # def __getModelCachePath(self, fmt="pickle"):
-    def __getModelCachePath(self, fmt="json"):
+    def __getModelCachePath(self, fmt="pickle"):
         ext = "pic" if fmt == "pickle" else "json"
         speciesNameNoSpace = self.__speciesName.replace(" ", "_")
         pth = os.path.join(self.__speciesModelDir, speciesNameNoSpace + "-model-data." + ext)

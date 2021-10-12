@@ -24,8 +24,8 @@ import resource
 import time
 import unittest
 
-# from rcsb.utils.insilico3d.SwissModelProvider import SwissModelProvider
-from SwissModelProvider import SwissModelProvider
+from rcsb.utils.insilico3d.SwissModelProvider import SwissModelProvider
+# from SwissModelProvider import SwissModelProvider
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(HERE))
@@ -86,7 +86,7 @@ def fetchSwissModels():
     suiteSelect = unittest.TestSuite()
     suiteSelect.addTest(SwissModelProviderTests("testFetchSwissModels"))
     suiteSelect.addTest(SwissModelProviderTests("testReloadCache"))
-    # suiteSelect.addTest(SwissModelProviderTests("testDeleteCache"))
+    suiteSelect.addTest(SwissModelProviderTests("testDeleteCache"))
     return suiteSelect
 
 

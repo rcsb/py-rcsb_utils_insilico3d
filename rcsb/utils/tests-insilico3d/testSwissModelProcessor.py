@@ -24,10 +24,10 @@ import resource
 import time
 import unittest
 
-# from rcsb.utils.insilico3d.SwissModelProvider import SwissModelProvider
-# from rcsb.utils.insilico3d.SwissModelProcessor import SwissModelProcessor
-from SwissModelProvider import SwissModelProvider
-from SwissModelProcessor import SwissModelProcessor
+from rcsb.utils.insilico3d.SwissModelProvider import SwissModelProvider
+from rcsb.utils.insilico3d.SwissModelProcessor import SwissModelProcessor
+# from SwissModelProvider import SwissModelProvider
+# from SwissModelProcessor import SwissModelProcessor
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
@@ -76,7 +76,7 @@ class SwissModelProcessorTests(unittest.TestCase):
             ok = True if len(speciesNameList) > 0 else False
             self.assertTrue(ok)
             speciesConversionDict = mProv.getSpeciesConversionDict(speciesName=speciesNameList[0])
-            speciesConversionDict["speciesPdbModelFileList"] = speciesConversionDict["speciesPdbModelFileList"][0:20]
+            speciesConversionDict["speciesPdbModelFileList"] = speciesConversionDict["speciesPdbModelFileList"][0:300]
             ok = True if len(speciesConversionDict["speciesPdbModelFileList"]) > 0 else False
             self.assertTrue(ok)
             mProc = SwissModelProcessor(
@@ -117,13 +117,13 @@ class SwissModelProcessorTests(unittest.TestCase):
         self.assertTrue(ok)
         ok = mProv.reorganizeModelFiles()
         self.assertTrue(ok)
-        # ok = mProv.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
-        # self.assertTrue(ok)
+        ok = mProv.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
+        self.assertTrue(ok)
 
 
 def modelProcessorSuite():
     suiteSelect = unittest.TestSuite()
-    # suiteSelect.addTest(SwissModelProcessorTests("testSwissModelProvider"))
+    suiteSelect.addTest(SwissModelProcessorTests("testSwissModelProvider"))
     suiteSelect.addTest(SwissModelProcessorTests("testSwissModelProcessor"))
     suiteSelect.addTest(SwissModelProcessorTests("testReorganizeModels"))
     return suiteSelect
