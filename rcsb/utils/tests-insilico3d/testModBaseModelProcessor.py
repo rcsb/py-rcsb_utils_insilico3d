@@ -125,12 +125,18 @@ class ModBaseModelProcessorTests(unittest.TestCase):
         ok = mProv.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
         self.assertTrue(ok)
 
+    def testModBaseModelProcessorAll(self):
+        self.testModBaseModelProvider()
+        self.testModBaseModelProcessor()
+        self.testReorganizeModels()
+
 
 def modelProcessorSuite():
     suiteSelect = unittest.TestSuite()
-    suiteSelect.addTest(ModBaseModelProcessorTests("testModBaseModelProvider"))
-    suiteSelect.addTest(ModBaseModelProcessorTests("testModBaseModelProcessor"))
-    suiteSelect.addTest(ModBaseModelProcessorTests("testReorganizeModels"))
+    # suiteSelect.addTest(ModBaseModelProcessorTests("testModBaseModelProvider"))
+    # suiteSelect.addTest(ModBaseModelProcessorTests("testModBaseModelProcessor"))
+    # suiteSelect.addTest(ModBaseModelProcessorTests("testReorganizeModels"))
+    suiteSelect.addTest(ModBaseModelProcessorTests("testModBaseModelProcessorAll"))
     return suiteSelect
 
 

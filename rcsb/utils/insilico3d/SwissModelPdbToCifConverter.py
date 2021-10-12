@@ -53,7 +53,7 @@ class SwissModelPdbToCifConverter:
         self.alignTarget, self.alignTemplate, self.alignOffsets = None, None, None
         self.templateEntityId, self.targetEntityId, self.templateDataId, self.targetDataId, self.alignmentDataId, self.coordDataId = None, None, None, None, None, None
 
-    def convertPdbToCif(self, pdbFileIn, cifFileOut,  **kwargs):
+    def convertPdbToCif(self, pdbFileIn, cifFileOut, **kwargs):
         self.organism = kwargs.get("organism", self.organism)
         self.uniProtId = kwargs.get("uniProtId", self.uniProtId)
         readOk = self.readPdb(pdbFileIn=pdbFileIn, organism=self.organism, uniProtId=self.uniProtId)

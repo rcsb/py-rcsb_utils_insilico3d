@@ -65,6 +65,16 @@ class SwissModelProcessorTests(unittest.TestCase):
     def testSwissModelProcessor(self):
         """Test case: convert SWISS-MODEL PDB models to mmCIF"""
         try:
+            # # First download the archived data for processing
+            # mProv = SwissModelProvider(
+            #     cachePath=self.__cachePath,
+            #     useCache=False,
+            #     swissModelServerSpeciesDataPathDict={"Staphylococcus aureus": "93061_coords.tar.gz"}
+            # )
+            # ok = mProv.testCache()
+            # self.assertTrue(ok)
+            #
+            # Next test reload data for processing
             mProv = SwissModelProvider(
                 cachePath=self.__cachePath,
                 useCache=True,
@@ -103,6 +113,15 @@ class SwissModelProcessorTests(unittest.TestCase):
             ok = mProc.testCache(minCount=10)
             self.assertTrue(ok)
             #
+            # # Test reorganize models
+            # ok = mProv.testCache()
+            # self.assertTrue(ok)
+            # ok = mProv.reorganizeModelFiles()
+            # self.assertTrue(ok)
+            # #
+            # # Last remove species data directory
+            # ok = mProv.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
+            # self.assertTrue(ok)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
             self.fail()
@@ -120,12 +139,18 @@ class SwissModelProcessorTests(unittest.TestCase):
         ok = mProv.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
         self.assertTrue(ok)
 
+    def testSwissModelProcessorAll(self):
+        self.testSwissModelProvider()
+        self.testSwissModelProcessor()
+        self.testReorganizeModels()
+
 
 def modelProcessorSuite():
     suiteSelect = unittest.TestSuite()
-    suiteSelect.addTest(SwissModelProcessorTests("testSwissModelProvider"))
-    suiteSelect.addTest(SwissModelProcessorTests("testSwissModelProcessor"))
-    suiteSelect.addTest(SwissModelProcessorTests("testReorganizeModels"))
+    # suiteSelect.addTest(SwissModelProcessorTests("testSwissModelProvider"))
+    # suiteSelect.addTest(SwissModelProcessorTests("testSwissModelProcessor"))
+    # suiteSelect.addTest(SwissModelProcessorTests("testReorganizeModels"))
+    suiteSelect.addTest(SwissModelProcessorTests("testSwissModelProcessorAll"))
     return suiteSelect
 
 
