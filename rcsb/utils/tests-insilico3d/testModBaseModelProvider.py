@@ -81,47 +81,10 @@ class ModBaseModelProviderTests(unittest.TestCase):
             ok = mProv.removeSpeciesDataDir(speciesName=species)
             self.assertTrue(ok)
 
-    # def testFetchModBaseModels(self):
-    #     mProv = ModBaseModelProvider(
-    #         cachePath=self.__cachePath,
-    #         useCache=False,
-    #         modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
-    #     )
-    #     ok = mProv.testCache()
-    #     self.assertTrue(ok)
-
-    # def testReloadCache(self):
-    #     mProv = ModBaseModelProvider(
-    #         cachePath=self.__cachePath,
-    #         useCache=True,
-    #         modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
-    #     )
-    #     speciesDirList = mProv.getSpeciesDirList()
-    #     ok = True if len(speciesDirList) > 0 else False
-    #     self.assertTrue(ok)
-    #     #
-    #     speciesPdbModelFileList = mProv.getSpeciesPdbModelFileList(speciesDataDir=speciesDirList[0])
-    #     ok = True if len(speciesPdbModelFileList) > 0 else False
-    #     self.assertTrue(ok)
-
-    # def testDeleteCache(self):
-    #     mProv = ModBaseModelProvider(
-    #         cachePath=self.__cachePath,
-    #         useCache=True,
-    #         modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
-    #     )
-    #     speciesNameList = mProv.getSpeciesNameList()
-    #     for species in speciesNameList:
-    #         ok = mProv.removeSpeciesDataDir(speciesName=species)
-    #         self.assertTrue(ok)
-
 
 def fetchModBaseModels():
     suiteSelect = unittest.TestSuite()
     suiteSelect.addTest(ModBaseModelProviderTests("testModBaseModelProvider"))
-    # suiteSelect.addTest(ModBaseModelProviderTests("testFetchModBaseModels"))
-    # suiteSelect.addTest(ModBaseModelProviderTests("testReloadCache"))
-    # suiteSelect.addTest(ModBaseModelProviderTests("testDeleteCache"))
     return suiteSelect
 
 

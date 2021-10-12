@@ -73,37 +73,10 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         ok = aFMP.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
         self.assertTrue(ok)
 
-    # def testFetchAlphaFoldModels(self):
-    #     aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=False, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
-    #     ok = aFMP.testCache()
-    #     self.assertTrue(ok)
-
-    # def testReloadCache(self):
-    #     aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
-    #     speciesDirList = aFMP.getSpeciesDirList()
-    #     ok = True if len(speciesDirList) > 0 else False
-    #     self.assertTrue(ok)
-
-    #     speciesModelFileList = aFMP.getModelFileList(inputPathList=speciesDirList)
-    #     ok = True if len(speciesModelFileList) > 0 else False
-    #     self.assertTrue(ok)
-
-    # def testReorganizeModels(self):
-    #     aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
-    #     ok = aFMP.testCache()
-    #     self.assertTrue(ok)
-    #     ok = aFMP.reorganizeModelFiles()
-    #     self.assertTrue(ok)
-    #     ok = aFMP.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
-    #     self.assertTrue(ok)
-
 
 def fetchAlphaFoldModels():
     suiteSelect = unittest.TestSuite()
     suiteSelect.addTest(AlphaFoldModelProviderTests("testAlphaFoldModelProvider"))
-    # suiteSelect.addTest(AlphaFoldModelProviderTests("testFetchAlphaFoldModels"))
-    # suiteSelect.addTest(AlphaFoldModelProviderTests("testReloadCache"))
-    # suiteSelect.addTest(AlphaFoldModelProviderTests("testReorganizeModels"))
     return suiteSelect
 
 

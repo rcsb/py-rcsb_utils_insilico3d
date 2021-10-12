@@ -1,1 +1,0 @@
-../insilico3d/ModBaseModelProvider.py

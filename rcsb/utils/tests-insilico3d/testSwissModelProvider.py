@@ -81,47 +81,10 @@ class SwissModelProviderTests(unittest.TestCase):
             ok = mProv.removeSpeciesDataDir(speciesName=species)
             self.assertTrue(ok)
 
-    # def testFetchSwissModels(self):
-    #     mProv = SwissModelProvider(
-    #         cachePath=self.__cachePath,
-    #         useCache=False,
-    #         swissModelServerSpeciesDataPathDict={"Staphylococcus aureus": "93061_coords.tar.gz"}
-    #     )
-    #     ok = mProv.testCache()
-    #     self.assertTrue(ok)
-
-    # def testReloadCache(self):
-    #     mProv = SwissModelProvider(
-    #         cachePath=self.__cachePath,
-    #         useCache=True,
-    #         swissModelServerSpeciesDataPathDict={"Staphylococcus aureus": "93061_coords.tar.gz"}
-    #     )
-    #     speciesDirList = mProv.getSpeciesDirList()
-    #     ok = True if len(speciesDirList) > 0 else False
-    #     self.assertTrue(ok)
-    #     #
-    #     speciesPdbModelFileList = mProv.getSpeciesPdbModelFileList(speciesDataDir=speciesDirList[0])
-    #     ok = True if len(speciesPdbModelFileList) > 0 else False
-    #     self.assertTrue(ok)
-
-    # def testDeleteCache(self):
-    #     mProv = SwissModelProvider(
-    #         cachePath=self.__cachePath,
-    #         useCache=True,
-    #         swissModelServerSpeciesDataPathDict={"Staphylococcus aureus": "93061_coords.tar.gz"}
-    #     )
-    #     speciesNameList = mProv.getSpeciesNameList()
-    #     for species in speciesNameList:
-    #         ok = mProv.removeSpeciesDataDir(speciesName=species)
-    #         self.assertTrue(ok)
-
 
 def fetchSwissModels():
     suiteSelect = unittest.TestSuite()
     suiteSelect.addTest(SwissModelProviderTests("testSwissModelProvider"))
-    # suiteSelect.addTest(SwissModelProviderTests("testFetchSwissModels"))
-    # suiteSelect.addTest(SwissModelProviderTests("testReloadCache"))
-    # suiteSelect.addTest(SwissModelProviderTests("testDeleteCache"))
     return suiteSelect
 
 
