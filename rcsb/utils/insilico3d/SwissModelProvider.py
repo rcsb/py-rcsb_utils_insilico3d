@@ -38,6 +38,8 @@ class SwissModelProvider:
         self.__cachePath = kwargs.get("cachePath", "./CACHE-insilico3d-models")
         self.__dirPath = os.path.join(self.__cachePath, "SWISS-MODEL")
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
+        self.__dividedDataPath = os.path.join(self.__cachePath, "divided")
+        self.__dividedDataCacheFile = os.path.join(self.__cachePath, "SWISS-MODEL-model-data.json")
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
         self.__fU = FileUtil(workPath=self.__dirPath)
@@ -193,6 +195,27 @@ class SwissModelProvider:
 
         return modelFileList
 
+    def getSpeciesCifModelFileList(self, speciesDataDir=None):
+        """Return a list of filepaths for all converted SWISS-MODEL mmCIF model files for a given species.
+
+        Args:
+            speciesDataDir (str): path to base-level of species data directory.
+
+        Returns:
+            (list): list of absolute model file paths (only matches "*.cif.gz" files)
+        """
+
+        modelFileList = []
+
+        if speciesDataDir:
+            try:
+                modelFiles = glob.glob(os.path.join(speciesDataDir, "SWISS-MODEL_Repository", "*", "*", "*", "swissmodel", "*.cif.gz"))
+                modelFileList = [os.path.abspath(f) for f in modelFiles]
+            except Exception as e:
+                logger.exception("Failing with %s", str(e))
+
+        return modelFileList
+
     def getSpeciesPdbModelFileList(self, speciesDataDir=None):
         """Return a list of filepaths for all SWISS-MODEL PDB model files for a given species.
 
@@ -235,29 +258,31 @@ class SwissModelProvider:
             speciesConversionDict["speciesPdbModelFileList"] = self.getSpeciesPdbModelFileList(speciesDataDir=speciesDataDir)
         return speciesConversionDict
 
-    def removePdbModelDir(self, speciesDataDir=None):
-        """Remove the directory containing PDB model files for a given species directory."""
+    def reorganizeModelFiles(self):
+        """Move model files from organism-wide model listing to hashed directory structure constructed
+        from the 6-character UniProt ID (e.g., "P52078" will be moved to "./P5/20/78").
+        """
 
-        ok = False
-        if speciesDataDir:
-            try:
-                speciesPdbModelDir = os.path.join(speciesDataDir, "model")
-                ok = self.__fU.remove(speciesPdbModelDir)
-            except Exception as e:
-                logger.exception("Failing with %s", str(e))
-        return ok
-
-    def removeAlignmentDir(self, speciesDataDir=None):
-        """Remove the directory containing alignment files for a given species directory."""
-
-        ok = False
-        if speciesDataDir:
-            try:
-                speciesAlignmentDir = os.path.join(speciesDataDir, "alignment")
-                ok = self.__fU.remove(speciesAlignmentDir)
-            except Exception as e:
-                logger.exception("Failing with %s", str(e))
-        return ok
+        try:
+            speciesDirList = self.getSpeciesDirList()
+            newModelDirD = {}
+            for speciesDir in speciesDirList:
+                modelFileList = self.getSpeciesCifModelFileList(speciesDataDir=speciesDir)
+                for model in modelFileList:
+                    modelName = self.__fU.getFileName(model)
+                    # uniProtId = "".join(model.split("/")[-5:-2])
+                    first2, mid2, last2 = model.split("/")[-5:-2]
+                    destDir = os.path.join(self.__dividedDataPath, first2, mid2, last2)
+                    if not self.__fU.exists(destDir):
+                        self.__fU.mkdir(destDir)
+                    destModelPath = os.path.join(destDir, modelName)
+                    self.__fU.put(model, destModelPath)
+                    newModelDirD[modelName] = destModelPath
+            self.__mU.doExport(self.__dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
+            return True
+        except Exception as e:
+            logger.exception("Failing with %s", str(e))
+            return False
 
     def removeSpeciesDataDir(self, speciesName=None, updateCache=True):
         """"Remove an entire species data directory (and its corresponding cache file entry),

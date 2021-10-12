@@ -214,8 +214,8 @@ class AlphaFoldModelProvider:
         return self.__speciesDataCacheFile
 
     def reorganizeModelFiles(self):
-        """Move model files from organism-wide model listing to hashed directory structure
-        using last two characters of UniProt ID"""
+        """Move model files from organism-wide model listing to hashed directory structure constructed
+        from the 6-character UniProt ID (e.g., "P52078" will be moved to "./P5/20/78")"""
 
         try:
             fU = FileUtil()

@@ -12,27 +12,6 @@
 """
 Processors for converting SWISS-MODEL PDB files to mmCIF format.
 
-Notes:
-- Not all swiss models are single chain.
-    Example: Q9/RF/J6/swissmodel/39_166_4rbr.1.A_60eb681aeae30f29666470ae.pdb
-    AlsoSee: Q9/3T/05/swissmodel/6_330_3h4l.1.B_60ec0a3ffbea99323638d15a.pdb
-- Quality scores: https://swissmodel.expasy.org/docs/help#qmean
-    - The beta factor field has residue-level quality scores (QMEANDisCo)
-    - For global quality, use the 'GMQE and global QMEANDisCo' scores
-- Can use the INDEX.json file to retrieve basic metadata about each model, including:
-    "uniprot_ac":"Q2FZI9",
-    "uniprot_seq_length":494,
-    "uniprot_seq_md5":"d87943e7f3e51524cd0ad4a472c5dae5",
-    "coordinate_id":"60eb0877109faa74bf82d467",
-    "provider":"SWISSMODEL",
-    "from":11,
-    "to":461,
-    "template":"1ao0.1.A",
-    "qmeandisco_global":0.8273887012,
-    "seqid":55.9020042419
-- Most of the header/remarks should be the same between models, so can likely re-populate the same information in the cif
-- Grab the Version date from the PDB headers though
-- Then can re-apply modbase converter for re-writing atom sites
 """
 
 __docformat__ = "google en"
@@ -42,21 +21,12 @@ __license__ = "Apache 2.0"
 
 import datetime
 import logging
-import os.path
-# import time
-# import glob
-# import requests
-# import re
-# import collections
+# import os.path
 
 from rcsb.utils.modbase_utils.modbase_pdb_to_cif import CifLoop, three_to_one, one_to_three
 from rcsb.utils.io.FileUtil import FileUtil
-from rcsb.utils.io.MarshalUtil import MarshalUtil
 
 logger = logging.getLogger(__name__)
-
-# Sequence = collections.namedtuple(
-#     "Sequence", ["entityId", "chainId", "oneLetterWithGaps", "oneLetter", "resNumBegin", "resNumEnd"])
 
 
 class SwissModelPdbToCifConverter:
@@ -64,30 +34,40 @@ class SwissModelPdbToCifConverter:
 
     def __init__(self, **kwargs):
         self.__cachePath = kwargs.get("cachePath", "./CACHE-insilico3d-models")
-        self.__workPath = os.path.join(self.__cachePath, "SWISS-MODEL", "tmp")
-        # self.__mU = MarshalUtil(workPath=self.__workPath)
-        self.__fU = FileUtil(workPath=self.__workPath)
-        self.__fU.mkdir(self.__workPath)
+        # self.__workPath = os.path.join(self.__cachePath, "SWISS-MODEL", "tmp")
+        self.__fU = FileUtil(workPath=self.__cachePath)
+        # self.__fU.mkdir(self.__workPath)
+        #
+        # Initialize all attributes
         self.pdbRead = False
-
-    def convertPdbToCif(self, pdbFileIn, cifFileOut,  **kwargs):
-        speciesName = kwargs.get("speciesName", "?")
-        ok = self.readPdb(pdbFileIn=pdbFileIn)
-        result = self.writeCif(cifFileOut=cifFileOut, speciesName=speciesName)
-        if ok and result:
-            return True
-        else:
-            return False
-
-    def readPdb(self, pdbFileIn, **kwargs):
-        # Make sure to initialize all attributes here to be sure none are leftover and used for the next file
-        self.pdbRead = False
+        self.fh = None
         self.organism = kwargs.get("organism", None)
         self.uniProtId = kwargs.get("uniProtId", None)
         self.title, self.expdta, self.author, self.revDate = None, None, None, None
         self.jrnl, self.remarks, self.atoms = [], [], []
         self.align = False
-        # self.target, self.template = [], []
+        self.todaysDate = datetime.datetime.today().strftime("%Y-%m-%d")
+        self.modelFileName, self.modelNameBase = None, None
+        self.atomSiteParsedList, self.atomTypeElements, self.structureResidueD = None, None, None
+        self.remarksD, self.remarksAllD = None, None
+        self.alignTarget, self.alignTemplate, self.alignOffsets = None, None, None
+        self.templateEntityId, self.targetEntityId, self.templateDataId, self.targetDataId, self.alignmentDataId, self.coordDataId = None, None, None, None, None, None
+
+    def convertPdbToCif(self, pdbFileIn, cifFileOut,  **kwargs):
+        self.organism = kwargs.get("organism", self.organism)
+        self.uniProtId = kwargs.get("uniProtId", self.uniProtId)
+        readOk = self.readPdb(pdbFileIn=pdbFileIn, organism=self.organism, uniProtId=self.uniProtId)
+        writeOk = self.writeCif(cifFileOut=cifFileOut, organism=self.organism, uniProtId=self.uniProtId)
+        return bool(readOk and writeOk)
+
+    def readPdb(self, pdbFileIn, **kwargs):
+        # Make sure to initialize all attributes here to be sure none are leftover and used for the next file
+        self.organism = kwargs.get("organism", self.organism)
+        self.uniProtId = kwargs.get("uniProtId", self.uniProtId)
+        self.pdbRead = False
+        self.title, self.expdta, self.author, self.revDate = None, None, None, None
+        self.jrnl, self.remarks, self.atoms = [], [], []
+        self.align = False
         self.todaysDate = datetime.datetime.today().strftime("%Y-%m-%d")
         self.modelFileName = self.__fU.getFileName(pdbFileIn)
         self.modelNameBase = self.modelFileName.split('.pdb')[0]
@@ -115,21 +95,15 @@ class SwissModelPdbToCifConverter:
                     elif line.startswith('ATOM') or line.startswith('HETATM'):  # how to handle hetatoms later? see model O07325
                         self.atoms.append(line)
             # NOT ALL SWISS-MODEL models are single chain
-            # if self.atoms:
-            #     self.chain_ids = set([a[21].strip() for a in self.atoms])
             self.atomSiteParsedList, self.atomTypeElements = self.__parseAtomSites()
             self.structureResidueD = self.__getStructureResidueInfo()
             self.remarksD, self.remarksAllD = self.__parseRemarks()
-            # Search through ALN remarks and deterine whether Target or Template, and the Chain IDs A, B, etc...
-            self.alignTargets, self.alignTemplates, self.alignOffsets = self.__parseAlign()
-            if len(self.alignTemplates) > 0:
-                self.align = True
-                self.templateEntityId, self.targetEntityId = 1, 2
-                self.templateDataId, self.targetDataId = 1, 2
-                self.alignmentDataId, self.coordDataId = 3, 4
-            else:
-                self.targetEntityId = 1
-            # self.sequence3 = list(self.__getSequence3())
+            self.alignTarget, self.alignTemplate, self.alignOffsets = self.__parseAlign()
+            assert len(self.alignTemplate) > 0
+            self.align = True
+            self.templateEntityId, self.targetEntityId = 1, 2
+            self.templateDataId, self.targetDataId = 1, 2
+            self.alignmentDataId, self.coordDataId = 3, 4
             self.pdbRead = True
         #
         except Exception as e:
@@ -164,14 +138,12 @@ class SwissModelPdbToCifConverter:
                 alnTrgKey = ln[10:21].strip()
                 if alnTrgKey not in remarksD:
                     collectInfoFlag = False
-                    self.alignTarget = True
                     remarksD[alnTrgKey] = ""
                 remarksD[alnTrgKey] += ln[21:].strip()
             if ln[10:15].strip() == "ALN" and ln[18:21] == "TPL":
                 alnTplKey = ln[10:21].strip()
                 if alnTplKey not in remarksD:
                     collectInfoFlag = False
-                    self.alignTemplate = True
                     remarksD[alnTplKey] = ""
                 remarksD[alnTplKey] += ln[21:].strip()
             if ln[10:15].strip() == "ALN" and ln[18:21] == "OFF":
@@ -181,50 +153,20 @@ class SwissModelPdbToCifConverter:
                 key, val = ln[10:20].strip(), ln[20:].strip()
                 remarksD[infoKey][key] = val
         return remarksD, remarksAllD
-        # Example return dict:
-        # {
-        # 'ALN A OFF': '19',
-        # 'ALN A TPL': 'KKVSVIMPTFNNGEKLHRTISSVLNQTMKSTDYELIIIDDHSNDNGETLNVIKKYK---GLVRFKQLKKNSGNASVPRNTGLKMSK------AEYVFFLDSDDLLHERALEDLYNYGKEN-NSDLIIGKYGVEGKGRSVPKAI...',
-        # 'ALN A TRG': 'MRFTIIIPTCNNEATIRQLLISIESKE----HYRILCIDGGSTDQ--TIPMIERLQRELKHISLIQL-QN-ASIATCINKGLMDIKMTDPHDSDAFMVIKPTSIVLPGKLDRLTAAFKNNDNIDMVIGQRAYNYHGEWKLKSA...',
-        # 'MODEL INFORMATION': {'ENGIN': 'PROMOD3',
-        #                     'GMQE': '0.25',
-        #                     'MODT': 'FALSE',
-        #                     'OSRSN': 'PREDICTION',
-        #                     'OSTAT': 'monomer',
-        #                     'QMNDG': '0.56',
-        #                     'QMNV': '4.2.0',
-        #                     'QSPRD': '0.000',
-        #                     'VERSN': '3.2.0'},
-        # 'TEMPLATE': {'CHAIN': 'A',
-        #             'FOUND': 'HHblits',
-        #             'GMQE': '0.33',
-        #             'LIGND': 'MG',
-        #             'LIGND 2': 'MG',
-        #             'MMCIF': 'A',
-        #             'MTHD': 'X-RAY DIFFRACTION 1.86 A',
-        #             'OSTAT': 'monomer',
-        #             'PDBID': '6h1j',
-        #             'PDBV': '2021-07-02',
-        #             'SID': '18.04',
-        #             'SIM': '0.30',
-        #             'SMTLE': '6h1j.1.A',
-        #             'SMTLV': '2021-07-07'}
-        # }
 
     def __parseAlign(self):
         # Search through ALN remarks and deterine whether Target or Template, and the Chain IDs A, B, etc...
-        targetAlignList, templateAlignList, offAlignList = [], [], []
         for k in self.remarksD:
             if k.startswith("ALN"):
                 alignType = k[-3:]
                 alignChain = k[4]
                 if alignType == "TRG":
-                    targetAlignList.append({"chainId": alignChain, "oneLetterWithGaps": self.remarksD[k], "oneLetter": self.remarksD[k].replace('-', '')})
+                    targetAlignD = {"chainId": alignChain, "oneLetterWithGaps": self.remarksD[k], "oneLetter": self.remarksD[k].replace('-', '')}
                 if alignType == "TPL":
-                    templateAlignList.append({"chainId": alignChain, "oneLetterWithGaps": self.remarksD[k], "oneLetter": self.remarksD[k].replace('-', '')})
+                    templateAlignD = {"chainId": alignChain, "oneLetterWithGaps": self.remarksD[k], "oneLetter": self.remarksD[k].replace('-', '')}
                 if alignType == "OFF":
-                    offAlignList.append({"chainId": alignChain, "offset": self.remarksD[k]})
-        return targetAlignList, templateAlignList, offAlignList
+                    offAlignD = {"chainId": alignChain, "offset": self.remarksD[k]}
+        return targetAlignD, templateAlignD, offAlignD
 
     def __parseAtomSites(self):
         # Modify this to accept a list of chain_ids
@@ -252,9 +194,8 @@ class SwissModelPdbToCifConverter:
             insCode = atom[26:27].strip() or '?'
             element = atom[76:78].strip()
             atomTypeElements.add(element)
-            ordinal += 1
             aD = {
-                "group_PDB": atom[:6],
+                "group_PDB": atom[:6].strip(),
                 "id": ordinal,
                 "type_symbol": element,
                 "label_atom_id": atom[12:16],
@@ -274,6 +215,7 @@ class SwissModelPdbToCifConverter:
                 "auth_asym_id": authChainId,
             }
             atomSiteParsedList.append(aD)
+            ordinal += 1
         return atomSiteParsedList, atomTypeElements
 
     def __getStructureResidueInfo(self):
@@ -282,7 +224,7 @@ class SwissModelPdbToCifConverter:
         resTracker = None
         # Loop over atoms to get residue-level details
         for aD in self.atomSiteParsedList:
-            if aD["auth_seq_id"] != resTracker:
+            if aD["auth_seq_id"] != resTracker and aD["group_PDB"] == "ATOM":
                 resTracker = aD["auth_seq_id"]
                 pdbSeqIds.append(aD["label_seq_id"])
                 pdbChainIds.append(aD["label_asym_id"])
@@ -295,58 +237,65 @@ class SwissModelPdbToCifConverter:
                     insCodes.append(".")
                 else:
                     insCodes.append(aD["pdbx_PDB_ins_code"])
-        structureResidueD = {"pdbSeqIds": pdbSeqIds, "pdbChainIds": pdbChainIds, "authSeqIds": authSeqIds, "authChainIds": authChainIds, 
+        structureResidueD = {"pdbSeqIds": pdbSeqIds, "pdbChainIds": pdbChainIds, "authSeqIds": authSeqIds, "authChainIds": authChainIds,
                              "pdbRes3Letter": pdbRes3Letter, "pdbRes1Letter": pdbRes1Letter, "insCodes": insCodes, "bFactors": bFactors}
         return structureResidueD
 
-    def print(self, s):
-        print(s, file=self.fh)
+    def print(self, strP):
+        print(strP, file=self.fh)
 
     def loop(self, category, keys):
         return CifLoop(self.fh, category, keys)
 
     def writeCif(self, cifFileOut, **kwargs):
-        self.speciesName = kwargs.get("speciesName", "?")
-        if not self.pdbRead:
+        try:
+            self.organism = kwargs.get("organism", self.organism)
+            self.uniProtId = kwargs.get("uniProtId", self.uniProtId)
+            if not self.pdbRead:
+                return False
+            if not self.organism:
+                self.organism = "?"
+            with open(cifFileOut, "w", encoding="utf-8") as fh:
+                self.fh = fh
+                self.__writeHeader()
+                self.__writeExptl()
+                self.__writeCitationDetails()
+                self.__writeChemComp()
+                self.__writeEntityDetails()
+                self.__writeTemplateDetails()
+                self.__writeTargetDetails()
+                self.__writeAlignment()
+                self.__writeAssembly()
+                self.__writeData()
+                self.__writeSoftware()
+                self.__writePdbRemarkText()
+                self.__writeModelList()  # Check if this is writing what it should, and below
+                self.__writeScores()
+                self.__writeTargetRefDbDetails()
+                self.__writePdbxDatabaseStatus()
+                self.__writePdbxAuditRevisionDetails()
+                self.__writePdbxAuditRevisionHistory()
+                self.__writeAsym()
+                self.__writePdbxPolySeqScheme()
+                self.__writeAtomSites()
+                fh.close()
+                return True
+        except Exception as e:
+            logger.exception("Failing with %s", str(e))
             return False
-        with open(cifFileOut, 'w') as fh:
-            self.fh = fh
-            self.__writeHeader()
-            self.__writeExptl()
-            self.__writeCitationDetails()
-            self.__writeChemComp()
-            self.__writeEntityDetails()
-            self.__writeTemplateDetails()
-            self.__writeTargetDetails()
-            self.__writeAlignment()
-            self.__writeAssembly()
-            self.__writeData()
-            self.__writeSoftware()
-            self.__writePdbRemarkText()
-            self.__writeModelList()  # Check if this is writing what it should, and below
-            self.__writeScores()
-            self.__writeTargetRefDbDetails()
-            self.__writePdbxDatabaseStatus()
-            self.__writePdbxAuditRevisionDetails()
-            self.__writePdbxAuditRevisionHistory()
-            self.__writeAsym()
-            self.__writePdbxPolySeqScheme()
-            self.__writeAtomSites()
-            fh.close()
-            return True
 
     def __writeHeader(self):
-        self.print("data_%s" % self.modelNameBase)
-        self.print("#\n_entry.id %s" % self.modelNameBase)
-        self.print("_struct.entry_id %s" % self.modelNameBase)
+        self.print(f"data_{self.modelNameBase}")
+        self.print(f"#\n_entry.id {self.modelNameBase}")
+        self.print(f"_struct.entry_id {self.modelNameBase}")
         if self.title:
-            self.print("_struct.title '%s'" % self.title)
+            self.print(f"_struct.title '{self.title}'")
 
     def __writeExptl(self):
         if self.expdta.startswith('THEORETICAL MODEL'):
-            self.print("#\n_exptl.entry_id %s" % self.modelNameBase)
+            self.print(f"#\n_exptl.entry_id {self.modelNameBase}")
             self.print("_exptl.method 'THEORETICAL MODEL'")
-            self.print("_exptl.details '%s'" % self.expdta)
+            self.print(f"_exptl.details '{self.expdta}'")
 
     def __writeCitationDetails(self):
         """Citation details originally generated by MAXIT using a SWISS-MODEL PDB file created on 13-JUL-2021."""
@@ -464,40 +413,32 @@ VAL 'L-peptide linking' VALINE 'C5 H11 N O2' 117.148""")
                 "entity",
                 ["id", "type", "src_method", "pdbx_description"]) as lp:
             if self.align:
-                lp.write("%d polymer man template" % self.templateEntityId)
-            lp.write("%d polymer man target" % self.targetEntityId)
+                lp.write(f"{self.templateEntityId} polymer man template")
+            lp.write(f"{self.targetEntityId} polymer man target")
 
-        # target_primary = "".join(x for x in self.structureResidueD["pdbRes1Letter"])
-        target_primary = "".join(
-            self.structureResidueD["pdbRes1Letter"][i] for i in range(len(self.structureResidueD["pdbRes1Letter"])) if self.structureResidueD["pdbChainIds"][i] == "A")
-        # target_primary_len = len(target_primary)
-        # structureResidueD = {"pdbSeqIds", "pdbChainIds", "authSeqIds", "authChainIds", "pdbRes3Letter", "pdbRes1Letter", "insCodes"}
+        sD = self.structureResidueD
+        targetPrimary = "".join(sD["pdbRes1Letter"][i] for i in range(len(sD["pdbRes1Letter"])) if sD["pdbChainIds"][i] == "A")
 
         with self.loop(
                 "entity_poly",
                 ["entity_id", "type", "nstd_linkage", "pdbx_seq_one_letter_code", "pdbx_seq_one_letter_code_can"]) as lp:
             if self.align:
-                # Are there any models with more than one aligned chain? If not, make 'alignTemplates' (and 'alignTargets') a single item instead of a list
-                for i in range(len(self.alignTemplates)):
-                    # if self.alignTargets[i]["oneLetter"] != target_primary:
-                    if self.alignTargets[i]["oneLetter"].find(target_primary) < 0:
-                        raise ValueError(
-                            "Model sequence does not match target sequence in alignment:", target_primary, self.alignTargets[i]["oneLetter"])
-                    p = self.alignTemplates[i]["oneLetter"]
-                    lp.write("%d polypeptide(L) no %s %s" % (self.templateEntityId, p, p))
-                lp.write("%d polypeptide(L) no %s %s" % (self.targetEntityId, target_primary, target_primary))
+                if self.alignTarget["oneLetter"].find(targetPrimary) < 0:
+                    raise ValueError("Model sequence does not match target sequence in alignment:", targetPrimary, self.alignTarget["oneLetter"])
+                pSeq = self.alignTemplate["oneLetter"]
+                lp.write(f"{self.templateEntityId} polypeptide(L) no {pSeq} {pSeq}")
+                lp.write(f"{self.targetEntityId} polypeptide(L) no {targetPrimary} {targetPrimary}")
 
         with self.loop(
                 "entity_poly_seq",
                 ["entity_id", "num", "mon_id", "hetero"]) as lp:
             if self.align:
-                for i in range(len(self.alignTemplates)):
-                    p = self.alignTemplates[i]["oneLetter"]
-                    for i, s in enumerate(p):
-                        lp.write("%d %d %s n" % (self.templateEntityId, i+1, one_to_three[s]))
-            for i, s in enumerate(self.structureResidueD["pdbRes3Letter"]):
+                pSeq = self.alignTemplate["oneLetter"]
+                for i, val in enumerate(pSeq):
+                    lp.write(f"{self.templateEntityId} {i+1} {one_to_three[val]} n")
+            for i, val in enumerate(self.structureResidueD["pdbRes3Letter"]):
                 if self.structureResidueD["pdbChainIds"][i] == "A":  # Only write out chain A? (That's what Maxit does...)
-                    lp.write("%d %d %s n" % (self.targetEntityId, self.structureResidueD["pdbSeqIds"][i], s))
+                    lp.write(f'{self.targetEntityId} {self.structureResidueD["pdbSeqIds"][i]} {val} n')
 
     def __writePdbxPolySeqScheme(self):
         sD = self.structureResidueD
@@ -505,10 +446,10 @@ VAL 'L-peptide linking' VALINE 'C5 H11 N O2' 117.148""")
                 "pdbx_poly_seq_scheme",
                 ["asym_id", "entity_id", "seq_id", "mon_id", "ndb_seq_num", "pdb_seq_num", "auth_seq_num", "pdb_mon_id", "auth_mon_id",
                  "pdb_strand_id", "pdb_ins_code", "hetero"]) as lp:
-            for i, s in enumerate(sD["pdbRes3Letter"]):
+            for i, val in enumerate(sD["pdbRes3Letter"]):
                 lp.write("%s %d %d %s %d %s %s %s %s %s %s n" %
-                         (sD["pdbChainIds"][i], self.targetEntityId, sD["pdbSeqIds"][i], s, sD["pdbSeqIds"][i],
-                          sD["authSeqIds"][i], sD["authSeqIds"][i], s, s, sD["authChainIds"][i], sD["insCodes"][i]))
+                         (sD["pdbChainIds"][i], self.targetEntityId, sD["pdbSeqIds"][i], val, sD["pdbSeqIds"][i],
+                          sD["authSeqIds"][i], sD["authSeqIds"][i], val, val, sD["authChainIds"][i], sD["insCodes"][i]))
 
     def __writeTemplateDetails(self):
         if not self.align:
@@ -529,12 +470,12 @@ VAL 'L-peptide linking' VALINE 'C5 H11 N O2' 117.148""")
             # template structure is data_id=1
             # trans_matrix_id=1 is the identity transformation
             # model_num=1
-            lp.write('1 1 "reference database" polymer 1 %d %s %s 1 1' % (self.templateDataId, self.alignTargets[0]["chainId"], self.alignTemplates[0]["chainId"]))
+            lp.write('1 1 "reference database" polymer 1 %d %s %s 1 1' % (self.templateDataId, self.alignTarget["chainId"], self.alignTemplate["chainId"]))
 
         with self.loop(
                 "ma_template_poly", ["template_id", "seq_one_letter_code", "seq_one_letter_code_can"]) as lp:
-            p = self.alignTemplates[0]["oneLetter"]
-            lp.write("1 %s %s" % (p, p))
+            pSeq = self.alignTemplate["oneLetter"]
+            lp.write("1 %s %s" % (pSeq, pSeq))
 
         with self.loop(
                 "ma_template_poly_segment",
@@ -554,40 +495,37 @@ VAL 'L-peptide linking' VALINE 'C5 H11 N O2' 117.148""")
         with self.loop(
                 "ma_target_entity_instance",
                 ["asym_id", "entity_id", "details"]) as lp:
-            lp.write("%s %d ." % (self.alignTargets[0]["chainId"], self.targetEntityId))
+            lp.write("%s %d ." % (self.alignTarget["chainId"], self.targetEntityId))
 
         if self.align:
             # Cannot write a template segment ID without an alignment
             with self.loop(
                     "ma_target_template_poly_mapping",
                     ["id", "template_segment_id", "target_asym_id", "target_seq_id_begin", "target_seq_id_end"]) as lp:
-                lp.write("1 1 %s 1 %d" % (self.alignTargets[0]["chainId"], len(self.structureResidueD["pdbRes1Letter"])))
+                lp.write("1 1 %s 1 %d" % (self.alignTarget["chainId"], len(self.structureResidueD["pdbRes1Letter"])))
 
     def __writeAlignment(self):
         if not self.align:
             return
-        # Just one target-template alignment (one template, one chain) so this
-        # table is pretty simple:
         with self.loop(
                 "ma_alignment_info",
                 ["alignment_id", "data_id", "software_id", "alignment_length", "alignment_type", "alignment_mode"]) as lp:
-            # ModPipe is software_id=1
             lp.write('1 %d 1 %d "target-template pairwise alignment" global'
-                     % (self.alignmentDataId, len(self.alignTemplates[0]["oneLetterWithGaps"])))
+                     % (self.alignmentDataId, len(self.alignTemplate["oneLetterWithGaps"])))
 
         with self.loop(
                 "ma_alignment_details",
                 # Add in "score_value" after determining which SwissModel header field represents the 'e-value'
                 ["ordinal_id", "alignment_id", "template_segment_id", "target_asym_id", "score_type", "percent_sequence_identity"]) as lp:
-            lp.write("1 1 1 %s '%s e-value' %s" % (self.alignTargets[0]["chainId"], self.remarksD["TEMPLATE"]["FOUND"], self.remarksD["TEMPLATE"]["SID"]))
+            lp.write("1 1 1 %s '%s e-value' %s" % (self.alignTarget["chainId"], self.remarksD["TEMPLATE"]["FOUND"], self.remarksD["TEMPLATE"]["SID"]))
 
         with self.loop(
                 "ma_alignment",
                 ["ordinal_id", "alignment_id", "target_template_flag", "sequence"]) as lp:
             # Template (flag=2)
-            lp.write("1 1 2 %s" % self.alignTemplates[0]["oneLetterWithGaps"])
+            lp.write("1 1 2 %s" % self.alignTemplate["oneLetterWithGaps"])
             # Target (flag=1)
-            lp.write("2 1 1 %s" % self.alignTargets[0]["oneLetterWithGaps"])
+            lp.write("2 1 1 %s" % self.alignTarget["oneLetterWithGaps"])
 
     def __writeAssembly(self):
         # Should this be looped over for each chain, as done in 'struct_asym' below?
@@ -595,7 +533,7 @@ VAL 'L-peptide linking' VALINE 'C5 H11 N O2' 117.148""")
                 'ma_struct_assembly',
                 ['ordinal_id', 'assembly_id', 'entity_id', 'asym_id', 'seq_id_begin', 'seq_id_end']) as lp:
             # Simple assembly of a single chain
-            lp.write("1 1 %d %s 1 %d" % (self.targetEntityId, self.alignTargets[0]["chainId"], len(self.structureResidueD["pdbRes1Letter"])))
+            lp.write("1 1 %d %s 1 %d" % (self.targetEntityId, self.alignTarget["chainId"], len(self.structureResidueD["pdbRes1Letter"])))
 
     def __writeData(self):
         with self.loop("ma_data", ["id", "name", "content_type"]) as lp:
@@ -607,7 +545,7 @@ VAL 'L-peptide linking' VALINE 'C5 H11 N O2' 117.148""")
         # Put each data item in its own group
         with self.loop("ma_data_group", ["ordinal_id", "group_id", "data_id"]) as lp:
             for i in range(1, 5):
-                lp.write("%d %d %d" % (i, i, i))
+                lp.write(f"{i} {i} {i}")
 
     def __writeSoftware(self):
         with self.loop(
@@ -623,16 +561,15 @@ VAL 'L-peptide linking' VALINE 'C5 H11 N O2' 117.148""")
                 "ma_software_group",
                 ["ordinal_id", "group_id", "software_id"]) as lp:
             for i in range(1, 3):
-                lp.write("%d %d %d" % (i, i, i))
+                lp.write(f"{i} {i} {i}")
 
     def __writeScores(self):
         with self.loop(
                 'ma_qa_metric',
                 ['id', 'name', 'description', 'type', 'mode', 'type_other_details', 'software_group_id']) as lp:
-            # SWISS-MODEL is software_id=1
-            lp.write("1 GMQE 'Global Model Quality Estimate' other global . 1")
+            lp.write("1 GMQE 'Global Model Quality Estimate' other global . 1")  # SWISS-MODEL is software_id=1
             lp.write("2 QMEANDisCo 'Average Model Confidence' other global 'QMEAN version %s' 1" % self.remarksD["MODEL INFORMATION"]["QMNV"])  # This is "QMNDG" in remarks
-            lp.write("3 QMEANDisCo 'Per-residue Quality Score' other local 'QMEAN version %s' 1" % self.remarksD["MODEL INFORMATION"]["QMNV"])  # This is "QMNDG" in remarks
+            lp.write("3 QMEANDisCo 'Per-residue Quality Score' other local 'QMEAN version %s' 1" % self.remarksD["MODEL INFORMATION"]["QMNV"])  # This is beta factor field
         with self.loop(
                 'ma_qa_metric_global',
                 ['ordinal_id', 'model_id', 'metric_id', 'value']) as lp:
@@ -646,25 +583,24 @@ VAL 'L-peptide linking' VALINE 'C5 H11 N O2' 117.148""")
                 # Per-residue quality score is metric_id 3
                 lp.write("1 1 %s %s %d 3 %s" % (sD["pdbChainIds"][resIdx], sD["pdbRes3Letter"][resIdx], sD["pdbSeqIds"][resIdx], sD["bFactors"][resIdx]))
 
-        # structureResidueD = {"pdbSeqIds": pdbSeqIds, "pdbChainIds": pdbChainIds, "authSeqIds": authSeqIds, "authChainIds": authChainIds, 
-        #                      "pdbRes3Letter": pdbRes3Letter, "pdbRes1Letter": pdbRes1Letter, "insCodes": insCodes, "bFactors": bFactors}
-
     def __writeModelList(self):
         with self.loop(
                 'ma_model_list',
                 ['ordinal_id', 'model_id', 'model_group_id', 'model_name', 'model_group_name', 'assembly_id', 'data_id', 'model_type']) as lp:
-            lp.write("1 1 1 'Selected model' . 1 %d 'Homology model'" % self.coordDataId)
+            lp.write(f"1 1 1 'Selected model' . 1 {self.coordDataId} 'Homology model'")
 
     def __writeTargetRefDbDetails(self):
+        if not self.uniProtId:
+            return
         sD = self.structureResidueD
         self.print("#\n_ma_target_ref_db_details.db_name UNP")
-        self.print("_ma_target_ref_db_details.accession %s" % self.uniProtId)
-        self.print("_ma_target_ref_db_details.code %s" % self.uniProtId)  # To be consitent with AF this should be the "ID" value mapped from "ACC+ID" UniProt ID (or "LOCUS" on NCBI)
+        self.print(f"_ma_target_ref_db_details.accession {self.uniProtId}")
+        self.print(f"_ma_target_ref_db_details.code {self.uniProtId}")  # To be consitent with AF this should be the "ID" value mapped from "ACC+ID" UniProt ID (or "LOCUS" on NCBI)
         if self.organism:
-            self.print("_ma_target_ref_db_details.organism_scientific %s" % self.organism)
-        self.print("_ma_target_ref_db_details.seq_db_align_begin %s" % sD["authSeqIds"][0])
-        self.print("_ma_target_ref_db_details.seq_db_align_end %s" % sD["authSeqIds"][-1])
-        self.print("_ma_target_ref_db_details.target_entity_id %d" % self.targetEntityId)
+            self.print(f"_ma_target_ref_db_details.organism_scientific {self.organism}")
+        self.print(f'_ma_target_ref_db_details.seq_db_align_begin {sD["authSeqIds"][0]}')
+        self.print(f'_ma_target_ref_db_details.seq_db_align_end {sD["authSeqIds"][-1]}')
+        self.print(f"_ma_target_ref_db_details.target_entity_id {self.targetEntityId}")
 
     def __writePdbxAuditRevisionDetails(self):
         self.print('#\n_pdbx_audit_revision_details.data_content_type "Structure model"')
@@ -676,15 +612,15 @@ VAL 'L-peptide linking' VALINE 'C5 H11 N O2' 117.148""")
 
     def __writePdbxAuditRevisionHistory(self):
         self.print('#\n_pdbx_audit_revision_history.data_content_type "Structure model"')
-        self.print('_pdbx_audit_revision_history.major_revision %d' % 1)
-        self.print('_pdbx_audit_revision_history.minor_revision %d' % 0)
+        self.print('_pdbx_audit_revision_history.major_revision 1')
+        self.print('_pdbx_audit_revision_history.minor_revision 0')
         self.print('_pdbx_audit_revision_history.ordinal 1')
-        self.print('_pdbx_audit_revision_history.revision_date %s' % self.revDate)
+        self.print(f'_pdbx_audit_revision_history.revision_date {self.revDate}')
 
     def __writePdbxDatabaseStatus(self):
-        self.print('#\n_pdbx_database_status.entry_id %s' % self.targetEntityId)
-        self.print('_pdbx_database_status.recvd_initial_deposition_date %s' % self.todaysDate)
-        self.print('_pdbx_database_status.status_code %s' % "REL")
+        self.print(f'#\n_pdbx_database_status.entry_id {self.targetEntityId}')
+        self.print(f'_pdbx_database_status.recvd_initial_deposition_date {self.todaysDate}')
+        self.print('_pdbx_database_status.status_code REL')
 
     def __writeAsym(self):
         # Revist '__writeAssembly' too
@@ -719,5 +655,5 @@ VAL 'L-peptide linking' VALINE 'C5 H11 N O2' 117.148""")
 
     def __writePdbRemarkText(self):
         with self.loop("database_PDB_remark", ["id", "text"]) as lp:
-            for r in self.remarksAllD:
-                lp.write("%s\n;%s;" % (r, self.remarksAllD[r]))
+            for rem in self.remarksAllD:
+                lp.write("%s\n;%s;" % (rem, self.remarksAllD[rem]))
