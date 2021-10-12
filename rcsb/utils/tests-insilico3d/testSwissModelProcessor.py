@@ -1,14 +1,14 @@
 ##
-# File:    testModBaseModelProcessor.py
+# File:    testSwissModelProcessor.py
 # Author:  Dennis Piehl
-# Date:    27-Sep-2021
+# Date:    11-Oct-2021
 #
 # Update:
 #
 #
 ##
 """
-Tests for processors for converting ModBase PDB models to mmCIF format.
+Tests for processors for converting SWISS-MODEL PDB models to mmCIF format.
 
 """
 
@@ -24,8 +24,8 @@ import resource
 import time
 import unittest
 
-from rcsb.utils.insilico3d.ModBaseModelProvider import ModBaseModelProvider
-from rcsb.utils.insilico3d.ModBaseModelProcessor import ModBaseModelProcessor
+from rcsb.utils.insilico3d.SwissModelProvider import SwissModelProvider
+from rcsb.utils.insilico3d.SwissModelProcessor import SwissModelProcessor
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
@@ -34,7 +34,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(mo
 logger = logging.getLogger()
 
 
-class ModBaseModelProcessorTests(unittest.TestCase):
+class SwissModelProcessorTests(unittest.TestCase):
     skipFlag = platform.system() != "Darwin"
     buildTestingCache = True
 
@@ -50,23 +50,23 @@ class ModBaseModelProcessorTests(unittest.TestCase):
         endTime = time.time()
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
-    def testModBaseModelProcessor(self):
-        """Test case: convert ModBase PDB models to mmCIF"""
+    def testSwissModelProcessor(self):
+        """Test case: convert SWISS-MODEL PDB models to mmCIF"""
         try:
             # First download the archived data for processing
-            mProv = ModBaseModelProvider(
+            mProv = SwissModelProvider(
                 cachePath=self.__cachePath,
                 useCache=False,
-                modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
+                swissModelServerSpeciesDataPathDict={"Staphylococcus aureus": "93061_coords.tar.gz"}
             )
             ok = mProv.testCache()
             self.assertTrue(ok)
             #
-            # Next test reload data for processing
-            mProv = ModBaseModelProvider(
+            # Next test reloading data and processing
+            mProv = SwissModelProvider(
                 cachePath=self.__cachePath,
                 useCache=True,
-                modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
+                swissModelServerSpeciesDataPathDict={"Staphylococcus aureus": "93061_coords.tar.gz"}
             )
             ok = mProv.testCache()
             self.assertTrue(ok)
@@ -74,10 +74,11 @@ class ModBaseModelProcessorTests(unittest.TestCase):
             ok = True if len(speciesNameList) > 0 else False
             self.assertTrue(ok)
             speciesConversionDict = mProv.getSpeciesConversionDict(speciesName=speciesNameList[0])
-            speciesConversionDict["speciesPdbModelFileList"] = speciesConversionDict["speciesPdbModelFileList"][0:20]
+            speciesConversionDict["speciesPdbModelFileList"] = speciesConversionDict["speciesPdbModelFileList"][0:300]
+            # logger.info("speciesConversionDict['speciesPdbModelFileList'] %s", speciesConversionDict["speciesPdbModelFileList"])
             ok = True if len(speciesConversionDict["speciesPdbModelFileList"]) > 0 else False
             self.assertTrue(ok)
-            mProc = ModBaseModelProcessor(
+            mProc = SwissModelProcessor(
                 useCache=False,
                 numProc=2,
                 speciesD=speciesConversionDict,
@@ -92,18 +93,13 @@ class ModBaseModelProcessorTests(unittest.TestCase):
             self.assertTrue(ok)
             #
             processedModelCachePath = mProc.getCachePath()
-            mProc = ModBaseModelProcessor(
+            mProc = SwissModelProcessor(
                 cachePath=processedModelCachePath,
                 useCache=True,
                 numProc=2,
                 speciesD=speciesConversionDict,
             )
             ok = mProc.testCache(minCount=10)
-            self.assertTrue(ok)
-            #
-            ok = mProv.removePdbModelDir(speciesDataDir=speciesConversionDict["speciesModelDir"])
-            self.assertTrue(ok)
-            ok = mProv.removeAlignmentDir(speciesDataDir=speciesConversionDict["speciesModelDir"])
             self.assertTrue(ok)
             #
             # Test reorganize models
@@ -122,7 +118,7 @@ class ModBaseModelProcessorTests(unittest.TestCase):
 
 def modelProcessorSuite():
     suiteSelect = unittest.TestSuite()
-    suiteSelect.addTest(ModBaseModelProcessorTests("testModBaseModelProcessor"))
+    suiteSelect.addTest(SwissModelProcessorTests("testSwissModelProcessor"))
     return suiteSelect
 
 

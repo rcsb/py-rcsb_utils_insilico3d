@@ -1,7 +1,7 @@
 ##
-# File:    ModBaseModelProcessor.py
+# File:    SwissModelProcessor.py
 # Author:  Dennis Piehl
-# Date:    27-Sep-2021
+# Date:    11-Oct-2021
 #
 # Update:
 #
@@ -12,7 +12,7 @@
 ##
 
 """
-Processors for converting ModBase PDB models into mmCIF format.
+Processors for converting SwissModel PDB models into mmCIF format.
 
 """
 
@@ -26,7 +26,7 @@ import os.path
 import time
 import collections
 
-import rcsb.utils.modbase_utils.modbase_pdb_to_cif as modbase
+from rcsb.utils.insilico3d.SwissModelPdbToCifConverter import SwissModelPdbToCifConverter
 from rcsb.utils.insilico3d import __version__
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FileUtil import FileUtil
@@ -34,12 +34,12 @@ from rcsb.utils.multiproc.MultiProcUtil import MultiProcUtil
 
 logger = logging.getLogger(__name__)
 
-ModBaseEntry = collections.namedtuple("ModBaseEntry", ["name", "model", "alignment"])
+SwissModelEntry = collections.namedtuple("SwissModelEntry", ["name", "model", "uniProtId"])
 
 
-class ModBaseModelWorker(object):
+class SwissModelWorker(object):
     """A skeleton class that implements the interface expected by the multiprocessing
-    for converting ModBase PDB files to mmCIF files.
+    for converting SwissModel PDB files to mmCIF files.
     """
 
     def __init__(self, **kwargs):
@@ -48,10 +48,10 @@ class ModBaseModelWorker(object):
         self.__fU = FileUtil(workPath=self.__workPath)
 
     def convert(self, dataList, procName, optionsD, workingDir):
-        """Enumerate ModBase PDB model files for conversion to mmCIF.
+        """Enumerate SwissModel PDB model files for conversion to mmCIF.
 
         Args:
-            dataList (list): list of model (and alignment) files to convert, each stored as a dict
+            dataList (list): list of model files to convert, each stored as a dict
             procName (str): worker process name
             optionsD (dict): dictionary of additional options that worker can access
             workingDir (str): path to working directory
@@ -69,32 +69,30 @@ class ModBaseModelWorker(object):
         diagList = []
 
         try:
+            converterObj = SwissModelPdbToCifConverter(cachePath=workingDir)
             for modelE in dataList:
                 convertedCifFileZ = None
-                alignmentFileUsed = None
                 # calculatedDssp = False
-                modelNameRoot, pdbFileZ, alignFileZ = modelE.name, modelE.model, modelE.alignment
-                # First unzip pdb and alignmet files
-                pF = self.__fU.uncompress(pdbFileZ, outputDir=workingDir)
-                aF = self.__fU.uncompress(alignFileZ, outputDir=workingDir)
-                if pF.endswith(".pdb") and aF.endswith(".xml"):
-                    cF = os.path.join(workingDir, modelNameRoot + ".cif")
+                modelNameRoot, pdbFile, uniProtId = modelE.name, modelE.model, modelE.uniProtId
+                modelDir = os.path.dirname(self.__fU.getFilePath(pdbFile))
+                if pdbFile.endswith(".pdb"):
+                    cF = os.path.join(modelDir, modelNameRoot + ".cif")
                     # Then attempt the conversion with alignment
-                    convertedCifFileZ = self.__convertPdbToCif(procName=procName, pdbFile=pF, alignmentFile=aF, mmCifOutFile=cF, optionsD=optionsD)
+                    convertedCifFileZ = self.__convertPdbToCif(procName=procName, pdbFile=pdbFile, mmCifOutFile=cF,
+                                                               uniProtId=uniProtId, swissModelConverter=converterObj, optionsD=optionsD)
                     if convertedCifFileZ:
-                        alignmentFileUsed = alignFileZ
                         successList.append(modelE)
-                    else:
-                        # If fails, attempt the conversion without alignment
-                        convertedCifFileZ = self.__convertPdbToCif(procName=procName, pdbFile=pF, alignmentFile=None, mmCifOutFile=cF, optionsD=optionsD)
-                        if convertedCifFileZ:
-                            successList.append(modelE)
-                    # print('\n', convertedCifFileZ, alignmentFileUsed)
+                    # else:
+                    #     # If fails, attempt the conversion without alignment
+                    #     convertedCifFileZ = self.__convertPdbToCif(procName=procName, pdbFile=pF, mmCifOutFile=cF, optionsD=optionsD)
+                    #     if convertedCifFileZ:
+                    #         successList.append(modelE)
+                    print('\n', convertedCifFileZ)
                     # Last remove the unzipped pdb, alignment and cif files
-                    self.__fU.remove(pF)
-                    self.__fU.remove(aF)
+                    # self.__fU.remove(pF)  # Don't remove uncompressed PDB files right away, since SwissModel provides files as uncompressed already.
+                    #                       # Instead, delete the entire species directory once the conversion process is all complete
                     self.__fU.remove(cF)
-                retList.append((modelE, convertedCifFileZ, alignmentFileUsed))
+                retList.append((modelE, convertedCifFileZ, uniProtId))
 
             failList = sorted(set(dataList) - set(successList))
             if failList:
@@ -106,14 +104,15 @@ class ModBaseModelWorker(object):
 
         return successList, retList, diagList
 
-    def __convertPdbToCif(self, procName, pdbFile, alignmentFile, mmCifOutFile, optionsD):
-        """Internal method to convert a ModBase PDB file to mmCIF format.
+    def __convertPdbToCif(self, procName, pdbFile, mmCifOutFile, uniProtId, swissModelConverter, optionsD):
+        """Internal method to convert a SwissModel PDB file to mmCIF format.
 
         Args:
             procName (str): worker process name
             pdbFile (str): path to PDB model file to convert
-            alignmentFile (str): path to ModBase alignment file for the corresponding model file
             mmCifOutFile (str): path to which to write mmCIF model file
+            uniProtId (str): UniProt ID corresponding to the given model file
+            swissModelConverter (obj): SwissModelPdbToCifConverter class object
             optionsD (dict): additional options/parameters to use in conversion
 
         Returns:
@@ -122,25 +121,22 @@ class ModBaseModelWorker(object):
 
         try:
             species = optionsD.get("species")
-            speciesModDate = optionsD.get("speciesModDate")
-            with open(pdbFile, "r", encoding="utf-8") as fh:
-                sF = modbase.read_pdb(fh, organism_name=species, moddate=speciesModDate)
-            with open(mmCifOutFile, "w", encoding="utf-8") as fh:
-                sF.write_mmcif(fh, alignmentFile)
+            ok = swissModelConverter.convertPdbToCif(pdbFileIn=pdbFile, cifFileOut=mmCifOutFile, organism=species, uniProtId=uniProtId)
+            assert ok
             mmCifOutFileZ = mmCifOutFile + ".gz"
             ok = self.__fU.compress(inpPath=mmCifOutFile, outPath=mmCifOutFileZ)
             if ok:
                 return mmCifOutFileZ
         except Exception as e:
-            # logger.exception("%s failing on PDB file %s and alignment file %s, with %s", procName, pdbFile, alignmentFile, str(e))
-            logger.debug("%s failing on PDB file %s and alignment file %s, with %s", procName, pdbFile, alignmentFile, str(e))
+            # logger.exception("%s failing on PDB file %s with %s", procName, pdbFile, str(e))
+            logger.debug("%s failing on PDB file %s, with %s", procName, pdbFile, str(e))
 
 
-class ModBaseModelProcessor(object):
-    """Generators and accessors for ModBase model files."""
+class SwissModelProcessor(object):
+    """Generators and accessors for SwissModel model files."""
 
     def __init__(self, cachePath=None, useCache=False, speciesD=None, **kwargs):
-        """Initialize ModBaseModelProcessor object.
+        """Initialize SwissModelProcessor object.
 
         Args:
             cachePath (str): path to species-specific cache file containing list of processed model files.
@@ -148,7 +144,7 @@ class ModBaseModelProcessor(object):
             speciesD (dict): dictionary containing the following necessary key:value pairs for conversion:
                              "speciesModelDir": path to species data directory
                              "lastModified": last modified date of the downloaded species archive tarball
-                             "speciesName": name of the species as it is stored in the ModBaseModelProvider cache
+                             "speciesName": name of the species as it is stored in the SwissModelProvider cache
                              "speciesPdbModelFileList": list of the PDB model files to convert
         """
 
@@ -196,7 +192,7 @@ class ModBaseModelProcessor(object):
         return []
 
     def generate(self, updateOnly=False, fmt="pickle", indent=0):
-        """Generate converted mmCIF models from ModBase PDB and alignment files.
+        """Generate converted mmCIF models from SwissModel PDB files.
 
         Args:
             updateOnly (bool): only convert new or previously-failed models.  Defaults to False.
@@ -209,7 +205,7 @@ class ModBaseModelProcessor(object):
         ok = False
         try:
             tS = time.strftime("%Y %m %d %H:%M:%S", time.localtime())
-            mD, failD = self.__convertModBasePdb(numProc=self.__numProc, chunkSize=self.__chunkSize, updateOnly=updateOnly)
+            mD, failD = self.__convertSwissModelPdb(numProc=self.__numProc, chunkSize=self.__chunkSize, updateOnly=updateOnly)
             self.__modelD = {
                 "version": self.__version,
                 "created": tS,
@@ -255,8 +251,8 @@ class ModBaseModelProcessor(object):
         pth = os.path.join(self.__speciesModelDir, speciesNameNoSpace + "-model-data." + ext)
         return pth
 
-    def __convertModBasePdb(self, numProc=2, chunkSize=10, updateOnly=False):
-        """Prepare multiprocessor queue and workers for converting all ModBase PDB model files to mmCIF, using alignment files.
+    def __convertSwissModelPdb(self, numProc=2, chunkSize=10, updateOnly=False):
+        """Prepare multiprocessor queue and workers for converting all SwissModel PDB model files to mmCIF.
 
         Args:
             numProc (int, optional): number of processes to use. Defaults to 2.
@@ -265,9 +261,9 @@ class ModBaseModelProcessor(object):
 
         Returns:
             mD (dict): dictionary of successfully-converted mmCIF models, in the following structure:
-                       {modelNameRoot: {"model": pathToGzippedCifFile, "alignment": pathToCompressedAlignmentFile}, ...}
-            failD (dict): dictionary of ModBase models for which conversion failed, in the following structure:
-                          {modelNameRoot: {"model": pathToCompressedPDBModelFile, "alignment": pathToCompressedAlignmentFile}, ...}
+                       {modelNameRoot: {"model": pathToGzippedCifFile, "uniProtId": uniProtId}, ...}
+            failD (dict): dictionary of SwissModel models for which conversion failed, in the following structure:
+                          {modelNameRoot: {"model": pathToCompressedPDBModelFile, "uniProtId": uniProtId}, ...}
         """
         mD = {}
         failD = {}
@@ -282,16 +278,16 @@ class ModBaseModelProcessor(object):
         #
         pdbModelFileList = self.__speciesPdbModelFileList
         modelList = []
-        for pFZ in pdbModelFileList:
-            modelNameRoot = self.__fU.getFileName(pFZ).split(".pdb.xz")[0]
+        for pF in pdbModelFileList:
+            modelNameRoot = self.__fU.getFileName(pF).split(".pdb")[0]
             if modelNameRoot not in mD:
-                aFZ = os.path.join(self.__speciesModelDir, "alignment", modelNameRoot + ".ali.xml.xz")
-                modelE = ModBaseEntry(name=modelNameRoot, model=pFZ, alignment=aFZ)
+                uniProtId = "".join(pF.split("/")[-5:-2])
+                modelE = SwissModelEntry(name=modelNameRoot, model=pF, uniProtId=uniProtId)
                 modelList.append(modelE)
 
         logger.info("Starting with %d models, numProc %d, updateOnly (%r)", len(modelList), self.__numProc, updateOnly)
         #
-        rWorker = ModBaseModelWorker(workPath=self.__speciesModelDir)
+        rWorker = SwissModelWorker(workPath=self.__speciesModelDir)
         mpu = MultiProcUtil(verbose=True)
         optD = {"species": self.__speciesName, "speciesModDate": self.__speciesModDate}
         mpu.setOptions(optD)
@@ -301,11 +297,11 @@ class ModBaseModelProcessor(object):
         if failList:
             logger.info("mmCIF conversion failures (%d): %r", len(failList), failList)
         #
-        for (model, convertedCifFileZ, alignmentFileUsed) in resultList[0]:
+        for (model, convertedCifFileZ, uniProtId) in resultList[0]:
             if convertedCifFileZ:
-                mD[model.name] = {"model": convertedCifFileZ, "alignment": alignmentFileUsed}
+                mD[model.name] = {"model": convertedCifFileZ, "uniProtId": uniProtId}
             else:
-                failD[model.name] = {"model": model.model, "alignment": model.alignment}
+                failD[model.name] = {"model": model.model, "uniProtId": uniProtId}
         #
         logger.info("Completed with multi-proc status %r, failures %r, total models with data (%d)", ok, len(failList), len(mD))
         return mD, failD

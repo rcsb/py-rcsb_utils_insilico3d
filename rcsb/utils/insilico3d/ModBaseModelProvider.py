@@ -254,24 +254,6 @@ class ModBaseModelProvider:
                 logger.exception("Failing with %s", str(e))
         return ok
 
-    def removeSpeciesDataDir(self, speciesName=None, updateCache=True):
-        """"Remove an entire species data directory (and its corresponding cache file entry),
-        provided the species name as stored in the cache file."""
-
-        ok = False
-        if speciesName:
-            try:
-                cacheD = self.__mU.doImport(self.__speciesDataCacheFile, fmt="json")
-                dataD = cacheD["data"]
-                speciesDataD = dataD.pop(speciesName)
-                if updateCache:
-                    ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=3)
-                speciesDataDir = speciesDataD["dataDirectory"]
-                ok = self.__fU.remove(speciesDataDir)
-            except Exception as e:
-                logger.exception("Failing with %s", str(e))
-        return ok
-
     def reorganizeModelFiles(self):
         """Move model files from organism-wide model listing to hashed directory structure
         using last two characters of the filename (NCBI ID), excluing the run number suffix."""
@@ -304,3 +286,21 @@ class ModBaseModelProvider:
         except Exception as e:
             logger.exception("Failing with %s", str(e))
             return False
+
+    def removeSpeciesDataDir(self, speciesName=None, updateCache=True):
+        """"Remove an entire species data directory (and its corresponding cache file entry),
+        provided the species name as stored in the cache file."""
+
+        ok = False
+        if speciesName:
+            try:
+                cacheD = self.__mU.doImport(self.__speciesDataCacheFile, fmt="json")
+                dataD = cacheD["data"]
+                speciesDataD = dataD.pop(speciesName)
+                if updateCache:
+                    ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=3)
+                speciesDataDir = speciesDataD["dataDirectory"]
+                ok = self.__fU.remove(speciesDataDir)
+            except Exception as e:
+                logger.exception("Failing with %s", str(e))
+        return ok
