@@ -86,7 +86,7 @@ def fetchSwissModels():
     suiteSelect = unittest.TestSuite()
     suiteSelect.addTest(SwissModelProviderTests("testFetchSwissModels"))
     suiteSelect.addTest(SwissModelProviderTests("testReloadCache"))
-    # suiteSelect.addTest(SwissModelProviderTests("testDeleteCache"))
+    suiteSelect.addTest(SwissModelProviderTests("testDeleteCache"))
     return suiteSelect
 
 
