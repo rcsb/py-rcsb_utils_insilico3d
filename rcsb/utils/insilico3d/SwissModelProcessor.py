@@ -82,15 +82,7 @@ class SwissModelWorker(object):
                                                                uniProtId=uniProtId, swissModelConverter=converterObj, optionsD=optionsD)
                     if convertedCifFileZ:
                         successList.append(modelE)
-                    # else:
-                    #     # If fails, attempt the conversion without alignment
-                    #     convertedCifFileZ = self.__convertPdbToCif(procName=procName, pdbFile=pF, mmCifOutFile=cF, optionsD=optionsD)
-                    #     if convertedCifFileZ:
-                    #         successList.append(modelE)
                     print('\n', convertedCifFileZ)
-                    # Last remove the unzipped pdb, alignment and cif files
-                    # self.__fU.remove(pF)  # Don't remove uncompressed PDB files right away, since SwissModel provides files as uncompressed already.
-                    #                       # Instead, delete the entire species directory once the conversion process is all complete
                     self.__fU.remove(cF)
                 retList.append((modelE, convertedCifFileZ, uniProtId))
 
@@ -128,8 +120,8 @@ class SwissModelWorker(object):
             if ok:
                 return mmCifOutFileZ
         except Exception as e:
-            # logger.exception("%s failing on PDB file %s with %s", procName, pdbFile, str(e))
-            logger.debug("%s failing on PDB file %s, with %s", procName, pdbFile, str(e))
+            logger.exception("%s failing on PDB file %s with %s", procName, pdbFile, str(e))
+            # logger.debug("%s failing on PDB file %s, with %s", procName, pdbFile, str(e))
 
 
 class SwissModelProcessor(object):

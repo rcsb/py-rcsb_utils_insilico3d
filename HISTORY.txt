@@ -6,3 +6,4 @@
   30-Sep-2021  - V0.14 Added SWISS-MODEL provider class; Minor changes to other classes
   01-Oct-2021  - V0.15 Reorganized directory tree structure for divided models into three levels
   12-Oct-2021  - V0.16 Added SWISS-MODEL conversion and processor classes; Minor adjustments to other classes
+  13-Oct-2021  - V0.17 Changed AlphaFoldProvider to use HTTP instead of FTP for accessing files on remote server

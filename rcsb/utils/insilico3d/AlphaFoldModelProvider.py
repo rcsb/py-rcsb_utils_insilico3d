@@ -32,7 +32,6 @@ import glob
 
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
-from rcsb.utils.io.FtpUtil import FtpUtil
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +48,7 @@ class AlphaFoldModelProvider:
         self.__dividedDataCacheFile = os.path.join(self.__cachePath, "AlphaFold-model-data.json")
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
+        self.__fU = FileUtil(workPath=self.__dirPath)
 
         self.__oD, self.__createdDate = self.__reload(**kwargs)
 
@@ -76,19 +76,15 @@ class AlphaFoldModelProvider:
             startTime = time.time()
             startDateTime = datetime.datetime.now().isoformat()
             useCache = kwargs.get("useCache", True)
-            alphaFoldFtpHost = kwargs.get("alphaFoldFtpHost", "ftp.ebi.ac.uk")
-            alphaFoldFtpDataPath = kwargs.get("alphaFoldFtpDataPath", "/pub/databases/alphafold/")
-            alphaFoldFtpLatestDataList = os.path.join(alphaFoldFtpDataPath, "download_metadata.json")
+
+            alphaFoldBaseUrl = kwargs.get("alphaFoldBaseUrl", "https://ftp.ebi.ac.uk/pub/databases/alphafold/")
+            alphaFoldLatestDataList = os.path.join(alphaFoldBaseUrl, "download_metadata.json")
             alphaFoldRequestedSpeciesList = kwargs.get("alphaFoldRequestedSpeciesList", [])
 
-            ftpU = FtpUtil()
-            ftpU.connect(alphaFoldFtpHost)
+            self.__fU.mkdir(self.__dirPath)
 
-            fU = FileUtil()
-            fU.mkdir(self.__dirPath)
-
-            latestDataListDumpPath = os.path.join(self.__dirPath, alphaFoldFtpLatestDataList.split("/")[-1])
-            ok = ftpU.get(alphaFoldFtpLatestDataList, latestDataListDumpPath)
+            latestDataListDumpPath = os.path.join(self.__dirPath, self.__fU.getFileName(alphaFoldLatestDataList))
+            ok = self.__fU.get(alphaFoldLatestDataList, latestDataListDumpPath)
             lDL = self.__mU.doImport(latestDataListDumpPath, fmt="json")
 
             # If a specific list of species files was requested, only iterate over those
@@ -141,15 +137,15 @@ class AlphaFoldModelProvider:
                         sD = copy.deepcopy(speciesData)
                         speciesName = sD["species"]
                         speciesFile = sD["archive_name"]
-                        speciesFilePath = os.path.join(alphaFoldFtpDataPath, speciesFile)
+                        speciesFilePath = os.path.join(alphaFoldBaseUrl, speciesFile)
                         speciesDataDumpDir = os.path.join(self.__dirPath, speciesName.replace(" ", "_"))
-                        fU.mkdir(speciesDataDumpDir)
+                        self.__fU.mkdir(speciesDataDumpDir)
                         speciesFileDumpPath = os.path.join(speciesDataDumpDir, speciesFile)
                         sD.update({"data_directory": speciesDataDumpDir, "archive_file_path": speciesFileDumpPath})
 
                         logger.info("Fetching file %s from FTP server to local path %s", speciesFilePath, speciesFileDumpPath)
-                        ok = ftpU.get(speciesFilePath, speciesFileDumpPath)
-                        ok = fU.unbundleTarfile(speciesFileDumpPath, dirPath=speciesDataDumpDir)
+                        ok = self.__fU.get(speciesFilePath, speciesFileDumpPath)
+                        ok = self.__fU.unbundleTarfile(speciesFileDumpPath, dirPath=speciesDataDumpDir)
                         logger.info("Completed fetch (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
 
                         logger.info("Clearing PDB files from extracted tar bundle...")
@@ -158,7 +154,7 @@ class AlphaFoldModelProvider:
 
                         if ok:
                             cacheD["data"].update({speciesName: sD})
-                            fU.remove(speciesFileDumpPath)
+                            self.__fU.remove(speciesFileDumpPath)
 
                     except Exception as e:
                         logger.exception("Failing on fetching and expansion of file %s from FTP server, with message:\n%s", speciesData["archive_name"], str(e))
@@ -218,22 +214,21 @@ class AlphaFoldModelProvider:
         from the 6-character UniProt ID (e.g., "P52078" will be moved to "./P5/20/78")"""
 
         try:
-            fU = FileUtil()
             speciesDirList = self.getSpeciesDirList()
             newModelDirD = {}
             for speciesDir in speciesDirList:
                 modelFileList = self.getModelFileList(inputPathList=[speciesDir])
                 for model in modelFileList:
-                    modelName = fU.getFileName(model)
+                    modelName = self.__fU.getFileName(model)
                     uniProtID = modelName.split(".cif.gz")[0].split("-")[1]
                     first2 = uniProtID[0:2]
                     mid2 = uniProtID[2:4]
                     last2 = uniProtID[4:6]
                     destDir = os.path.join(self.__dividedDataPath, first2, mid2, last2)
-                    if not fU.exists(destDir):
-                        fU.mkdir(destDir)
+                    if not self.__fU.exists(destDir):
+                        self.__fU.mkdir(destDir)
                     destModelPath = os.path.join(destDir, modelName)
-                    fU.put(model, destModelPath)
+                    self.__fU.put(model, destModelPath)
                     newModelDirD[modelName] = destModelPath
             self.__mU.doExport(self.__dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
             return True
@@ -246,7 +241,6 @@ class AlphaFoldModelProvider:
         provided the species name as stored in the cache file."""
 
         ok = False
-        fU = FileUtil()
         if speciesName:
             try:
                 cacheD = self.__mU.doImport(self.__speciesDataCacheFile, fmt="json")
@@ -255,7 +249,7 @@ class AlphaFoldModelProvider:
                 if updateCache:
                     ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=3)
                 speciesDataDir = speciesDataD["data_directory"]
-                ok = fU.remove(speciesDataDir)
+                ok = self.__fU.remove(speciesDataDir)
             except Exception as e:
                 logger.exception("Failing with %s", str(e))
         return ok
