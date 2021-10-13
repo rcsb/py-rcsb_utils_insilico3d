@@ -77,7 +77,7 @@ class AlphaFoldModelProvider:
             startDateTime = datetime.datetime.now().isoformat()
             useCache = kwargs.get("useCache", True)
 
-            alphaFoldBaseUrl = kwargs.get("alphaFoldBaseUrl", "http://ftp.ebi.ac.uk/pub/databases/alphafold/")
+            alphaFoldBaseUrl = kwargs.get("alphaFoldBaseUrl", "https://ftp.ebi.ac.uk/pub/databases/alphafold/")
             alphaFoldLatestDataList = os.path.join(alphaFoldBaseUrl, "download_metadata.json")
             alphaFoldRequestedSpeciesList = kwargs.get("alphaFoldRequestedSpeciesList", [])
 
