@@ -287,7 +287,7 @@ class SwissModelProvider:
             logger.exception("Failing with %s", str(e))
             return False
 
-    def removeSwissModelDataDir(self, speciesName=None, updateCache=True):
+    def removeSpeciesDataDir(self, speciesName=None, updateCache=True):
         """"Remove an entire species data directory (and its corresponding cache file entry),
         provided the species name as stored in the cache file."""
 
