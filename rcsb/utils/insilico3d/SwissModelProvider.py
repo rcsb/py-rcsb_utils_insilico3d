@@ -280,7 +280,7 @@ class SwissModelProvider:
                     newModelDirD[modelName] = destModelPath
                 # Now remove the originally downloaded data directory (of PDB files)
                 swissModelDataDir = os.path.join(speciesDir, "SWISS-MODEL_Repository")
-                ok = self.__fU.remove(swissModelDataDir)
+                self.__fU.remove(swissModelDataDir)
             self.__mU.doExport(dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
             return True
         except Exception as e:

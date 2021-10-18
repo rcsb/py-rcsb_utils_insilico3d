@@ -278,8 +278,8 @@ class ModBaseModelProvider:
                     destModelPath = os.path.join(destDir, modelName)
                     self.__fU.replace(model, destModelPath)
                     newModelDirD[modelName] = destModelPath
-                ok = self.removePdbModelDir(speciesDataDir=speciesDir)
-                ok = self.removeAlignmentDir(speciesDataDir=speciesDir)
+                self.removePdbModelDir(speciesDataDir=speciesDir)
+                self.removeAlignmentDir(speciesDataDir=speciesDir)
             self.__mU.doExport(dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
             return True
         except Exception as e:
