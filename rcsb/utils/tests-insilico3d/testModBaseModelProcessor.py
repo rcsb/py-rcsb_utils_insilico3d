@@ -25,7 +25,6 @@ import time
 import unittest
 
 from rcsb.utils.insilico3d.ModBaseModelProvider import ModBaseModelProvider
-# from ModBaseModelProvider import ModBaseModelProvider
 from rcsb.utils.insilico3d.ModBaseModelProcessor import ModBaseModelProcessor
 
 HERE = os.path.abspath(os.path.dirname(__file__))

@@ -25,7 +25,6 @@ import time
 import unittest
 
 from rcsb.utils.insilico3d.AlphaFoldModelProvider import AlphaFoldModelProvider
-# from AlphaFoldModelProvider import AlphaFoldModelProvider
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(HERE))

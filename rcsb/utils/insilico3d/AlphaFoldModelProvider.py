@@ -45,7 +45,6 @@ class AlphaFoldModelProvider:
         self.__dirPath = os.path.join(self.__cachePath, "AlphaFold")
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
         self.__dividedDataPath = os.path.join(self.__cachePath, "computed-models")
-        # self.__dividedDataCacheFile = os.path.join(self.__cachePath, "AlphaFold-model-data.json")
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
         self.__fU = FileUtil(workPath=self.__dirPath)

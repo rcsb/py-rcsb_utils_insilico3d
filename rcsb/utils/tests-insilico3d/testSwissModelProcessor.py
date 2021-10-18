@@ -25,7 +25,6 @@ import time
 import unittest
 
 from rcsb.utils.insilico3d.SwissModelProvider import SwissModelProvider
-# from SwissModelProvider import SwissModelProvider
 from rcsb.utils.insilico3d.SwissModelProcessor import SwissModelProcessor
 
 HERE = os.path.abspath(os.path.dirname(__file__))
