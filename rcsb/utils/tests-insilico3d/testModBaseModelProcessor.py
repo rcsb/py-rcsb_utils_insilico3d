@@ -25,6 +25,7 @@ import time
 import unittest
 
 from rcsb.utils.insilico3d.ModBaseModelProvider import ModBaseModelProvider
+# from ModBaseModelProvider import ModBaseModelProvider
 from rcsb.utils.insilico3d.ModBaseModelProcessor import ModBaseModelProcessor
 
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -101,10 +102,10 @@ class ModBaseModelProcessorTests(unittest.TestCase):
             ok = mProc.testCache(minCount=10)
             self.assertTrue(ok)
             #
-            ok = mProv.removePdbModelDir(speciesDataDir=speciesConversionDict["speciesModelDir"])
-            self.assertTrue(ok)
-            ok = mProv.removeAlignmentDir(speciesDataDir=speciesConversionDict["speciesModelDir"])
-            self.assertTrue(ok)
+            # ok = mProv.removePdbModelDir(speciesDataDir=speciesConversionDict["speciesModelDir"])
+            # self.assertTrue(ok)
+            # ok = mProv.removeAlignmentDir(speciesDataDir=speciesConversionDict["speciesModelDir"])
+            # self.assertTrue(ok)
             #
             # Test reorganize models
             ok = mProv.testCache()
@@ -112,9 +113,6 @@ class ModBaseModelProcessorTests(unittest.TestCase):
             ok = mProv.reorganizeModelFiles()
             self.assertTrue(ok)
             #
-            # Last remove species data directory
-            ok = mProv.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
-            self.assertTrue(ok)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
             self.fail()

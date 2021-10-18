@@ -44,8 +44,8 @@ class AlphaFoldModelProvider:
         self.__cachePath = kwargs.get("cachePath", "./CACHE-insilico3d-models")
         self.__dirPath = os.path.join(self.__cachePath, "AlphaFold")
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
-        self.__dividedDataPath = os.path.join(self.__cachePath, "divided")
-        self.__dividedDataCacheFile = os.path.join(self.__cachePath, "AlphaFold-model-data.json")
+        self.__dividedDataPath = os.path.join(self.__cachePath, "computed-models")
+        # self.__dividedDataCacheFile = os.path.join(self.__cachePath, "AlphaFold-model-data.json")
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
         self.__fU = FileUtil(workPath=self.__dirPath)
@@ -215,8 +215,9 @@ class AlphaFoldModelProvider:
 
         try:
             speciesDirList = self.getSpeciesDirList()
-            newModelDirD = {}
             for speciesDir in speciesDirList:
+                newModelDirD = {}
+                dividedDataCacheFile = os.path.join(speciesDir, "species-model-files.json")
                 modelFileList = self.getModelFileList(inputPathList=[speciesDir])
                 for model in modelFileList:
                     modelName = self.__fU.getFileName(model)
@@ -228,28 +229,10 @@ class AlphaFoldModelProvider:
                     if not self.__fU.exists(destDir):
                         self.__fU.mkdir(destDir)
                     destModelPath = os.path.join(destDir, modelName)
-                    self.__fU.put(model, destModelPath)
+                    self.__fU.replace(model, destModelPath)
                     newModelDirD[modelName] = destModelPath
-            self.__mU.doExport(self.__dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
+            self.__mU.doExport(dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
             return True
         except Exception as e:
             logger.exception("Failing with %s", str(e))
             return False
-
-    def removeSpeciesDataDir(self, speciesName=None, updateCache=True):
-        """"Remove an entire species data directory (and its corresponding cache file entry),
-        provided the species name as stored in the cache file."""
-
-        ok = False
-        if speciesName:
-            try:
-                cacheD = self.__mU.doImport(self.__speciesDataCacheFile, fmt="json")
-                dataD = cacheD["data"]
-                speciesDataD = dataD.pop(speciesName)
-                if updateCache:
-                    ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=3)
-                speciesDataDir = speciesDataD["data_directory"]
-                ok = self.__fU.remove(speciesDataDir)
-            except Exception as e:
-                logger.exception("Failing with %s", str(e))
-        return ok

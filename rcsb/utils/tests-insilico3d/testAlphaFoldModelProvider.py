@@ -25,6 +25,7 @@ import time
 import unittest
 
 from rcsb.utils.insilico3d.AlphaFoldModelProvider import AlphaFoldModelProvider
+# from AlphaFoldModelProvider import AlphaFoldModelProvider
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(HERE))
@@ -68,10 +69,6 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         self.assertTrue(ok)
         ok = aFMP.reorganizeModelFiles()
         self.assertTrue(ok)
-        #
-        # Last test deleting the cache
-        # ok = aFMP.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
-        # self.assertTrue(ok)
 
 
 def fetchAlphaFoldModels():

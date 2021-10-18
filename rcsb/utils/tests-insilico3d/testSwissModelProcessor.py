@@ -25,6 +25,7 @@ import time
 import unittest
 
 from rcsb.utils.insilico3d.SwissModelProvider import SwissModelProvider
+# from SwissModelProvider import SwissModelProvider
 from rcsb.utils.insilico3d.SwissModelProcessor import SwissModelProcessor
 
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -75,7 +76,6 @@ class SwissModelProcessorTests(unittest.TestCase):
             self.assertTrue(ok)
             speciesConversionDict = mProv.getSpeciesConversionDict(speciesName=speciesNameList[0])
             speciesConversionDict["speciesPdbModelFileList"] = speciesConversionDict["speciesPdbModelFileList"][0:300]
-            # logger.info("speciesConversionDict['speciesPdbModelFileList'] %s", speciesConversionDict["speciesPdbModelFileList"])
             ok = True if len(speciesConversionDict["speciesPdbModelFileList"]) > 0 else False
             self.assertTrue(ok)
             mProc = SwissModelProcessor(
@@ -108,9 +108,6 @@ class SwissModelProcessorTests(unittest.TestCase):
             ok = mProv.reorganizeModelFiles()
             self.assertTrue(ok)
             #
-            # Last remove species data directory
-            ok = mProv.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
-            self.assertTrue(ok)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
             self.fail()
