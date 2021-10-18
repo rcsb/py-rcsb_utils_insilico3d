@@ -68,10 +68,6 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         self.assertTrue(ok)
         ok = aFMP.reorganizeModelFiles()
         self.assertTrue(ok)
-        #
-        # Last test deleting the cache
-        # ok = aFMP.removeSpeciesDataDir(speciesName="Staphylococcus aureus", updateCache=False)
-        # self.assertTrue(ok)
 
 
 def fetchAlphaFoldModels():

@@ -38,8 +38,7 @@ class SwissModelProvider:
         self.__cachePath = kwargs.get("cachePath", "./CACHE-insilico3d-models")
         self.__dirPath = os.path.join(self.__cachePath, "SWISS-MODEL")
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
-        self.__dividedDataPath = os.path.join(self.__cachePath, "divided")
-        self.__dividedDataCacheFile = os.path.join(self.__cachePath, "SWISS-MODEL-model-data.json")
+        self.__dividedDataPath = os.path.join(self.__cachePath, "computed-models")
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
         self.__fU = FileUtil(workPath=self.__dirPath)
@@ -265,8 +264,9 @@ class SwissModelProvider:
 
         try:
             speciesDirList = self.getSpeciesDirList()
-            newModelDirD = {}
             for speciesDir in speciesDirList:
+                newModelDirD = {}
+                dividedDataCacheFile = os.path.join(speciesDir, "species-model-files.json")
                 modelFileList = self.getSpeciesCifModelFileList(speciesDataDir=speciesDir)
                 for model in modelFileList:
                     modelName = self.__fU.getFileName(model)
@@ -276,9 +276,12 @@ class SwissModelProvider:
                     if not self.__fU.exists(destDir):
                         self.__fU.mkdir(destDir)
                     destModelPath = os.path.join(destDir, modelName)
-                    self.__fU.put(model, destModelPath)
+                    self.__fU.replace(model, destModelPath)
                     newModelDirD[modelName] = destModelPath
-            self.__mU.doExport(self.__dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
+                # Now remove the originally downloaded data directory (of PDB files)
+                swissModelDataDir = os.path.join(speciesDir, "SWISS-MODEL_Repository")
+                self.__fU.remove(swissModelDataDir)
+            self.__mU.doExport(dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
             return True
         except Exception as e:
             logger.exception("Failing with %s", str(e))
@@ -297,7 +300,8 @@ class SwissModelProvider:
                 if updateCache:
                     ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=3)
                 speciesDataDir = speciesDataD["dataDirectory"]
-                ok = self.__fU.remove(speciesDataDir)
+                swissModelDataDir = os.path.join(speciesDataDir, "SWISS-MODEL_Repository")
+                ok = self.__fU.remove(swissModelDataDir)
             except Exception as e:
                 logger.exception("Failing with %s", str(e))
         return ok

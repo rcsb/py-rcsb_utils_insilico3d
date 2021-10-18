@@ -38,8 +38,7 @@ class ModBaseModelProvider:
         self.__cachePath = kwargs.get("cachePath", "./CACHE-insilico3d-models")
         self.__dirPath = os.path.join(self.__cachePath, "ModBase")
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
-        self.__dividedDataPath = os.path.join(self.__cachePath, "divided")
-        self.__dividedDataCacheFile = os.path.join(self.__cachePath, "ModBase-model-data.json")
+        self.__dividedDataPath = os.path.join(self.__cachePath, "computed-models")
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
         self.__fU = FileUtil(workPath=self.__dirPath)
@@ -97,7 +96,6 @@ class ModBaseModelProvider:
                         speciesFilePath = os.path.join(modBaseBaseUrl, path)
                         speciesFileSize = int(self.__fU.size(speciesFilePath))
                         speciesFileHeadResp = requests.head(speciesFilePath)
-                        # speciesFileModDate = speciesFileHeadResp.headers['Last-Modified']
                         speciesFileModDate = datetime.datetime.strptime(speciesFileHeadResp.headers["Last-Modified"], "%a, %d %b %Y %H:%M:%S %Z").isoformat()
                         cacheSpeciesDir = oD[species]["dataDirectory"]
                         cacheSpeciesFileSize = oD[species]["archiveFileSizeBytes"]
@@ -120,7 +118,6 @@ class ModBaseModelProvider:
                         speciesFilePath = os.path.join(modBaseBaseUrl, path)
                         speciesFileSize = int(self.__fU.size(speciesFilePath))
                         speciesFileHeadResp = requests.head(speciesFilePath)
-                        # speciesFileModDate = speciesFileHeadResp.headers['Last-Modified']
                         speciesFileModDate = datetime.datetime.strptime(speciesFileHeadResp.headers["Last-Modified"], "%a, %d %b %Y %H:%M:%S %Z").isoformat()
                         speciesDataDumpDir = os.path.join(self.__dirPath, species.replace(" ", "_"))
                         self.__fU.mkdir(speciesDataDumpDir)
@@ -259,13 +256,13 @@ class ModBaseModelProvider:
         using last two characters of the filename (NCBI ID), excluing the run number suffix."""
 
         try:
-            fU = FileUtil()
             speciesDirList = self.getSpeciesDirList()
-            newModelDirD = {}
             for speciesDir in speciesDirList:
+                newModelDirD = {}
+                dividedDataCacheFile = os.path.join(speciesDir, "species-model-files.json")
                 modelFileList = self.getModelFileList(inputPathList=[speciesDir])
                 for model in modelFileList:
-                    modelName = fU.getFileName(model)
+                    modelName = self.__fU.getFileName(model)
                     modelNameBase = modelName.split('.cif')[0]
                     if "_" in modelNameBase[0:5] or modelNameBase.startswith("ENS"):
                         modelNameBaseHash = modelNameBase.split(".")[0]
@@ -276,12 +273,14 @@ class ModBaseModelProvider:
                     mid2 = sixCharHash[2:4]
                     last2 = sixCharHash[4:6]
                     destDir = os.path.join(self.__dividedDataPath, first2, mid2, last2)
-                    if not fU.exists(destDir):
-                        fU.mkdir(destDir)
+                    if not self.__fU.exists(destDir):
+                        self.__fU.mkdir(destDir)
                     destModelPath = os.path.join(destDir, modelName)
-                    fU.put(model, destModelPath)
+                    self.__fU.replace(model, destModelPath)
                     newModelDirD[modelName] = destModelPath
-            self.__mU.doExport(self.__dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
+                self.removePdbModelDir(speciesDataDir=speciesDir)
+                self.removeAlignmentDir(speciesDataDir=speciesDir)
+            self.__mU.doExport(dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
             return True
         except Exception as e:
             logger.exception("Failing with %s", str(e))
