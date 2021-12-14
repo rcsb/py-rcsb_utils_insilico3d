@@ -567,7 +567,7 @@ VAL 'L-peptide linking' VALINE 'C5 H11 N O2' 117.148""")
             lp.write("3 QMEANDisCo 'Per-residue Quality Score' other local 'QMEAN version %s' 1" % self.remarksD["MODEL INFORMATION"]["QMNV"])  # This is beta factor field
         with self.loop(
                 'ma_qa_metric_global',
-                ['ordinal_id', 'model_id', 'metric_id', 'value']) as lp:
+                ['ordinal_id', 'model_id', 'metric_id', 'metric_value']) as lp:
             lp.write("1 1 1 %s" % self.remarksD["MODEL INFORMATION"]["GMQE"])
             lp.write("2 1 2 %s" % self.remarksD["MODEL INFORMATION"]["QMNDG"])
         with self.loop(

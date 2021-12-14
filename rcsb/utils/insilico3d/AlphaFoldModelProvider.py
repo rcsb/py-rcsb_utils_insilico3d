@@ -6,11 +6,8 @@
 # Update:
 #
 #
-# To do:
-# - Change category data item name, '_ma_qa_metric_global.metric_value' to '_ma_qa_metric_global.value' (or await the change on AF end)
-# - Add the following data items to MA dictionary:
-#   _ma_target_ref_db_details.ncbi_taxonomy_id    9606
-#   _ma_target_ref_db_details.organism_scientific "Homo sapiens"
+# To Do:
+# - Add check that converted files are consistent with mmCIF dictionaries
 ##
 """
 Accessors for AlphaFold 3D Models (mmCIF).
@@ -29,6 +26,7 @@ import time
 from pathlib import Path
 import copy
 import glob
+import re
 
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
@@ -79,12 +77,17 @@ class AlphaFoldModelProvider:
             alphaFoldBaseUrl = kwargs.get("alphaFoldBaseUrl", "https://ftp.ebi.ac.uk/pub/databases/alphafold/")
             alphaFoldLatestDataList = os.path.join(alphaFoldBaseUrl, "download_metadata.json")
             alphaFoldRequestedSpeciesList = kwargs.get("alphaFoldRequestedSpeciesList", [])
+            excludeArchiveFileRegexList = ["swissprot_pdb_v[0-9]+.tar"]
+            excludeArchiveFileRegexListCombined = "(?:% s)" % "|".join(excludeArchiveFileRegexList)
 
             self.__fU.mkdir(self.__dirPath)
 
             latestDataListDumpPath = os.path.join(self.__dirPath, self.__fU.getFileName(alphaFoldLatestDataList))
             ok = self.__fU.get(alphaFoldLatestDataList, latestDataListDumpPath)
             lDL = self.__mU.doImport(latestDataListDumpPath, fmt="json")
+
+            # Exclude undesired archives (defined in excludeArchiveFileRegexList)
+            lDL = [s for s in lDL if not re.match(excludeArchiveFileRegexListCombined, s["archive_name"])]
 
             # If a specific list of species files was requested, only iterate over those
             if alphaFoldRequestedSpeciesList:
@@ -136,7 +139,7 @@ class AlphaFoldModelProvider:
                         sD = copy.deepcopy(speciesData)
                         speciesName = sD["species"]
                         speciesFile = sD["archive_name"]
-                        speciesFilePath = os.path.join(alphaFoldBaseUrl, speciesFile)
+                        speciesFilePath = os.path.join(alphaFoldBaseUrl, "latest", speciesFile)
                         speciesDataDumpDir = os.path.join(self.__dirPath, speciesName.replace(" ", "_"))
                         self.__fU.mkdir(speciesDataDumpDir)
                         speciesFileDumpPath = os.path.join(speciesDataDumpDir, speciesFile)
