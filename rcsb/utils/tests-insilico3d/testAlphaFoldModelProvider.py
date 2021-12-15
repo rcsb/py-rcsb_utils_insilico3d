@@ -54,7 +54,7 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         #
         # Next test reloading the cache
         aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
-        speciesDirList = aFMP.getSpeciesDirList()
+        speciesDirList = aFMP.getArchiveDirList()
         ok = True if len(speciesDirList) > 0 else False
         self.assertTrue(ok)
         #
