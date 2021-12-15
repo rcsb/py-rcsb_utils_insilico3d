@@ -8,4 +8,4 @@
   12-Oct-2021  - V0.16 Added SWISS-MODEL conversion and processor classes; Minor adjustments to other classes
   13-Oct-2021  - V0.17 Changed AlphaFoldProvider to use HTTP instead of FTP for accessing files on remote server
   18-Oct-2021  - V0.18 Reorganized directory structure and cache of provided model files
-  18-Oct-2021  - V0.19 Update location and filenames of AlphaFold models on FTP server
+  15-Dec-2021  - V0.19 Update location and filenames of AlphaFold models on FTP server
