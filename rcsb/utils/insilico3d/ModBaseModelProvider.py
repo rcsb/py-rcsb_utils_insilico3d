@@ -6,6 +6,8 @@
 # Update:
 #
 #
+# To Do:
+# - Add check that converted files are consistent with mmCIF dictionaries
 ##
 """
 Accessors for ModBase 3D Models (PDB).
