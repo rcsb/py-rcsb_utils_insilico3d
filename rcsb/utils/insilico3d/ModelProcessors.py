@@ -9,7 +9,7 @@
 # To Do:
 # - pylint: disable=fixme
 # - Add mkdssp calculation
-# - Add check that converted files are consistent with mmCIF dictionaries
+# - Add check that model files are consistent with mmCIF dictionaries
 ##
 
 """
@@ -24,11 +24,9 @@ __license__ = "Apache 2.0"
 
 import logging
 import os.path
-import time
-import collections
 
-import rcsb.utils.modbase_utils.modbase_pdb_to_cif as modbase
-from rcsb.utils.insilico3d import __version__
+# import rcsb.utils.modbase_utils.modbase_pdb_to_cif as modbase
+# from rcsb.utils.insilico3d import __version__
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.multiproc.MultiProcUtil import MultiProcUtil
@@ -38,7 +36,7 @@ logger = logging.getLogger(__name__)
 
 class ModelWorker(object):
     """A skeleton class that implements the interface expected by the multiprocessing
-    for converting ModBase PDB files to mmCIF files.
+    for working on model files.
     """
 
     def __init__(self, **kwargs):
@@ -104,7 +102,7 @@ class ModelWorker(object):
             if failList:
                 logger.info("%s returns %d definitions with failures: %r", procName, len(failList), failList)
 
-            logger.debug("%s converted %d/%d models, failures %d", procName, len(retList), len(dataList), len(failList))
+            logger.debug("%s processed %d/%d models, failures %d", procName, len(retList), len(dataList), len(failList))
         except Exception as e:
             logger.exception("Failing %s for %d data items %s", procName, len(dataList), str(e))
 
@@ -114,39 +112,31 @@ class ModelWorker(object):
 class ModelReorganizer(object):
     """Generators and accessors for model files."""
 
-    def __init__(self, cachePath=None, useCache=False, speciesD=None, **kwargs):
+    def __init__(self, cachePath=None, modelD=None, **kwargs):
         """Initialize ModelReorganizer object.
 
         Args:
             cachePath (str): path to species-specific cache file containing list of processed model files;
                              should be provided!; else defaults to some temporary cache file.
             useCache (bool): whether to use the existing data cache or re-run conversion process
-            speciesD (dict): dictionary containing the following necessary key:value pairs for processing:
-                             "speciesModelDir": path to species data directory, will be used as working directory
-                             "lastModified": last modified date of the downloaded species archive tarball
-                             "speciesName": name of the species as it is stored in the ModBaseModelProvider cache
-                             "speciesModelFileList": list of the model files to process
+            modelD (dict): dictionary containing the following necessary key:value pairs for processing:
+                             "modelDir": path to species data directory, will be used as working directory
+                             "modelFileList": list of the model files to process
                              "modelSourcePrefix": internal identifier prefix to use for provided model source type (e.g., "af", "ma")
                              "destModelDir": base destination directory into which to reorganize model files
         """
 
         try:
-            # self.__version = __version__
-            self.__numProc = kwargs.get("numProc", 4)
-            self.__chunkSize = kwargs.get("chunkSize", 20)
-
-            self.__speciesModelDir = speciesD.get("speciesModelDir")
-            self.__workPath = self.__speciesModelDir
-            self.__speciesModDate = speciesD.get("lastModified", None)
-            self.__speciesName = speciesD.get("speciesName")
-            self.__speciesModelFileList = speciesD.get("speciesModelFileList", [])
-            self.__modelSourcePrefix = speciesD.get("modelSourcePrefix")
-            self.__destModelDir = speciesD.get("destModelDir")
-
             self.__cachePath = cachePath if cachePath else self.__getModelCachePath()
+            self.__numProc = kwargs.get("numProc", 2)
+            self.__chunkSize = kwargs.get("chunkSize", 20)
+            self.__modelDir = modelD.get("modelDir")
+            self.__workPath = self.__modelDir
+            self.__modelFileList = modelD.get("modelFileList", [])
+            self.__modelSourcePrefix = modelD.get("modelSourcePrefix")
+            self.__destModelDir = modelD.get("destModelDir")
 
             self.__mU = MarshalUtil(workPath=self.__workPath)
-            self.__fU = FileUtil(workPath=self.__workPath)
 
         except Exception as e:
             logger.exception("Failing with %s", str(e))
@@ -157,9 +147,7 @@ class ModelReorganizer(object):
     # def __getModelCachePath(self, fmt="pickle"):
     def __getModelCachePath(self, fmt="json"):
         ext = "pic" if fmt == "pickle" else "json"
-        # speciesNameNoSpace = self.__speciesName.replace(" ", "_")
-        # pth = os.path.join(self.__speciesModelDir, speciesNameNoSpace + "-model-files-cache." + ext)
-        pth = os.path.join(self.__speciesModelDir, "species-model-files-cache." + ext)
+        pth = os.path.join(self.__modelDir, "species-model-files-cache." + ext)
         return pth
 
     # def reorganize(self, fmt="pickle", indent=0):
@@ -177,79 +165,50 @@ class ModelReorganizer(object):
         """
         ok = False
         try:
-            # tS = time.strftime("%Y %m %d %H:%M:%S", time.localtime())
             mD, failD = self.__reorganizeModels(numProc=self.__numProc, chunkSize=self.__chunkSize)
             if len(failD) > 0:
                 logger.error("Failed to move %d model files.", len(failD))
-            # self.__modelD = {
-            #     # "version": self.__version,
-            #     # "created": tS,
-            #     # "species": self.__speciesName,
-            #     # "archiveModDate": self.__speciesModDate,
-            #     "speciesModelDir": self.__speciesModelDir,
-            #     "modelsCif": mD,
-            #     "modelsFailed": failD,
-            # }
             kwargs = {"indent": indent} if fmt == "json" else {"pickleProtocol": 4}
             ok = self.__mU.doExport(self.__cachePath, mD, fmt=fmt, **kwargs)
             logger.info("Wrote %r status %r", self.__cachePath, ok)
-            # modelCachePath = self.__getModelCachePath(fmt=fmt)
-            # modelCachePath = self.__cachePath
-            # ok = self.__mU.doExport(modelCachePath, self.__modelD, fmt=fmt, **kwargs)
-            # ok = self.__mU.doExport(modelCachePath[:-5]+"_failed.json", failD, fmt=fmt, **kwargs)
-            # logger.info("Wrote %r status %r", modelCachePath, ok)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
         return ok
 
-    def __reorganizeModels(self, numProc=2, chunkSize=10):
+    def __reorganizeModels(self, numProc=2, chunkSize=20):
         """Prepare multiprocessor queue and workers for reorganizing and renaming all downloaded model files into
         structured directory tree using internal identifiers.
 
         Args:
             numProc (int, optional): number of processes to use. Defaults to 2.
-            chunkSize (int, optional): incremental chunk size used for distribute work processes. Defaults to 10.
+            chunkSize (int, optional): incremental chunk size used for distribute work processes. Defaults to 20.
 
         Returns:
             mD (dict): dictionary of successfully processed models, in the following structure:
-                       {modelNameRoot: {"model": newPathToModelFile}, ...}
+                       {internalModelId: {"sourceModelName": modelFileNameIn, "modelPath": modelFileOut}, ...}
             failD (dict): dictionary of models for which processing failed, in the following structure:
-                          {modelNameRoot: {"model": originalPathToModelFile}, ...}
+                          {internalModelId: {"sourceModelName": modelFileNameIn}, ...}
         """
         mD = {}
         failD = {}
-        # exD = {}
         #
-        # modelFileList = self.__speciesModelFileList
-        modelFileList = self.__speciesModelFileList[0:100]
-        # print("modelFileList: ", modelFileList)
-        #
-        logger.info("Starting with %d models, numProc %d", len(modelFileList), self.__numProc)
+        logger.info("Starting with %d models, numProc %d", len(self.__modelFileList), self.__numProc)
         #
         rWorker = ModelWorker(workPath=self.__workPath)
         mpu = MultiProcUtil(verbose=True)
-        optD = {"species": self.__speciesName, "speciesModDate": self.__speciesModDate, "modelSourcePrefix": self.__modelSourcePrefix, "destModelDir": self.__destModelDir}
+        optD = {"modelSourcePrefix": self.__modelSourcePrefix, "destModelDir": self.__destModelDir}
         mpu.setOptions(optD)
         mpu.set(workerObj=rWorker, workerMethod="reorganize")
         mpu.setWorkingDir(workingDir=self.__workPath)
-        ok, failList, resultList, _ = mpu.runMulti(dataList=modelFileList, numProc=numProc, numResults=1, chunkSize=chunkSize)
+        ok, failList, resultList, _ = mpu.runMulti(dataList=self.__modelFileList, numProc=numProc, numResults=1, chunkSize=chunkSize)
         if failList:
             logger.info("model file failures (%d): %r", len(failList), failList)
         #
         for (modelFileNameIn, internalModelId, modelFileOut) in resultList[0]:
             if modelFileOut:
-                # internalModelId = self.__fU.getFileName(modelFileOut).split(".cif.gz")[0]   # Provide this as output from MPU method above, don't extract it here
                 mD[internalModelId] = {"sourceModelName": modelFileNameIn, "modelPath": modelFileOut}
             else:
                 failD[internalModelId] = {"sourceModelName": modelFileNameIn}
         #
         logger.info("Completed with multi-proc status %r, failures %r, total models with data (%d)", ok, len(failList), len(mD))
         return mD, failD
-
-    def convertJsonToPickle(self, fmt1="json", fmt2="pickle"):
-        modelCachePath = self.__getModelCachePath(fmt=fmt1)
-        self.__modelD = self.__mU.doImport(modelCachePath, fmt=fmt1)
-        #
-        modelCachePath = self.__getModelCachePath(fmt=fmt2)
-        ok = self.__mU.doExport(modelCachePath, self.__modelD, fmt=fmt2, pickleProtocol=4)
-        return ok

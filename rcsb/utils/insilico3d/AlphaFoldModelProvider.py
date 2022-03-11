@@ -33,12 +33,9 @@ from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FtpUtil import FtpUtil
 from rcsb.utils.insilico3d.ModelProcessors import ModelReorganizer
-from rcsb.utils.config.ConfigUtil import ConfigUtil
+# from rcsb.utils.config.ConfigUtil import ConfigUtil
 
 logger = logging.getLogger(__name__)
-
-# HERE = os.path.abspath(os.path.dirname(__file__))
-# TOPDIR = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
 
 
 class AlphaFoldModelProvider:
@@ -236,70 +233,25 @@ class AlphaFoldModelProvider:
         try:
             archiveDirList = self.getArchiveDirList()
             for archiveDir in archiveDirList:
-                print(archiveDir)
-                print(archiveDir.split("/")[-1])
-                newModelDirD = {}
-                dividedDataCacheFile = os.path.join(archiveDir, "species-model-files.json")
                 modelFileList = self.getModelFileList(inputPathList=[archiveDir])
-                # print("modelFileList:", modelFileList[0:10])
                 mR = ModelReorganizer(
                     cachePath=os.path.join(archiveDir, "species-model-files-test.json"),
-                    numProc=2,
-                    speciesD={
-                        "speciesModelDir": archiveDir,
-                        "speciesName": archiveDir.split("/")[-1],
-                        "speciesModelFileList": modelFileList,
+                    numProc=4,
+                    chunkSize=20,
+                    modelD={
+                        "modelDir": archiveDir,
+                        "modelFileList": modelFileList,
+                        # "modelFileList": modelFileList[0:200],
                         "modelSourcePrefix": "af",
                         "destModelDir": self.__dividedDataPath
                     }
                 )
                 ok = mR.reorganize()
                 #
-                #
-                ## TODO: Would be worth it to perform this using multiprocessing
-                ## TODO: If this method can be generalized enough (using input variables), move it to a separate class that all insilico provider classes can use
-                #
-                # for model in modelFileList[0:200]:
-                #     containerList = self.__mU.doImport(model, fmt="mmcif")
-                #     for dataContainer in containerList:
-                #         print(dataContainer.getObj("entry").getValue("id", 0))
-                #
-                ### Runtime Stats (without multiprocessing):
-                ### 100 files
-                # INFO:root:Maximum resident memory size 95.0067 MB
-                # INFO:root:Completed __main__.AlphaFoldModelProviderTests.testAlphaFoldModelProvider at 2022 03 10 16:14:13 (11.8166 seconds)
-                # Ran 1 test in 11.817s
-                #
-                ### 200 files
-                # INFO:root:Maximum resident memory size 96.8499 MB
-                # INFO:root:Completed __main__.AlphaFoldModelProviderTests.testAlphaFoldModelProvider at 2022 03 10 16:15:26 (18.1101 seconds)
-                # Ran 1 test in 18.110s
-                #
-            #     # for modelPath in modelFileList:
-            #     for modelPath in modelFileList[0:200]:
-            #         containerList = self.__mU.doImport(modelPath, fmt="mmcif")
-            #         if len(containerList) > 1:
-            #             # Expecting all computed models to have one container per file. When this becomes no longer the case, update this to handle it accordingly.
-            #             logger.error("Skipping - model file %s has more than one container (%d)", modelPath, len(containerList))
-            #             continue
-            #         modelEntryId = containerList[0].getObj("entry").getValue("id", 0)
-            #         internalModelName = "af_"+modelEntryId+".cif.gz"
-            #         print(modelEntryId, internalModelName)
-
-            #         modelName = self.__fU.getFileName(modelPath)
-            #         uniProtID = modelName.split(".cif.gz")[0].split("-")[1]
-            #         first2 = uniProtID[0:2]
-            #         mid2 = uniProtID[2:4]
-            #         last2 = uniProtID[4:6]
-            #         destDir = os.path.join(self.__dividedDataPath, first2, mid2, last2)
-            #         if not self.__fU.exists(destDir):
-            #             self.__fU.mkdir(destDir)
-            #         destModelPath = os.path.join(destDir, internalModelName)
-            #         self.__fU.put(modelPath, destModelPath)  # Copies files (only use for testing)
-            #         # self.__fU.replace(modelPath, destModelPath)  # Moves files (use for production)
-            #         newModelDirD[modelName] = destModelPath
-            # self.__mU.doExport(dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
-            return True
+                if not ok:
+                    logger.error("Reorganization of model files failed for species archive %s", archiveDir)
+                    return False
+            return ok
         except Exception as e:
             logger.exception("Failing with %s", str(e))
             return False
