@@ -1,0 +1,17 @@
+{
+   "created": "2022-03-10T14:50:28.207886",
+   "data": {
+      "Staphylococcus aureus": {
+         "archive_name": "UP000008816_93061_STAA8_v2.tar",
+         "species": "Staphylococcus aureus",
+         "common_name": "S. aureus",
+         "latin_common_name": true,
+         "reference_proteome": "UP000008816",
+         "num_predicted_structures": 2888,
+         "size_bytes": 283850752,
+         "type": "global_health",
+         "data_directory": "/Users/dennis/rcsb/py-rcsb_utils_insilico3d/rcsb/utils/tests-insilico3d/test-data/AlphaFold/Staphylococcus_aureus",
+         "archive_file_path": "/Users/dennis/rcsb/py-rcsb_utils_insilico3d/rcsb/utils/tests-insilico3d/test-data/AlphaFold/Staphylococcus_aureus/UP000008816_93061_STAA8_v2.tar"
+      }
+   }
+}

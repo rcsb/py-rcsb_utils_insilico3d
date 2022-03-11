@@ -37,7 +37,7 @@ from rcsb.utils.insilico3d.ModelProcessors import ModelReorganizer
 
 logger = logging.getLogger(__name__)
 
-
+## TODO: Add URLs to CACHE file
 class AlphaFoldModelProvider:
     """Accessors for AlphaFold models (mmCIF)."""
 
@@ -235,7 +235,7 @@ class AlphaFoldModelProvider:
             for archiveDir in archiveDirList:
                 modelFileList = self.getModelFileList(inputPathList=[archiveDir])
                 mR = ModelReorganizer(
-                    cachePath=os.path.join(archiveDir, "species-model-files-test.json"),
+                    cachePath=os.path.join(self.__dirPath, "computed-models-af.json"),
                     numProc=4,
                     chunkSize=20,
                     modelD={

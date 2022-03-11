@@ -31,7 +31,9 @@ from rcsb.utils.io.MarshalUtil import MarshalUtil
 
 logger = logging.getLogger(__name__)
 
-
+## TODO: First filter out only those models that have MPQS > 1.1 & ZDOPE < -1.0!
+##       Do this BEFORE converting all of them!
+##       Then, add a method here to call the conversion method from ModBaseModelProcessor from within here
 class ModBaseModelProvider:
     """Accessors for ModBase models (PDB)."""
 
