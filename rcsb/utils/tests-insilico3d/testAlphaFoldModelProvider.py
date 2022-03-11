@@ -25,9 +25,12 @@ import time
 import unittest
 
 from rcsb.utils.insilico3d.AlphaFoldModelProvider import AlphaFoldModelProvider
+from rcsb.utils.config.ConfigUtil import ConfigUtil
 
 HERE = os.path.abspath(os.path.dirname(__file__))
-TOPDIR = os.path.dirname(os.path.dirname(HERE))
+# TOPDIR = os.path.dirname(os.path.dirname(HERE))
+TOPDIR = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
@@ -37,6 +40,12 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
     def setUp(self):
         self.__cachePath = os.path.join(HERE, "test-output", "CACHE")
         self.__startTime = time.time()
+
+        # mockTopPath = os.path.join(TOPDIR, "rcsb", "mock-data")
+        # configPath = os.path.join(mockTopPath, "config", "dbload-setup-example.yml")
+        # self.__configName = "site_info_configuration"
+        # self.__cfgOb = ConfigUtil(configPath=configPath, defaultSectionName=self.__configName, mockTopPath=mockTopPath)
+
         logger.info("Starting %s at %s", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()))
 
     def tearDown(self):
@@ -48,9 +57,9 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
 
     def testAlphaFoldModelProvider(self):
         # First test fetching model archive
-        aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=False, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
-        ok = aFMP.testCache()
-        self.assertTrue(ok)
+        # aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=False, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
+        # ok = aFMP.testCache()
+        # self.assertTrue(ok)
         #
         # Next test reloading the cache
         aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])

@@ -1,3 +1,6 @@
 [submodule "rcsb/utils/modbase_utils"]
 	path = rcsb/utils/modbase_utils
 	url = https://github.com/rcsb/modbase_utils.git
+[submodule "rcsb/py-rcsb_mock-data"]
+	path = rcsb/mock-data
+	url = https://github.com/rcsb/py-rcsb_mock-data

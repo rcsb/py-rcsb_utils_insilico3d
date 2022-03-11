@@ -77,9 +77,9 @@ class ModBaseModelProvider:
             #  https://salilab.org/modbase-download/projects/genomes/H_sapiens/2020/Homo_sapiens_2020.tar
             #  https://salilab.org/modbase-download/projects/genomes/H_sapiens/2020/Homo_sapiens_2020.summary.txt
             modBaseServerSpeciesDataPathDict = kwargs.get("modBaseServerSpeciesDataPathDict", {
-                "Homo sapiens": "H_sapiens/2020/Homo_sapiens_2020.tar",
                 "Panicum virgatum": "P_virgatum/2021/p_virgatum_2021.tar",
-                "Arabidopsis thaliana": "A_thaliana/2021/a_thaliana_2021.tar",
+                # "Homo sapiens": "H_sapiens/2020/Homo_sapiens_2020.tar",
+                # "Arabidopsis thaliana": "A_thaliana/2021/a_thaliana_2021.tar",
                 # "Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar",  # Used for tests only
             })
 
