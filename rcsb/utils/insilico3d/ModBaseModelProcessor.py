@@ -3,7 +3,7 @@
 # Author:  Dennis Piehl
 # Date:    27-Sep-2021
 #
-# Update:
+# Updates:
 #
 # To Do:
 # - pylint: disable=fixme
@@ -37,6 +37,9 @@ logger = logging.getLogger(__name__)
 ModBaseEntry = collections.namedtuple("ModBaseEntry", ["name", "model", "alignment"])
 
 
+## TODO: First filter out only those models that have MPQS > 1.1 & ZDOPE < -1.0!
+##       Do this BEFORE converting all of them!
+##       Then, call these MPU methods from the ModBaseModelProvider class
 class ModBaseModelWorker(object):
     """A skeleton class that implements the interface expected by the multiprocessing
     for converting ModBase PDB files to mmCIF files.

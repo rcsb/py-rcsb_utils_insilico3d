@@ -3,7 +3,7 @@
 # Author:  Dennis Piehl
 # Date:    30-Sep-2021
 #
-# Update:
+# Updates:
 #
 #
 ##
@@ -74,7 +74,7 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
         ok = aFMP.testCache()
         self.assertTrue(ok)
-        ok = aFMP.reorganizeModelFiles()
+        ok = aFMP.reorganizeModelFiles(copyModelsToDestDir=True)
         self.assertTrue(ok)
 
 

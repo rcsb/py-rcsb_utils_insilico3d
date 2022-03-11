@@ -3,8 +3,7 @@
 # Author:  Dennis Piehl
 # Date:    30-Sep-2021
 #
-# Update:
-#  30-Sep-2021 dwp Start class
+# Updates:
 #  15-Dec-2021 dwp Re-introduce use of FTP instead of HTTP for downloading files; proved to be significantly faster
 #
 # To Do:
@@ -216,6 +215,30 @@ class AlphaFoldModelProvider:
 
         return modelFileList
 
+    def getSourceUrlMappings(self, modelFileList):
+        """Generate mapping between source model filenames and accession URLs.
+        
+        Args:
+            modelFileList (list): List of model files or paths.
+
+        Returns:
+            (dict): dictionary mapping betwen source model filenames and accession URLs.
+                    Note that file-specific downloads aren't gzipped, unlike model files in species tarball.
+                    E.g., {"AF-Q9RQP8-F1-model_v2.cif.gz" : "https://alphafold.ebi.ac.uk/files/AF-Q9RQP8-F1-model_v2.cif"}
+        """
+
+        modelSourceUrlMapD = {}
+        try:
+            for modelFile in modelFileList:
+                modelFileName = self.__fU.getFileName(modelFile)
+                modelFileNameInUrl = modelFileName.split(".gz")[0]
+                sourceModelUrl = "https://alphafold.ebi.ac.uk/files/"+modelFileNameInUrl
+                modelSourceUrlMapD.update({modelFileName: sourceModelUrl})
+        except Exception as e:
+            logger.exception("Failing with %s", str(e))
+
+        return modelSourceUrlMapD
+
     def getSpeciesDataDownloadDate(self):
         return self.__createdDate
 
@@ -225,23 +248,33 @@ class AlphaFoldModelProvider:
     def getSpeciesDataCacheFilePath(self):
         return self.__speciesDataCacheFile
 
-    def reorganizeModelFiles(self):
+    def reorganizeModelFiles(self, copyModelsToDestDir=False):
         """Move model files from organism-wide model listing to hashed directory structure constructed
         from the 6-character UniProt ID (e.g., "P52078" will be moved to "./P5/20/78"). Also rename files
-        to follow internal identifier naming convention."""
+        to follow internal identifier naming convention.
+        
+        Args:
+            copyModelsToDestDir (bool): whether to copy files to new directory (instead of moving them). Defaults to False.
+        
+        Returns:
+            (bool): True if successful; otherwise False.
+        """
 
         try:
             archiveDirList = self.getArchiveDirList()
             for archiveDir in archiveDirList:
                 modelFileList = self.getModelFileList(inputPathList=[archiveDir])
+                modelSourceUrlMapD = self.getSourceUrlMappings(modelFileList=modelFileList)
                 mR = ModelReorganizer(
                     cachePath=os.path.join(self.__dirPath, "computed-models-af.json"),
                     numProc=4,
                     chunkSize=20,
+                    copyModelsToDestDir=copyModelsToDestDir,
                     modelD={
                         "modelDir": archiveDir,
-                        "modelFileList": modelFileList,
-                        # "modelFileList": modelFileList[0:200],
+                        # "modelFileList": modelFileList,
+                        "modelFileList": modelFileList[0:200],
+                        "modelSourceUrlMapD": modelSourceUrlMapD,
                         "modelSourcePrefix": "af",
                         "destModelDir": self.__dividedDataPath
                     }

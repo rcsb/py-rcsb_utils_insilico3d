@@ -3,8 +3,7 @@
 # Author:  Dennis Piehl
 # Date:    10-Mar-2022
 #
-# Update:
-#   10-Mar-2022  dwp Start class
+# Updates:
 #
 # To Do:
 # - pylint: disable=fixme
@@ -68,7 +67,9 @@ class ModelWorker(object):
 
         try:
             modelSourcePrefix = optionsD.get("modelSourcePrefix")  # e.g., "af" or "ma"
-            destModelDir = optionsD.get("destModelDir")  # self.__dividedDataPath, which is:  os.path.join(self.__cachePath, "computed-models")
+            destModelDir = optionsD.get("destModelDir")  # base path for all computed models (i.e., "computed-models")
+            modelSourceUrlMapD = optionsD.get("modelSourceUrlMapD")  # mapping between source model filenames and accession URLs
+            copyModelsToDestDir = optionsD.get("copyModelsToDestDir", False)  # whether to copy files over (instead of moving them)
 
             for modelPath in dataList:
                 modelFileOut = None
@@ -91,13 +92,17 @@ class ModelWorker(object):
                     self.__fU.mkdir(destDir)
                 modelFileOut = os.path.join(destDir, internalModelName)
                 #
-                ok = self.__fU.put(modelPath, modelFileOut)  # Copies files (only use for testing)
-                # ok = self.__fU.replace(modelPath, modelFileOut)  # Moves files (use for production)
+                sourceModelUrl = modelSourceUrlMapD[modelFileNameIn]
+                #
+                if copyModelsToDestDir:
+                    ok = self.__fU.put(modelPath, modelFileOut)  # Copies files (only use for testing)
+                else:
+                    ok = self.__fU.replace(modelPath, modelFileOut)  # Moves files (use for production)
                 #
                 if ok:
                     successList.append(modelPath)
                 #
-                retList.append((modelFileNameIn, internalModelId, modelFileOut))
+                retList.append((modelFileNameIn, internalModelId, modelFileOut, sourceModelUrl))
             failList = sorted(set(dataList) - set(successList))
             if failList:
                 logger.info("%s returns %d definitions with failures: %r", procName, len(failList), failList)
@@ -112,7 +117,7 @@ class ModelWorker(object):
 class ModelReorganizer(object):
     """Generators and accessors for model files."""
 
-    def __init__(self, cachePath=None, modelD=None, **kwargs):
+    def __init__(self, cachePath=None, modelD=None, copyModelsToDestDir=False, **kwargs):
         """Initialize ModelReorganizer object.
 
         Args:
@@ -124,6 +129,8 @@ class ModelReorganizer(object):
                              "modelFileList": list of the model files to process
                              "modelSourcePrefix": internal identifier prefix to use for provided model source type (e.g., "af", "ma")
                              "destModelDir": base destination directory into which to reorganize model files
+                             "modelSourceUrlMapD": dictionary mapping between source model filenames and accession URLs
+            copyModelsToDestDir (bool): whether to copy model files to new directory (instead of moving them). Defaults to False.
         """
 
         try:
@@ -135,6 +142,8 @@ class ModelReorganizer(object):
             self.__modelFileList = modelD.get("modelFileList", [])
             self.__modelSourcePrefix = modelD.get("modelSourcePrefix")
             self.__destModelDir = modelD.get("destModelDir")
+            self.__modelSourceUrlMapD = modelD.get("modelSourceUrlMapD")
+            self.__copyModelsToDestDir = copyModelsToDestDir
 
             self.__mU = MarshalUtil(workPath=self.__workPath)
 
@@ -185,7 +194,7 @@ class ModelReorganizer(object):
 
         Returns:
             mD (dict): dictionary of successfully processed models, in the following structure:
-                       {internalModelId: {"sourceModelName": modelFileNameIn, "modelPath": modelFileOut}, ...}
+                       {internalModelId: {"sourceModelName": modelFileNameIn, "modelPath": modelFileOut, "sourceModelUrl": sourceModelUrl}, ...}
             failD (dict): dictionary of models for which processing failed, in the following structure:
                           {internalModelId: {"sourceModelName": modelFileNameIn}, ...}
         """
@@ -196,7 +205,12 @@ class ModelReorganizer(object):
         #
         rWorker = ModelWorker(workPath=self.__workPath)
         mpu = MultiProcUtil(verbose=True)
-        optD = {"modelSourcePrefix": self.__modelSourcePrefix, "destModelDir": self.__destModelDir}
+        optD = {
+            "modelSourcePrefix": self.__modelSourcePrefix,
+            "destModelDir": self.__destModelDir,
+            "modelSourceUrlMapD": self.__modelSourceUrlMapD,
+            "copyModelsToDestDir": self.__copyModelsToDestDir
+        }
         mpu.setOptions(optD)
         mpu.set(workerObj=rWorker, workerMethod="reorganize")
         mpu.setWorkingDir(workingDir=self.__workPath)
@@ -204,9 +218,9 @@ class ModelReorganizer(object):
         if failList:
             logger.info("model file failures (%d): %r", len(failList), failList)
         #
-        for (modelFileNameIn, internalModelId, modelFileOut) in resultList[0]:
+        for (modelFileNameIn, internalModelId, modelFileOut, sourceModelUrl) in resultList[0]:
             if modelFileOut:
-                mD[internalModelId] = {"sourceModelName": modelFileNameIn, "modelPath": modelFileOut}
+                mD[internalModelId] = {"modelPath": modelFileOut, "sourceModelName": modelFileNameIn, "sourceModelUrl": sourceModelUrl}
             else:
                 failD[internalModelId] = {"sourceModelName": modelFileNameIn}
         #
