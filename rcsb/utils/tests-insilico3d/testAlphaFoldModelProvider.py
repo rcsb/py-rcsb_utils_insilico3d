@@ -25,7 +25,7 @@ import time
 import unittest
 
 from rcsb.utils.insilico3d.AlphaFoldModelProvider import AlphaFoldModelProvider
-# from rcsb.utils.config.ConfigUtil import ConfigUtil
+from rcsb.utils.config.ConfigUtil import ConfigUtil
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
@@ -37,13 +37,16 @@ logger = logging.getLogger()
 
 class AlphaFoldModelProviderTests(unittest.TestCase):
     def setUp(self):
+        self.__dataPath = os.path.join(HERE, "test-data")
         self.__cachePath = os.path.join(HERE, "test-output", "CACHE")
         self.__startTime = time.time()
 
-        # mockTopPath = os.path.join(TOPDIR, "rcsb", "mock-data")
-        # configPath = os.path.join(mockTopPath, "config", "dbload-setup-example.yml")
-        # self.__configName = "site_info_configuration"
-        # self.__cfgOb = ConfigUtil(configPath=configPath, defaultSectionName=self.__configName, mockTopPath=mockTopPath)
+        mockTopPath = os.path.join(TOPDIR, "rcsb", "mock-data")
+        configPath = os.path.join(mockTopPath, "config", "dbload-setup-example.yml")
+        self.__configName = "site_info_configuration"
+        # Set mockTopPath to test-output directory here, because for testing the downloading and storing of the models we don't want to actually modify the mock-data directory.
+        # Only use the mock-data directory for testing the LOADING of models to ExDB, etc.
+        self.__cfgOb = ConfigUtil(configPath=configPath, defaultSectionName=self.__configName, mockTopPath=self.__cachePath)
 
         logger.info("Starting %s at %s", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()))
 
@@ -56,12 +59,28 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
 
     def testAlphaFoldModelProvider(self):
         # First test fetching model archive
-        # aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=False, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
+        # aFMP = AlphaFoldModelProvider(
+        #     cachePath=self.__cachePath,
+        #     useCache=False,
+        #     cfgOb=self.__cfgOb,
+        #     configName=self.__configName,
+        #     numProc=4,
+        #     chunkSize=20,
+        #     alphaFoldRequestedSpeciesList=["Staphylococcus aureus"]
+        # )
         # ok = aFMP.testCache()
         # self.assertTrue(ok)
         #
         # Next test reloading the cache
-        aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
+        aFMP = AlphaFoldModelProvider(
+            cachePath=self.__cachePath,
+            useCache=True,
+            cfgOb=self.__cfgOb,
+            configName=self.__configName,
+            numProc=4,
+            chunkSize=20,
+            alphaFoldRequestedSpeciesList=["Staphylococcus aureus"]
+        )
         speciesDirList = aFMP.getArchiveDirList()
         ok = True if len(speciesDirList) > 0 else False
         self.assertTrue(ok)
@@ -71,10 +90,9 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         self.assertTrue(ok)
         #
         # Next test reorganizing model file directory structure
-        aFMP = AlphaFoldModelProvider(cachePath=self.__cachePath, useCache=True, alphaFoldRequestedSpeciesList=["Staphylococcus aureus"])
         ok = aFMP.testCache()
         self.assertTrue(ok)
-        ok = aFMP.reorganizeModelFiles(copyModelsToDestDir=True)
+        ok = aFMP.reorganizeModelFiles(keepSource=True)
         self.assertTrue(ok)
 
 

@@ -32,31 +32,31 @@ from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FtpUtil import FtpUtil
 from rcsb.utils.insilico3d.ModelProcessors import ModelReorganizer
-# from rcsb.utils.config.ConfigUtil import ConfigUtil
 
 logger = logging.getLogger(__name__)
 
-## TODO: Add URLs to CACHE file
+## TODO: Need to add LICENSE FILE to mock-data or test-data for using AF (and ModBase and ModelArchive) models?
 class AlphaFoldModelProvider:
     """Accessors for AlphaFold models (mmCIF)."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, cachePath, useCache=False, cfgOb=None, configName=None, **kwargs):
         # Use the same root cachePath for all types of insilico3D model sources, but with unique dirPath names (sub-directory)
-        self.__cachePath = kwargs.get("cachePath", "./CACHE-insilico3d-models")
+        self.__cachePath = cachePath
+        self.__cfgOb = cfgOb
+        self.__configName = configName
         self.__dirPath = os.path.join(self.__cachePath, "AlphaFold")
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
-        self.__dividedDataPath = os.path.join(self.__cachePath, "computed-models")
-
-        # mockTopPath = os.path.join(TOPDIR, "rcsb", "mock-data")
-        # configPath = os.path.join(mockTopPath, "config", "dbload-setup-example.yml")
-        # self.__configName = "site_info_configuration"
-        # self.__cfgOb = ConfigUtil(configPath=configPath, defaultSectionName=self.__configName, mockTopPath=mockTopPath)
+        # self.__computedModelsDataPath = os.path.join(self.__cachePath, "computed-models")
+        # Comment out below because should only use mock directory for testing the LOADING of the models, NOT for testing the storing of the models
+        self.__computedModelsDataPath = self.__cfgOb.getPath("PDBX_COMP_MODEL_SANDBOX_PATH", sectionName=self.__configName, default=os.path.join(self.__cachePath, "computed-models"))
+        self.__numProc = kwargs.get("numProc", 4)
+        self.__chunkSize = kwargs.get("chunkSize", 20)
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
         self.__fU = FileUtil(workPath=self.__dirPath)
         self.__ftpU = FtpUtil(workPath=self.__dirPath)
 
-        self.__oD, self.__createdDate = self.__reload(**kwargs)
+        self.__oD, self.__createdDate = self.__reload(useCache=useCache, **kwargs)
 
     def testCache(self, minCount=0):  # Increase minCount once we are consistently downloading more than one species data set
         if self.__oD and len(self.__oD) > minCount:
@@ -217,7 +217,7 @@ class AlphaFoldModelProvider:
 
     def getSourceUrlMappings(self, modelFileList):
         """Generate mapping between source model filenames and accession URLs.
-        
+
         Args:
             modelFileList (list): List of model files or paths.
 
@@ -248,35 +248,41 @@ class AlphaFoldModelProvider:
     def getSpeciesDataCacheFilePath(self):
         return self.__speciesDataCacheFile
 
-    def reorganizeModelFiles(self, copyModelsToDestDir=False):
+    def reorganizeModelFiles(self, keepSource=False):
         """Move model files from organism-wide model listing to hashed directory structure constructed
         from the 6-character UniProt ID (e.g., "P52078" will be moved to "./P5/20/78"). Also rename files
         to follow internal identifier naming convention.
-        
+
         Args:
-            copyModelsToDestDir (bool): whether to copy files to new directory (instead of moving them). Defaults to False.
-        
+            keepSource (bool): whether to copy files to new directory (instead of moving them). Defaults to False.
+
         Returns:
             (bool): True if successful; otherwise False.
         """
 
         try:
+            # Create the destination directory if it doesn't exist
+            if not self.__fU.exists(self.__computedModelsDataPath):
+                logger.info("Creating destination directory for model file reorganization, %s", self.__computedModelsDataPath)
+                self.__fU.mkdir(self.__computedModelsDataPath)
+
+            # Reorganize files into the destination directory
             archiveDirList = self.getArchiveDirList()
             for archiveDir in archiveDirList:
                 modelFileList = self.getModelFileList(inputPathList=[archiveDir])
                 modelSourceUrlMapD = self.getSourceUrlMappings(modelFileList=modelFileList)
                 mR = ModelReorganizer(
                     cachePath=os.path.join(self.__dirPath, "computed-models-af.json"),
-                    numProc=4,
-                    chunkSize=20,
-                    copyModelsToDestDir=copyModelsToDestDir,
+                    numProc=self.__numProc,
+                    chunkSize=self.__chunkSize,
+                    keepSource=keepSource,
                     modelD={
                         "modelDir": archiveDir,
                         # "modelFileList": modelFileList,
                         "modelFileList": modelFileList[0:200],
                         "modelSourceUrlMapD": modelSourceUrlMapD,
                         "modelSourcePrefix": "af",
-                        "destModelDir": self.__dividedDataPath
+                        "destModelDir": self.__computedModelsDataPath
                     }
                 )
                 ok = mR.reorganize()

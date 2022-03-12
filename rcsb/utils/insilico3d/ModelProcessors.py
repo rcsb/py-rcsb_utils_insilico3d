@@ -69,7 +69,7 @@ class ModelWorker(object):
             modelSourcePrefix = optionsD.get("modelSourcePrefix")  # e.g., "af" or "ma"
             destModelDir = optionsD.get("destModelDir")  # base path for all computed models (i.e., "computed-models")
             modelSourceUrlMapD = optionsD.get("modelSourceUrlMapD")  # mapping between source model filenames and accession URLs
-            copyModelsToDestDir = optionsD.get("copyModelsToDestDir", False)  # whether to copy files over (instead of moving them)
+            keepSource = optionsD.get("keepSource", False)  # whether to copy files over (instead of moving them)
 
             for modelPath in dataList:
                 modelFileOut = None
@@ -94,7 +94,7 @@ class ModelWorker(object):
                 #
                 sourceModelUrl = modelSourceUrlMapD[modelFileNameIn]
                 #
-                if copyModelsToDestDir:
+                if keepSource:
                     ok = self.__fU.put(modelPath, modelFileOut)  # Copies files (only use for testing)
                 else:
                     ok = self.__fU.replace(modelPath, modelFileOut)  # Moves files (use for production)
@@ -117,7 +117,7 @@ class ModelWorker(object):
 class ModelReorganizer(object):
     """Generators and accessors for model files."""
 
-    def __init__(self, cachePath=None, modelD=None, copyModelsToDestDir=False, **kwargs):
+    def __init__(self, cachePath=None, modelD=None, keepSource=False, **kwargs):
         """Initialize ModelReorganizer object.
 
         Args:
@@ -130,7 +130,7 @@ class ModelReorganizer(object):
                              "modelSourcePrefix": internal identifier prefix to use for provided model source type (e.g., "af", "ma")
                              "destModelDir": base destination directory into which to reorganize model files
                              "modelSourceUrlMapD": dictionary mapping between source model filenames and accession URLs
-            copyModelsToDestDir (bool): whether to copy model files to new directory (instead of moving them). Defaults to False.
+            keepSource (bool): whether to copy model files to new directory (instead of moving them). Defaults to False.
         """
 
         try:
@@ -143,7 +143,7 @@ class ModelReorganizer(object):
             self.__modelSourcePrefix = modelD.get("modelSourcePrefix")
             self.__destModelDir = modelD.get("destModelDir")
             self.__modelSourceUrlMapD = modelD.get("modelSourceUrlMapD")
-            self.__copyModelsToDestDir = copyModelsToDestDir
+            self.__keepSource = keepSource
 
             self.__mU = MarshalUtil(workPath=self.__workPath)
 
@@ -209,7 +209,7 @@ class ModelReorganizer(object):
             "modelSourcePrefix": self.__modelSourcePrefix,
             "destModelDir": self.__destModelDir,
             "modelSourceUrlMapD": self.__modelSourceUrlMapD,
-            "copyModelsToDestDir": self.__copyModelsToDestDir
+            "keepSource": self.__keepSource
         }
         mpu.setOptions(optD)
         mpu.set(workerObj=rWorker, workerMethod="reorganize")
