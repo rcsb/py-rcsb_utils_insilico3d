@@ -25,8 +25,6 @@ import time
 import unittest
 import glob
 
-import pprint
-
 from rcsb.utils.insilico3d.ModBaseModelProvider import ModBaseModelProvider
 from rcsb.utils.insilico3d.ModBaseModelProcessor import ModBaseModelProcessor
 from rcsb.utils.config.ConfigUtil import ConfigUtil
@@ -78,7 +76,7 @@ class ModBaseModelProcessorTests(unittest.TestCase):
                 useCache=False,
                 cachePath=os.path.join(self.__cachePath, "ModBase"),
                 cacheFormat="json",
-                workPath=os.path.join(self.__cachePath, "ModBase"),
+                workPath=os.path.join(self.__cachePath, "ModBase", "Panicum_virgatum"),
                 numProc=2,
                 speciesD=speciesConversionDict,
             )

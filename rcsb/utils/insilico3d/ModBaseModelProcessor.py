@@ -89,16 +89,12 @@ class ModBaseModelWorker(object):
                     if convertedCifFileZ:
                         alignmentFileUsed = alignFileZ
                         successList.append(modelE)
-                    else:
-                        # If fails, attempt the conversion without alignment
-                        convertedCifFileZ = self.__convertPdbToCif(procName=procName, pdbFile=pF, alignmentFile=None, mmCifOutFile=cF, optionsD=optionsD)
-                        if convertedCifFileZ:
-                            successList.append(modelE)
-                    # print('\n', convertedCifFileZ, alignmentFileUsed)
-                    # Last remove the unzipped pdb, alignment and cif files
+                        self.__fU.remove(cF)  # Remove the unzipped cif file
+                    else:  # Still append it to success list, since it was at least capable of being converted (this only occurs if it doesn't meet the quality score criteria)
+                        successList.append(modelE)
+                    # Remove the unzipped pdb and alignment files
                     self.__fU.remove(pF)
                     self.__fU.remove(aF)
-                    self.__fU.remove(cF)
                 retList.append((modelE, convertedCifFileZ, alignmentFileUsed))
 
             failList = sorted(set(dataList) - set(successList))
@@ -132,20 +128,30 @@ class ModBaseModelWorker(object):
             species = optionsD.get("species")
             speciesModDate = optionsD.get("speciesModDate")
             mmCifRepo = modbase.Repository(optionsD.get("mmCifRepoPath"))
+            mmCifOutFileZ = None
             with open(pdbFile, "r", encoding="utf-8") as fh:
                 # sF = modbase.read_pdb(fh, organism_name=species, moddate=speciesModDate)
                 sF = modbase.read_pdb(fh, mmCifRepo)
             systemWithAlign = sF.get_system(alignmentFile)
-            with open(mmCifOutFile, "w", encoding="utf-8") as fh:
-                # sF.write_mmcif(fh, alignmentFile)
-                modelcif.dumper.write(fh, [systemWithAlign], format="mmCIF")
-            mmCifOutFileZ = mmCifOutFile + ".gz"
-            ok = self.__fU.compress(inpPath=mmCifOutFile, outPath=mmCifOutFileZ)
-            if ok:
-                return mmCifOutFileZ
+            # Create quality metric dictionary to only write models with MPQS > 1.1 and ZDOPE < -1.0
+            qMD = {}
+            for qM in systemWithAlign.model_groups[0][0].qa_metrics:
+                qMD.update({qM.name: qM.value})
+            #
+            if (float(qMD['MPQS']) > 1.1 and float(qMD['zDOPE']) < -1.0):
+                with open(mmCifOutFile, "w", encoding="utf-8") as fh:
+                    # sF.write_mmcif(fh, alignmentFile)
+                    modelcif.dumper.write(fh, [systemWithAlign], format="mmCIF")
+                mmCifOutFileZ = mmCifOutFile + ".gz"
+                self.__fU.compress(inpPath=mmCifOutFile, outPath=mmCifOutFileZ)
+            else:
+                logger.debug("Skipping PDB file %s - Does not meet quality score criteria", pdbFile)
+            #
+            return mmCifOutFileZ
+            #
         except Exception as e:
-            # logger.exception("%s failing on PDB file %s and alignment file %s, with %s", procName, pdbFile, alignmentFile, str(e))
-            logger.debug("%s failing on PDB file %s and alignment file %s, with %s", procName, pdbFile, alignmentFile, str(e))
+            logger.exception("%s failing on PDB file %s and alignment file %s, with %s", procName, pdbFile, alignmentFile, str(e))
+            # logger.debug("%s failing on PDB file %s and alignment file %s, with %s", procName, pdbFile, alignmentFile, str(e))
 
 
 class ModBaseModelProcessor(object):

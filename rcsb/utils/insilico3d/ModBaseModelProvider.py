@@ -28,26 +28,30 @@ import requests
 
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
+from rcsb.utils.insilico3d.ModelProcessors import ModelReorganizer
 
 logger = logging.getLogger(__name__)
 
-## TODO: First filter out only those models that have MPQS > 1.1 & ZDOPE < -1.0!
-##       Do this BEFORE converting all of them!
-##       Then, add a method here to call the conversion method from ModBaseModelProcessor from within here
+## TODO: Add a method here to call the conversion method from ModBaseModelProcessor from within here
 class ModBaseModelProvider:
     """Accessors for ModBase models (PDB)."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, cachePath, useCache=False, cfgOb=None, configName=None, **kwargs):
         # Use the same root cachePath for all types of insilico3D model sources, but with unique dirPath names (sub-directory)
-        self.__cachePath = kwargs.get("cachePath", "./CACHE-insilico3d-models")
+        self.__cachePath = cachePath  # kwargs.get("cachePath", "./CACHE-insilico3d-models")
+        self.__cfgOb = cfgOb
+        self.__configName = configName
         self.__dirPath = os.path.join(self.__cachePath, "ModBase")
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
-        self.__dividedDataPath = os.path.join(self.__cachePath, "computed-models")
+        # self.__computedModelsDataPath = os.path.join(self.__cachePath, "computed-models")
+        self.__computedModelsDataPath = self.__cfgOb.getPath("PDBX_COMP_MODEL_SANDBOX_PATH", sectionName=self.__configName, default=os.path.join(self.__cachePath, "computed-models"))
+        self.__numProc = kwargs.get("numProc", 4)
+        self.__chunkSize = kwargs.get("chunkSize", 20)
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
         self.__fU = FileUtil(workPath=self.__dirPath)
 
-        self.__oD, self.__createdDate = self.__reload(**kwargs)
+        self.__oD, self.__createdDate = self.__reload(useCache=useCache, **kwargs)
 
     def testCache(self, minCount=0):  # Increase minCount once we are consistently downloading more than one species data set
         if self.__oD and len(self.__oD) > minCount:
@@ -255,40 +259,90 @@ class ModBaseModelProvider:
                 logger.exception("Failing with %s", str(e))
         return ok
 
-    def reorganizeModelFiles(self):
-        """Move model files from organism-wide model listing to hashed directory structure
-        using last two characters of the filename (NCBI ID), excluing the run number suffix."""
+    # def reorganizeModelFilesOld(self):
+    #     """Move model files from organism-wide model listing to hashed directory structure
+    #     using last two characters of the filename (NCBI ID), excluing the run number suffix."""
+
+    #     try:
+    #         speciesDirList = self.getSpeciesDirList()
+    #         for speciesDir in speciesDirList:
+    #             newModelDirD = {}
+    #             dividedDataCacheFile = os.path.join(speciesDir, "species-model-files.json")
+    #             modelFileList = self.getModelFileList(inputPathList=[speciesDir])
+    #             modelSourceUrlMapD = self.getSourceUrlMappings(modelFileList=modelFileList)
+    #             for model in modelFileList:
+    #                 modelName = self.__fU.getFileName(model)
+    #                 modelNameBase = modelName.split('.cif')[0]
+    #                 if "_" in modelNameBase[0:5] or modelNameBase.startswith("ENS"):
+    #                     modelNameBaseHash = modelNameBase.split(".")[0]
+    #                 else:
+    #                     modelNameBaseHash = modelNameBase.split("_")[0]
+    #                 sixCharHash = modelNameBaseHash[-6:]
+    #                 first2 = sixCharHash[0:2]
+    #                 mid2 = sixCharHash[2:4]
+    #                 last2 = sixCharHash[4:6]
+    #                 destDir = os.path.join(self.__computedModelsDataPath, first2, mid2, last2)
+    #                 if not self.__fU.exists(destDir):
+    #                     self.__fU.mkdir(destDir)
+    #                 destModelPath = os.path.join(destDir, modelName)
+    #                 self.__fU.replace(model, destModelPath)
+    #                 newModelDirD[modelName] = destModelPath
+    #             self.removePdbModelDir(speciesDataDir=speciesDir)
+    #             self.removeAlignmentDir(speciesDataDir=speciesDir)
+    #         self.__mU.doExport(dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
+    #         return True
+    #     except Exception as e:
+    #         logger.exception("Failing with %s", str(e))
+    #         return False
+
+    def reorganizeModelFiles(self, keepSource=False):
+        """Move model files from organism-wide model listing to hashed directory structure constructed
+        from the 6-character UniProt ID (e.g., "P52078" will be moved to "./P5/20/78"). Also rename files
+        to follow internal identifier naming convention.
+
+        Args:
+            keepSource (bool): whether to copy files to new directory (instead of moving them). Defaults to False.
+
+        Returns:
+            (bool): True if successful; otherwise False.
+        """
 
         try:
-            speciesDirList = self.getSpeciesDirList()
-            for speciesDir in speciesDirList:
-                newModelDirD = {}
-                dividedDataCacheFile = os.path.join(speciesDir, "species-model-files.json")
-                modelFileList = self.getModelFileList(inputPathList=[speciesDir])
-                for model in modelFileList:
-                    modelName = self.__fU.getFileName(model)
-                    modelNameBase = modelName.split('.cif')[0]
-                    if "_" in modelNameBase[0:5] or modelNameBase.startswith("ENS"):
-                        modelNameBaseHash = modelNameBase.split(".")[0]
-                    else:
-                        modelNameBaseHash = modelNameBase.split("_")[0]
-                    sixCharHash = modelNameBaseHash[-6:]
-                    first2 = sixCharHash[0:2]
-                    mid2 = sixCharHash[2:4]
-                    last2 = sixCharHash[4:6]
-                    destDir = os.path.join(self.__dividedDataPath, first2, mid2, last2)
-                    if not self.__fU.exists(destDir):
-                        self.__fU.mkdir(destDir)
-                    destModelPath = os.path.join(destDir, modelName)
-                    self.__fU.replace(model, destModelPath)
-                    newModelDirD[modelName] = destModelPath
-                self.removePdbModelDir(speciesDataDir=speciesDir)
-                self.removeAlignmentDir(speciesDataDir=speciesDir)
-            self.__mU.doExport(dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
-            return True
+            # Create the destination directory if it doesn't exist
+            if not self.__fU.exists(self.__computedModelsDataPath):
+                logger.info("Creating destination directory for model file reorganization, %s", self.__computedModelsDataPath)
+                self.__fU.mkdir(self.__computedModelsDataPath)
+
+            # Reorganize files into the destination directory
+            archiveDirList = self.getSpeciesDirList()
+            for archiveDir in archiveDirList:
+                modelFileList = self.getModelFileList(inputPathList=[archiveDir])
+                modelSourceUrlMapD = self.getSourceUrlMappings(modelFileList=modelFileList)
+                ## MAY NEED TO USE MODBASE PROCESSOR AGAIN SINCE NAMING SCHEME WILL DIFFER FROM COMMON UTIL
+                mR = ModelReorganizer(
+                    cachePath=os.path.join(self.__dirPath, "computed-models-mb.json"),
+                    numProc=self.__numProc,
+                    chunkSize=self.__chunkSize,
+                    keepSource=keepSource,
+                    modelD={
+                        "modelDir": archiveDir,
+                        "modelFileList": modelFileList,
+                        # "modelFileList": modelFileList[0:200],
+                        "modelSourceUrlMapD": modelSourceUrlMapD,
+                        "modelSourcePrefix": "mb",
+                        "destModelDir": self.__computedModelsDataPath
+                    }
+                )
+                ok = mR.reorganize()
+                #
+                if not ok:
+                    logger.error("Reorganization of model files failed for species archive %s", archiveDir)
+                    return False
+            return ok
         except Exception as e:
             logger.exception("Failing with %s", str(e))
             return False
+
 
     def removeSpeciesDataDir(self, speciesName=None, updateCache=True):
         """"Remove an entire species data directory (and its corresponding cache file entry),
