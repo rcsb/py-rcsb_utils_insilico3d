@@ -23,6 +23,9 @@ import platform
 import resource
 import time
 import unittest
+import glob
+
+import pprint
 
 from rcsb.utils.insilico3d.ModBaseModelProvider import ModBaseModelProvider
 from rcsb.utils.insilico3d.ModBaseModelProcessor import ModBaseModelProcessor
@@ -60,34 +63,22 @@ class ModBaseModelProcessorTests(unittest.TestCase):
     def testModBaseModelProcessor(self):
         """Test case: convert ModBase PDB models to mmCIF"""
         try:
-            ## INSTEAD OF redownloading data, use the test-data directory for processing
-
-            # First download the archived data for processing
-            # mProv = ModBaseModelProvider(
-            #     cachePath=self.__cachePath,
-            #     useCache=False,
-            #     modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
-            # )
-            # ok = mProv.testCache()
-            # self.assertTrue(ok)
-            #
-            # Next test reload data for processing
-            mProv = ModBaseModelProvider(
-                cachePath=self.__cachePath,
-                useCache=True,
-                modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
-            )
-            ok = mProv.testCache()
-            self.assertTrue(ok)
-            speciesNameList = mProv.getSpeciesNameList()
-            ok = True if len(speciesNameList) > 0 else False
-            self.assertTrue(ok)
-            speciesConversionDict = mProv.getSpeciesConversionDict(speciesName=speciesNameList[0])
-            speciesConversionDict["speciesPdbModelFileList"] = speciesConversionDict["speciesPdbModelFileList"][0:20]
+            speciesModelDir = os.path.join(self.__dataPath, "ModBase", "Panicum_virgatum")
+            speciesPdbModelFileList = [os.path.abspath(f) for f in glob.glob(os.path.join(speciesModelDir, "model", "*.pdb.xz"))]
+            speciesConversionDict = {
+                "lastModified": "2019-10-12T00:58:06",
+                "speciesModelDir": speciesModelDir,
+                "speciesName": "Panicum virgatum",
+                "speciesPdbModelFileList": speciesPdbModelFileList,
+                "mmCifRepoPath": "/Volumes/ftp.wwpdb.org/pub/pdb/data/structures/divided/mmCIF"  ### Need to provide as variable in config
+            }
             ok = True if len(speciesConversionDict["speciesPdbModelFileList"]) > 0 else False
             self.assertTrue(ok)
             mProc = ModBaseModelProcessor(
                 useCache=False,
+                cachePath=os.path.join(self.__cachePath, "ModBase"),
+                cacheFormat="json",
+                workPath=os.path.join(self.__cachePath, "ModBase"),
                 numProc=2,
                 speciesD=speciesConversionDict,
             )
@@ -97,17 +88,18 @@ class ModBaseModelProcessorTests(unittest.TestCase):
             self.assertTrue(ok)
             ok = mProc.reload()
             self.assertTrue(ok)
-            ok = mProc.testCache(minCount=10)
+            ok = mProc.testCache(minCount=5)
             self.assertTrue(ok)
             #
             processedModelCachePath = mProc.getCachePath()
             mProc = ModBaseModelProcessor(
-                cachePath=processedModelCachePath,
                 useCache=True,
+                cachePath=processedModelCachePath,
+                cacheFormat="json",
                 numProc=2,
                 speciesD=speciesConversionDict,
             )
-            ok = mProc.testCache(minCount=10)
+            ok = mProc.testCache(minCount=5)
             self.assertTrue(ok)
             #
             # ok = mProv.removePdbModelDir(speciesDataDir=speciesConversionDict["speciesModelDir"])
@@ -116,10 +108,10 @@ class ModBaseModelProcessorTests(unittest.TestCase):
             # self.assertTrue(ok)
             #
             # Test reorganize models
-            ok = mProv.testCache()
-            self.assertTrue(ok)
-            ok = mProv.reorganizeModelFiles()
-            self.assertTrue(ok)
+            # ok = mProv.testCache()
+            # self.assertTrue(ok)
+            # ok = mProv.reorganizeModelFiles()
+            # self.assertTrue(ok)
             #
         except Exception as e:
             logger.exception("Failing with %s", str(e))

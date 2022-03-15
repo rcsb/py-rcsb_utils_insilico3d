@@ -177,12 +177,14 @@ class ModBaseModelProcessor(object):
             self.__speciesPdbModelFileList = speciesD.get("speciesPdbModelFileList", [])
             self.__mmCifRepoPath = speciesD.get("mmCifRepoPath")
 
-            self.__cachePath = cachePath if cachePath else self.__getModelCachePath()
+            self.__cachePath = cachePath if cachePath else self.__speciesModelDir
+            self.__cacheFormat = kwargs.get("cacheFormat", "pickle")
+            self.__workPath = kwargs.get("workPath", self.__speciesModelDir)
 
-            self.__mU = MarshalUtil(workPath=self.__speciesModelDir)
-            self.__fU = FileUtil(workPath=self.__speciesModelDir)
+            self.__mU = MarshalUtil(workPath=self.__workPath)
+            self.__fU = FileUtil(workPath=self.__workPath)
 
-            self.__modelD = self.__reload(fmt="pickle", useCache=useCache)
+            self.__modelD = self.__reload(useCache=useCache)
 
         except Exception as e:
             logger.exception("Failing with %s", str(e))
@@ -210,12 +212,11 @@ class ModBaseModelProcessor(object):
             pass
         return []
 
-    def generate(self, updateOnly=False, fmt="pickle", indent=0):
+    def generate(self, updateOnly=False, indent=4):
         """Generate converted mmCIF models from ModBase PDB and alignment files.
 
         Args:
             updateOnly (bool): only convert new or previously-failed models.  Defaults to False.
-            fmt (str, optional): export file format. Defaults to "pickle".
             indent (int, optional): json format indent. Defaults to 0.
 
         Returns:
@@ -234,28 +235,28 @@ class ModBaseModelProcessor(object):
                 "modelsCif": mD,
                 "modelsFailed": failD,
             }
-            kwargs = {"indent": indent} if fmt == "json" else {"pickleProtocol": 4}
-            modelCachePath = self.__getModelCachePath(fmt=fmt)
-            ok = self.__mU.doExport(modelCachePath, self.__modelD, fmt=fmt, **kwargs)
+            kwargs = {"indent": indent} if self.__cacheFormat == "json" else {"pickleProtocol": 4}
+            modelCachePath = self.__getModelCachePath()
+            ok = self.__mU.doExport(modelCachePath, self.__modelD, fmt=self.__cacheFormat, **kwargs)
             logger.info("Wrote %r status %r", modelCachePath, ok)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
         return ok
 
-    def reload(self, fmt="pickle", useCache=True):
-        self.__modelD = self.__reload(fmt=fmt, useCache=useCache)
+    def reload(self, useCache=True):
+        self.__modelD = self.__reload(useCache=useCache)
         return self.__modelD is not None
 
-    def __reload(self, fmt="pickle", useCache=True):
+    def __reload(self, useCache=True):
         """Reload from the current cache directory."""
         try:
-            modelCachePath = self.__getModelCachePath(fmt=fmt)
+            modelCachePath = self.__getModelCachePath()
             tS = time.strftime("%Y %m %d %H:%M:%S", time.localtime())
             modelD = {"version": self.__version, "created": tS, "modelsCif": {}}
             logger.debug("useCache %r modelCachePath %r", useCache, modelCachePath)
             #
             if useCache and self.__mU.exists(modelCachePath):
-                modelD = self.__mU.doImport(modelCachePath, fmt=fmt)
+                modelD = self.__mU.doImport(modelCachePath, fmt=self.__cacheFormat)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
         #
@@ -264,10 +265,10 @@ class ModBaseModelProcessor(object):
     def getCachePath(self):
         return self.__cachePath
 
-    def __getModelCachePath(self, fmt="pickle"):
-        ext = "pic" if fmt == "pickle" else "json"
+    def __getModelCachePath(self):
+        ext = "pic" if self.__cacheFormat == "pickle" else "json"
         speciesNameNoSpace = self.__speciesName.replace(" ", "_")
-        pth = os.path.join(self.__speciesModelDir, speciesNameNoSpace + "-model-data." + ext)
+        pth = os.path.join(self.__cachePath, speciesNameNoSpace + "-model-data." + ext)
         return pth
 
     def __convertModBasePdb(self, numProc=2, chunkSize=10, updateOnly=False):
@@ -306,12 +307,12 @@ class ModBaseModelProcessor(object):
 
         logger.info("Starting with %d models, numProc %d, updateOnly (%r)", len(modelList), self.__numProc, updateOnly)
         #
-        rWorker = ModBaseModelWorker(workPath=self.__speciesModelDir)
+        rWorker = ModBaseModelWorker(workPath=self.__workPath)
         mpu = MultiProcUtil(verbose=True)
         optD = {"species": self.__speciesName, "speciesModDate": self.__speciesModDate, "mmCifRepoPath": self.__mmCifRepoPath}
         mpu.setOptions(optD)
         mpu.set(workerObj=rWorker, workerMethod="convert")
-        mpu.setWorkingDir(workingDir=self.__speciesModelDir)
+        mpu.setWorkingDir(workingDir=self.__workPath)
         ok, failList, resultList, _ = mpu.runMulti(dataList=modelList, numProc=numProc, numResults=1, chunkSize=chunkSize)
         if failList:
             logger.info("mmCIF conversion failures (%d): %r", len(failList), failList)
@@ -325,11 +326,11 @@ class ModBaseModelProcessor(object):
         logger.info("Completed with multi-proc status %r, failures %r, total models with data (%d)", ok, len(failList), len(mD))
         return mD, failD
 
-    def convertJsonPickle(self, fmt1="json", fmt2="pickle"):
-        # Keep method name as "convertJsonPickle" instead of "convert", to avoid complications from using the other "convert" for MPU method above
-        modelCachePath = self.__getModelCachePath(fmt=fmt1)
-        self.__modelD = self.__mU.doImport(modelCachePath, fmt=fmt1)
-        #
-        modelCachePath = self.__getModelCachePath(fmt=fmt2)
-        ok = self.__mU.doExport(modelCachePath, self.__modelD, fmt=fmt2, pickleProtocol=4)
-        return ok
+    # def convertJsonPickle(self, fmt1="json", fmt2="pickle"):
+    #     # Keep method name as "convertJsonPickle" instead of "convert", to avoid complications from using the other "convert" for MPU method above
+    #     modelCachePath = self.__getModelCachePath(fmt=fmt1)
+    #     self.__modelD = self.__mU.doImport(modelCachePath, fmt=fmt1)
+    #     #
+    #     modelCachePath = self.__getModelCachePath(fmt=fmt2)
+    #     ok = self.__mU.doExport(modelCachePath, self.__modelD, fmt=fmt2, pickleProtocol=4)
+    #     return ok
