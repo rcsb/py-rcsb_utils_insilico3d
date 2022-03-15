@@ -5,6 +5,10 @@
 #
 # Updates:
 #  15-Dec-2021 dwp Re-introduce use of FTP instead of HTTP for downloading files; proved to be significantly faster
+#  11-Mar-2022 dwp Move reorganizing method to separate class to enable multiprocessing and to make it common to other provider classes;
+#                  During reorganizing process, also rename the file to use an internal identifier instead of the original source filename;
+#                  Change cache file to record new internal identifier, original filename, and accession URL for each model file;
+#                  Add usage of config file object for specifying location for storing model files
 #
 # To Do:
 # - Add check that converted files are consistent with mmCIF dictionaries
@@ -35,7 +39,7 @@ from rcsb.utils.insilico3d.ModelProcessors import ModelReorganizer
 
 logger = logging.getLogger(__name__)
 
-## TODO: Need to add LICENSE FILE to mock-data or test-data for using AF (and ModBase and ModelArchive) models?
+
 class AlphaFoldModelProvider:
     """Accessors for AlphaFold models (mmCIF)."""
 
@@ -47,7 +51,6 @@ class AlphaFoldModelProvider:
         self.__dirPath = os.path.join(self.__cachePath, "AlphaFold")
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
         # self.__computedModelsDataPath = os.path.join(self.__cachePath, "computed-models")
-        # Comment out below because should only use mock directory for testing the LOADING of the models, NOT for testing the storing of the models
         self.__computedModelsDataPath = self.__cfgOb.getPath("PDBX_COMP_MODEL_SANDBOX_PATH", sectionName=self.__configName, default=os.path.join(self.__cachePath, "computed-models"))
         self.__numProc = kwargs.get("numProc", 4)
         self.__chunkSize = kwargs.get("chunkSize", 20)
@@ -232,7 +235,7 @@ class AlphaFoldModelProvider:
             for modelFile in modelFileList:
                 modelFileName = self.__fU.getFileName(modelFile)
                 modelFileNameInUrl = modelFileName.split(".gz")[0]
-                sourceModelUrl = "https://alphafold.ebi.ac.uk/files/"+modelFileNameInUrl
+                sourceModelUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelFileNameInUrl)
                 modelSourceUrlMapD.update({modelFileName: sourceModelUrl})
         except Exception as e:
             logger.exception("Failing with %s", str(e))

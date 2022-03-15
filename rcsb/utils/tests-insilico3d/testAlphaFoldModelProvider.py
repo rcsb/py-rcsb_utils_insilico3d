@@ -36,8 +36,9 @@ logger = logging.getLogger()
 
 
 class AlphaFoldModelProviderTests(unittest.TestCase):
+
     def setUp(self):
-        self.__dataPath = os.path.join(HERE, "test-data")
+        # self.__dataPath = os.path.join(HERE, "test-data")
         self.__cachePath = os.path.join(HERE, "test-output", "CACHE")
         self.__startTime = time.time()
 
@@ -58,18 +59,21 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
     def testAlphaFoldModelProvider(self):
+        redownloadBulkData = False
+        #
         # First test fetching model archive
-        # aFMP = AlphaFoldModelProvider(
-        #     cachePath=self.__cachePath,
-        #     useCache=False,
-        #     cfgOb=self.__cfgOb,
-        #     configName=self.__configName,
-        #     numProc=4,
-        #     chunkSize=20,
-        #     alphaFoldRequestedSpeciesList=["Staphylococcus aureus"]
-        # )
-        # ok = aFMP.testCache()
-        # self.assertTrue(ok)
+        if redownloadBulkData:
+            aFMP = AlphaFoldModelProvider(
+                cachePath=self.__cachePath,
+                useCache=False,
+                cfgOb=self.__cfgOb,
+                configName=self.__configName,
+                numProc=4,
+                chunkSize=20,
+                alphaFoldRequestedSpeciesList=["Helicobacter pylori"]
+            )
+            ok = aFMP.testCache()
+            self.assertTrue(ok)
         #
         # Next test reloading the cache
         aFMP = AlphaFoldModelProvider(
@@ -79,7 +83,7 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
             configName=self.__configName,
             numProc=4,
             chunkSize=20,
-            alphaFoldRequestedSpeciesList=["Staphylococcus aureus"]
+            alphaFoldRequestedSpeciesList=["Helicobacter pylori"]
         )
         speciesDirList = aFMP.getArchiveDirList()
         ok = True if len(speciesDirList) > 0 else False

@@ -80,8 +80,8 @@ class ModelWorker(object):
                     logger.error("Skipping - model file %s has more than one container (%d)", modelPath, len(containerList))
                     continue
                 modelEntryId = containerList[0].getObj("entry").getValue("id", 0)
-                internalModelId = modelSourcePrefix+"_"+modelEntryId
-                internalModelName = internalModelId+".cif.gz"
+                internalModelId = modelSourcePrefix + "_" + modelEntryId
+                internalModelName = internalModelId + ".cif.gz"
                 modelName = self.__fU.getFileName(modelPath)
                 uniProtID = modelName.split(".cif.gz")[0].split("-")[1]
                 first2 = uniProtID[0:2]

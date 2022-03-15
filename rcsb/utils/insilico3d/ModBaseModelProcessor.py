@@ -26,6 +26,8 @@ import os.path
 import time
 import collections
 
+import modelcif
+
 import rcsb.utils.modbase_utils.modbase_pdb_to_cif as modbase
 from rcsb.utils.insilico3d import __version__
 from rcsb.utils.io.MarshalUtil import MarshalUtil
@@ -123,13 +125,20 @@ class ModBaseModelWorker(object):
             str: path to converted (and gzipped) mmCIF file if successful; otherwise None
         """
 
+        # Running in command line:
+        # python ./modbase_pdb_to_cif.py   XP_039771084.1_1.pdb   XP_039771084.1_1.cif   -a XP_039771084.1_1.ali.xml   -r /Volumes/ftp.wwpdb.org/pub/pdb/data/structures/divided/mmCIF
+
         try:
             species = optionsD.get("species")
             speciesModDate = optionsD.get("speciesModDate")
+            mmCifRepo = modbase.Repository(optionsD.get("mmCifRepoPath"))
             with open(pdbFile, "r", encoding="utf-8") as fh:
-                sF = modbase.read_pdb(fh, organism_name=species, moddate=speciesModDate)
+                # sF = modbase.read_pdb(fh, organism_name=species, moddate=speciesModDate)
+                sF = modbase.read_pdb(fh, mmCifRepo)
+            systemWithAlign = sF.get_system(alignmentFile)
             with open(mmCifOutFile, "w", encoding="utf-8") as fh:
-                sF.write_mmcif(fh, alignmentFile)
+                # sF.write_mmcif(fh, alignmentFile)
+                modelcif.dumper.write(fh, [systemWithAlign], format="mmCIF")
             mmCifOutFileZ = mmCifOutFile + ".gz"
             ok = self.__fU.compress(inpPath=mmCifOutFile, outPath=mmCifOutFileZ)
             if ok:
@@ -153,6 +162,8 @@ class ModBaseModelProcessor(object):
                              "lastModified": last modified date of the downloaded species archive tarball
                              "speciesName": name of the species as it is stored in the ModBaseModelProvider cache
                              "speciesPdbModelFileList": list of the PDB model files to convert
+                             "mmCifRepoPath": path to repository containing divided mmCIF structure files (in current wwpdb archive)
+                                              (e.g., /Volumes/ftp.wwpdb.org/pub/pdb/data/structures/divided/mmCIF)
         """
 
         try:
@@ -164,6 +175,7 @@ class ModBaseModelProcessor(object):
             self.__speciesModDate = speciesD.get("lastModified", None)
             self.__speciesName = speciesD.get("speciesName")
             self.__speciesPdbModelFileList = speciesD.get("speciesPdbModelFileList", [])
+            self.__mmCifRepoPath = speciesD.get("mmCifRepoPath")
 
             self.__cachePath = cachePath if cachePath else self.__getModelCachePath()
 
@@ -296,7 +308,7 @@ class ModBaseModelProcessor(object):
         #
         rWorker = ModBaseModelWorker(workPath=self.__speciesModelDir)
         mpu = MultiProcUtil(verbose=True)
-        optD = {"species": self.__speciesName, "speciesModDate": self.__speciesModDate}
+        optD = {"species": self.__speciesName, "speciesModDate": self.__speciesModDate, "mmCifRepoPath": self.__mmCifRepoPath}
         mpu.setOptions(optD)
         mpu.set(workerObj=rWorker, workerMethod="convert")
         mpu.setWorkingDir(workingDir=self.__speciesModelDir)

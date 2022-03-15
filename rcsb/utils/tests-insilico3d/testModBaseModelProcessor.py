@@ -26,6 +26,7 @@ import unittest
 
 from rcsb.utils.insilico3d.ModBaseModelProvider import ModBaseModelProvider
 from rcsb.utils.insilico3d.ModBaseModelProcessor import ModBaseModelProcessor
+from rcsb.utils.config.ConfigUtil import ConfigUtil
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
@@ -39,8 +40,14 @@ class ModBaseModelProcessorTests(unittest.TestCase):
     buildTestingCache = True
 
     def setUp(self):
+        self.__dataPath = os.path.join(HERE, "test-data")
         self.__cachePath = os.path.join(HERE, "test-output", "CACHE")
         self.__startTime = time.time()
+        mockTopPath = os.path.join(TOPDIR, "rcsb", "mock-data")
+        configPath = os.path.join(mockTopPath, "config", "dbload-setup-example.yml")
+        self.__configName = "site_info_configuration"
+        self.__cfgOb = ConfigUtil(configPath=configPath, defaultSectionName=self.__configName, mockTopPath=self.__cachePath)
+
         logger.info("Starting %s at %s", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()))
 
     def tearDown(self):
@@ -53,14 +60,16 @@ class ModBaseModelProcessorTests(unittest.TestCase):
     def testModBaseModelProcessor(self):
         """Test case: convert ModBase PDB models to mmCIF"""
         try:
+            ## INSTEAD OF redownloading data, use the test-data directory for processing
+
             # First download the archived data for processing
-            mProv = ModBaseModelProvider(
-                cachePath=self.__cachePath,
-                useCache=False,
-                modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
-            )
-            ok = mProv.testCache()
-            self.assertTrue(ok)
+            # mProv = ModBaseModelProvider(
+            #     cachePath=self.__cachePath,
+            #     useCache=False,
+            #     modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
+            # )
+            # ok = mProv.testCache()
+            # self.assertTrue(ok)
             #
             # Next test reload data for processing
             mProv = ModBaseModelProvider(
