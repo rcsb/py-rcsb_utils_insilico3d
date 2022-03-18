@@ -28,7 +28,7 @@ import requests
 
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
-from rcsb.utils.insilico3d.ModelProcessors import ModelReorganizer
+from rcsb.utils.insilico3d.ModelReorganizer import ModelReorganizer
 
 logger = logging.getLogger(__name__)
 

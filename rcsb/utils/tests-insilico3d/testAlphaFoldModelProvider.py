@@ -96,7 +96,7 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         # Next test reorganizing model file directory structure
         ok = aFMP.testCache()
         self.assertTrue(ok)
-        ok = aFMP.reorganizeModelFiles(keepSource=True)
+        ok = aFMP.reorganizeModelFiles(inputModelList=speciesModelFileList[10:20], keepSource=True)
         self.assertTrue(ok)
 
 

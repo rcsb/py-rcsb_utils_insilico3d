@@ -35,7 +35,7 @@ import re
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FtpUtil import FtpUtil
-from rcsb.utils.insilico3d.ModelProcessors import ModelReorganizer
+from rcsb.utils.insilico3d.ModelReorganizer import ModelReorganizer
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +49,8 @@ class AlphaFoldModelProvider:
         self.__cfgOb = cfgOb
         self.__configName = configName
         self.__dirPath = os.path.join(self.__cachePath, "AlphaFold")
+        # print("\nself.__dirPath", self.__dirPath)
+        # exit()
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
         # self.__computedModelsDataPath = os.path.join(self.__cachePath, "computed-models")
         self.__computedModelsDataPath = self.__cfgOb.getPath("PDBX_COMP_MODEL_SANDBOX_PATH", sectionName=self.__configName, default=os.path.join(self.__cachePath, "computed-models"))
@@ -218,29 +220,29 @@ class AlphaFoldModelProvider:
 
         return modelFileList
 
-    def getSourceUrlMappings(self, modelFileList):
-        """Generate mapping between source model filenames and accession URLs.
+    # def getSourceUrlMappings(self, modelFileList):
+    #     """Generate mapping between source model filenames and accession URLs.
 
-        Args:
-            modelFileList (list): List of model files or paths.
+    #     Args:
+    #         modelFileList (list): List of model files or paths.
 
-        Returns:
-            (dict): dictionary mapping betwen source model filenames and accession URLs.
-                    Note that file-specific downloads aren't gzipped, unlike model files in species tarball.
-                    E.g., {"AF-Q9RQP8-F1-model_v2.cif.gz" : "https://alphafold.ebi.ac.uk/files/AF-Q9RQP8-F1-model_v2.cif"}
-        """
+    #     Returns:
+    #         (dict): dictionary mapping betwen source model filenames and accession URLs.
+    #                 Note that file-specific downloads aren't gzipped, unlike model files in species tarball.
+    #                 E.g., {"AF-Q9RQP8-F1-model_v2.cif.gz" : "https://alphafold.ebi.ac.uk/files/AF-Q9RQP8-F1-model_v2.cif"}
+    #     """
 
-        modelSourceUrlMapD = {}
-        try:
-            for modelFile in modelFileList:
-                modelFileName = self.__fU.getFileName(modelFile)
-                modelFileNameInUrl = modelFileName.split(".gz")[0]
-                sourceModelUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelFileNameInUrl)
-                modelSourceUrlMapD.update({modelFileName: sourceModelUrl})
-        except Exception as e:
-            logger.exception("Failing with %s", str(e))
+    #     modelSourceUrlMapD = {}
+    #     try:
+    #         for modelFile in modelFileList:
+    #             modelFileName = self.__fU.getFileName(modelFile)
+    #             modelFileNameInUrl = modelFileName.split(".gz")[0]
+    #             sourceModelUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelFileNameInUrl)
+    #             modelSourceUrlMapD.update({modelFileName: sourceModelUrl})
+    #     except Exception as e:
+    #         logger.exception("Failing with %s", str(e))
 
-        return modelSourceUrlMapD
+    #     return modelSourceUrlMapD
 
     def getSpeciesDataDownloadDate(self):
         return self.__createdDate
@@ -251,9 +253,8 @@ class AlphaFoldModelProvider:
     def getSpeciesDataCacheFilePath(self):
         return self.__speciesDataCacheFile
 
-    def reorganizeModelFiles(self, keepSource=False):
-        """Move model files from organism-wide model listing to hashed directory structure constructed
-        from the 6-character UniProt ID (e.g., "P52078" will be moved to "./P5/20/78"). Also rename files
+    def reorganizeModelFiles(self, cacheFilePath=None, inputModelList=None, keepSource=False):
+        """Reorganize model files from organism-wide model listing to hashed directory structure and rename files
         to follow internal identifier naming convention.
 
         Args:
@@ -264,35 +265,24 @@ class AlphaFoldModelProvider:
         """
 
         try:
-            # Create the destination directory if it doesn't exist
-            if not self.__fU.exists(self.__computedModelsDataPath):
-                logger.info("Creating destination directory for model file reorganization, %s", self.__computedModelsDataPath)
-                self.__fU.mkdir(self.__computedModelsDataPath)
-
-            # Reorganize files into the destination directory
-            archiveDirList = self.getArchiveDirList()
-            for archiveDir in archiveDirList:
-                modelFileList = self.getModelFileList(inputPathList=[archiveDir])
-                modelSourceUrlMapD = self.getSourceUrlMappings(modelFileList=modelFileList)
-                mR = ModelReorganizer(
-                    cachePath=os.path.join(self.__dirPath, "computed-models-af.json"),
-                    numProc=self.__numProc,
-                    chunkSize=self.__chunkSize,
-                    keepSource=keepSource,
-                    modelD={
-                        "modelDir": archiveDir,
-                        # "modelFileList": modelFileList,
-                        "modelFileList": modelFileList[0:200],
-                        "modelSourceUrlMapD": modelSourceUrlMapD,
-                        "modelSourcePrefix": "af",
-                        "destModelDir": self.__computedModelsDataPath
-                    }
-                )
-                ok = mR.reorganize()
-                #
+            ok = False
+            cacheFilePath = cacheFilePath if cacheFilePath else os.path.join(self.__cachePath, "computed-models-AlphaFold.json")
+            if inputModelList:  # Only reorganize given list of model files
+                mR = ModelReorganizer(cachePath=self.__cachePath,  cacheFilePath=cacheFilePath, numProc=self.__numProc, chunkSize=self.__chunkSize, keepSource=keepSource)
+                ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__computedModelsDataPath)
                 if not ok:
-                    logger.error("Reorganization of model files failed for species archive %s", archiveDir)
+                    logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputModelList[0])
                     return False
+            #
+            else:  # Reorganize ALL model files for ALL available species model sets
+                archiveDirList = self.getArchiveDirList()
+                for archiveDir in archiveDirList:
+                    inputModelList = self.getModelFileList(inputPathList=[archiveDir])
+                    mR = ModelReorganizer(cachePath=self.__cachePath, cacheFilePath=cacheFilePath, numProc=self.__numProc, chunkSize=self.__chunkSize, keepSource=keepSource)
+                    ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__computedModelsDataPath)
+                    if not ok:
+                        logger.error("Reorganization of model files failed for species archive %s", archiveDir)
+                        return False
             return ok
         except Exception as e:
             logger.exception("Failing with %s", str(e))
