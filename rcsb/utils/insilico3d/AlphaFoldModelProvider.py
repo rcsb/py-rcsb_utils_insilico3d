@@ -49,13 +49,9 @@ class AlphaFoldModelProvider:
         self.__cfgOb = cfgOb
         self.__configName = configName
         self.__dirPath = os.path.join(self.__cachePath, "AlphaFold")
-        # print("\nself.__dirPath", self.__dirPath)
-        # exit()
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
         # self.__computedModelsDataPath = os.path.join(self.__cachePath, "computed-models")
         self.__computedModelsDataPath = self.__cfgOb.getPath("PDBX_COMP_MODEL_SANDBOX_PATH", sectionName=self.__configName, default=os.path.join(self.__cachePath, "computed-models"))
-        # self.__numProc = kwargs.get("numProc", 4)
-        # self.__chunkSize = kwargs.get("chunkSize", 20)
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
         self.__fU = FileUtil(workPath=self.__dirPath)
@@ -255,10 +251,8 @@ class AlphaFoldModelProvider:
 
         try:
             ok = False
-            # cachePath = cachePath if cachePath else self.__cachePath
             #
             mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
-            # mR = ModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
             #
             if inputModelList:  # Only reorganize given list of model files
                 ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__computedModelsDataPath, useCache=useCache)
