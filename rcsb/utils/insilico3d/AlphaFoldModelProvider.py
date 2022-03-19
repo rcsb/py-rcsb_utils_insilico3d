@@ -54,8 +54,8 @@ class AlphaFoldModelProvider:
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
         # self.__computedModelsDataPath = os.path.join(self.__cachePath, "computed-models")
         self.__computedModelsDataPath = self.__cfgOb.getPath("PDBX_COMP_MODEL_SANDBOX_PATH", sectionName=self.__configName, default=os.path.join(self.__cachePath, "computed-models"))
-        self.__numProc = kwargs.get("numProc", 4)
-        self.__chunkSize = kwargs.get("chunkSize", 20)
+        # self.__numProc = kwargs.get("numProc", 4)
+        # self.__chunkSize = kwargs.get("chunkSize", 20)
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
         self.__fU = FileUtil(workPath=self.__dirPath)
@@ -220,30 +220,6 @@ class AlphaFoldModelProvider:
 
         return modelFileList
 
-    # def getSourceUrlMappings(self, modelFileList):
-    #     """Generate mapping between source model filenames and accession URLs.
-
-    #     Args:
-    #         modelFileList (list): List of model files or paths.
-
-    #     Returns:
-    #         (dict): dictionary mapping betwen source model filenames and accession URLs.
-    #                 Note that file-specific downloads aren't gzipped, unlike model files in species tarball.
-    #                 E.g., {"AF-Q9RQP8-F1-model_v2.cif.gz" : "https://alphafold.ebi.ac.uk/files/AF-Q9RQP8-F1-model_v2.cif"}
-    #     """
-
-    #     modelSourceUrlMapD = {}
-    #     try:
-    #         for modelFile in modelFileList:
-    #             modelFileName = self.__fU.getFileName(modelFile)
-    #             modelFileNameInUrl = modelFileName.split(".gz")[0]
-    #             sourceModelUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelFileNameInUrl)
-    #             modelSourceUrlMapD.update({modelFileName: sourceModelUrl})
-    #     except Exception as e:
-    #         logger.exception("Failing with %s", str(e))
-
-    #     return modelSourceUrlMapD
-
     def getSpeciesDataDownloadDate(self):
         return self.__createdDate
 
@@ -253,37 +229,52 @@ class AlphaFoldModelProvider:
     def getSpeciesDataCacheFilePath(self):
         return self.__speciesDataCacheFile
 
-    def reorganizeModelFiles(self, cacheFilePath=None, inputModelList=None, keepSource=False):
+    def getModelReorganizer(self, cachePath=None, useCache=True, **kwargs):
+        cachePath = cachePath if cachePath else self.__cachePath
+        return ModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
+
+    def getComputedModelsDataPath(self):
+        return self.__computedModelsDataPath
+
+    def reorganizeModelFiles(self, cachePath=None, useCache=True, inputModelList=None, **kwargs):
         """Reorganize model files from organism-wide model listing to hashed directory structure and rename files
         to follow internal identifier naming convention.
 
         Args:
-            keepSource (bool): whether to copy files to new directory (instead of moving them). Defaults to False.
+            cachePath (str): Path to cache directory.
+            inputModelList (list, optional): List of input model filepaths to reorganize; defaults to all models for all species model sets.
+            **kwargs (optional):
+                numProc (int): number of processes to use; default 2.
+                chunkSize (int): incremental chunk size used for distribute work processes; default 20.
+                keepSource (bool): whether to copy files to new directory (instead of moving them); default False.
+                cacheFilePath (str): full filepath and name for cache file containing a dictionary of all reorganized models.
 
         Returns:
-            (bool): True if successful; otherwise False.
+            (bool): True if successful; False otherwise.
         """
 
         try:
             ok = False
-            cacheFilePath = cacheFilePath if cacheFilePath else os.path.join(self.__cachePath, "computed-models-AlphaFold.json")
+            # cachePath = cachePath if cachePath else self.__cachePath
+            #
+            mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
+            # mR = ModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
+            #
             if inputModelList:  # Only reorganize given list of model files
-                mR = ModelReorganizer(cachePath=self.__cachePath,  cacheFilePath=cacheFilePath, numProc=self.__numProc, chunkSize=self.__chunkSize, keepSource=keepSource)
-                ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__computedModelsDataPath)
+                ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__computedModelsDataPath, useCache=useCache)
                 if not ok:
                     logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputModelList[0])
-                    return False
             #
             else:  # Reorganize ALL model files for ALL available species model sets
                 archiveDirList = self.getArchiveDirList()
                 for archiveDir in archiveDirList:
                     inputModelList = self.getModelFileList(inputPathList=[archiveDir])
-                    mR = ModelReorganizer(cachePath=self.__cachePath, cacheFilePath=cacheFilePath, numProc=self.__numProc, chunkSize=self.__chunkSize, keepSource=keepSource)
-                    ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__computedModelsDataPath)
+                    ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__computedModelsDataPath, useCache=useCache)
                     if not ok:
                         logger.error("Reorganization of model files failed for species archive %s", archiveDir)
-                        return False
+                        break
             return ok
+        #
         except Exception as e:
             logger.exception("Failing with %s", str(e))
             return False

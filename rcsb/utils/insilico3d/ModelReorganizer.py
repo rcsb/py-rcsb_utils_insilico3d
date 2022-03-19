@@ -151,7 +151,7 @@ class ModelWorker(object):
 class ModelReorganizer(object):
     """Generators and accessors for model files."""
 
-    def __init__(self, cachePath=None, useCache=False, **kwargs):
+    def __init__(self, cachePath=None, useCache=True, **kwargs):
         """Initialize ModelReorganizer object.
 
         Args:
@@ -164,15 +164,11 @@ class ModelReorganizer(object):
             workPath (str, optional): directory path for workers to operate in; default is cachePath.
             keepSource (bool, optional): whether to copy model files to new directory instead of moving them; default False.
         """
-        ##TODO: add useCache and reload functionality to not overwrite cache file when reorganizing models from one source and then another
-        ##      And then use the same cache file for all sources
 
         try:
-            # cacheFileSuffix = modelSource if modelSource else "cache"
-            self.__cachePath = cachePath if cachePath else "./CACHE"
+            self.__cachePath = cachePath if cachePath else "."
             self.__cacheFormat = kwargs.get("cacheFormat", "json")
             # self.__cacheFormat = kwargs.get("cacheFormat", "pickle")
-            # self.__cacheFile = kwargs.get("cacheFile", "computed-models-" + cacheFileSuffix + "." + self.__cacheFormat)
             self.__cacheFile = kwargs.get("cacheFile", "computed-models-cache." + self.__cacheFormat)
             self.__cacheFilePath = kwargs.get("cacheFilePath", os.path.join(self.__cachePath, self.__cacheFile))
             self.__numProc = kwargs.get("numProc", 2)
@@ -183,8 +179,40 @@ class ModelReorganizer(object):
             self.__mU = MarshalUtil(workPath=self.__workPath)
             self.__fU = FileUtil(workPath=self.__workPath)
 
+            self.__mD = self.__reload(cacheFilePath=self.__cacheFilePath, useCache=useCache)
+
         except Exception as e:
             logger.exception("Failing with %s", str(e))
+
+    def testCache(self, minCount=20):
+        try:
+            if minCount == 0:
+                return True
+            if self.__mD and len(self.__mD) >= minCount:
+                logger.info("Reorganized models in cache (%d)", len(self.__mD))
+                return True
+        except Exception:
+            pass
+        return False
+
+    def reload(self, cacheFilePath, useCache=True):
+        self.__mD = self.__reload(cacheFilePath, useCache=useCache)
+        return len(self.__mD) > 0  # Returns True or False, if reload was successful or not
+
+    def __reload(self, cacheFilePath, useCache=True):
+        """Reload from the current cache file."""
+        try:
+            mD = {}
+            logger.info("useCache %r cacheFilePath %r", useCache, cacheFilePath)
+            if useCache and self.__mU.exists(cacheFilePath):
+                if cacheFilePath != self.__cacheFilePath:
+                    self.__cacheFilePath = cacheFilePath
+                mD = self.__mU.doImport(cacheFilePath, fmt=self.__cacheFormat)
+                logger.info("Reorganized models (%d) in cacheFilePath %r", len(mD), cacheFilePath)
+        except Exception as e:
+            logger.exception("Failing with %s", str(e))
+        #
+        return mD
 
     def getCachePath(self):
         return self.__cachePath
@@ -192,7 +220,7 @@ class ModelReorganizer(object):
     def getCacheFilePath(self):
         return self.__cacheFilePath
 
-    def reorganize(self, inputModelList, modelSource, destBaseDir):
+    def reorganize(self, inputModelList, modelSource, destBaseDir, useCache=True):
         """Move model files from organism-wide model listing to hashed directory structure and rename files
         to follow internal identifier naming convention.
 
@@ -216,7 +244,15 @@ class ModelReorganizer(object):
             if len(failD) > 0:
                 logger.error("Failed to process %d model files.", len(failD))
             kwargs = {"indent": 4} if self.__cacheFormat == "json" else {"pickleProtocol": 4}
-            ok = self.__mU.doExport(self.__cacheFilePath, mD, fmt=self.__cacheFormat, **kwargs)
+            if useCache:
+                self.__mD = self.__reload(cacheFilePath=self.__cacheFilePath, useCache=useCache)
+                for modelId, modelD in mD.items():
+                    # if modelId not in self.__mD:
+                    #     self.__mD[modelId] = modelD
+                    self.__mD.update({modelId: modelD})
+            else:
+                self.__mD = copy.deepcopy(mD)
+            ok = self.__mU.doExport(self.__cacheFilePath, self.__mD, fmt=self.__cacheFormat, **kwargs)
             logger.info("Wrote %r status %r", self.__cacheFilePath, ok)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
