@@ -64,7 +64,7 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
         #
         # First test fetching model archive
         if redownloadBulkData:
-            aFMP = ModelArchiveModelProvider(
+            mAMP = ModelArchiveModelProvider(
                 cachePath=self.__cachePath,
                 useCache=False,
                 cfgOb=self.__cfgOb,
@@ -73,11 +73,11 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
                 chunkSize=20,
                 # modelArchiveRequestedSpeciesList=["Helicobacter pylori"]
             )
-            ok = aFMP.testCache()
+            ok = mAMP.testCache()
             self.assertTrue(ok)
         #
         # Next test reloading the cache
-        aFMP = ModelArchiveModelProvider(
+        mAMP = ModelArchiveModelProvider(
             cachePath=self.__cachePath,
             useCache=True,
             cfgOb=self.__cfgOb,
@@ -86,30 +86,31 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
             chunkSize=20,
             # modelArchiveRequestedSpeciesList=["Helicobacter pylori"]
         )
-        speciesDirList = aFMP.getArchiveDirList()
-        ok = True if len(speciesDirList) > 0 else False
+        archiveDirList = mAMP.getArchiveDirList()
+        print(archiveDirList)
+        ok = True if len(archiveDirList) > 0 else False
         self.assertTrue(ok)
-        # #
-        # speciesModelFileList = aFMP.getModelFileList(inputPathList=speciesDirList)
-        # ok = True if len(speciesModelFileList) > 0 else False
-        # self.assertTrue(ok)
-        # ok = aFMP.testCache()
-        # self.assertTrue(ok)
         #
-        # # Next test reorganizing model file directory structure
-        # ok = aFMP.reorganizeModelFiles(useCache=False, inputModelList=speciesModelFileList[0:10], numProc=4, chunkSize=20, keepSource=True)
-        # self.assertTrue(ok)
-        # # Now test using the reorganizer object directly
-        # aFMR = aFMP.getModelReorganizer(useCache=False, numProc=4, chunkSize=20, keepSource=True)
-        # destBaseDir = aFMP.getComputedModelsDataPath()
-        # ok = aFMR.reorganize(inputModelList=speciesModelFileList[10:20], modelSource="ModelArchive", destBaseDir=destBaseDir, useCache=False)
-        # self.assertTrue(ok)
-        # ok = aFMR.testCache()
-        # self.assertFalse(ok)  # Confirm that testCache FAILED (< 20 in cache)
-        # ok = aFMR.reorganize(inputModelList=speciesModelFileList[20:30], modelSource="ModelArchive", destBaseDir=destBaseDir, useCache=True)
-        # self.assertTrue(ok)
-        # ok = aFMR.testCache()
-        # self.assertTrue(ok)  # Confirm that testCache SUCCEEDED (>= 20 in cache)
+        archiveModelFileList = mAMP.getModelFileList(inputPathList=archiveDirList)
+        ok = True if len(archiveModelFileList) > 0 else False
+        self.assertTrue(ok)
+        ok = mAMP.testCache()
+        self.assertTrue(ok)
+        
+        # Next test reorganizing model file directory structure
+        ok = mAMP.reorganizeModelFiles(useCache=False, inputModelList=archiveModelFileList[0:10], numProc=4, chunkSize=20, keepSource=True)
+        self.assertTrue(ok)
+        # Now test using the reorganizer object directly
+        mAMR = mAMP.getModelReorganizer(useCache=False, numProc=4, chunkSize=20, keepSource=True)
+        destBaseDir = mAMP.getComputedModelsDataPath()
+        ok = mAMR.reorganize(inputModelList=archiveModelFileList[10:20], modelSource="ModelArchive", destBaseDir=destBaseDir, useCache=False)
+        self.assertTrue(ok)
+        ok = mAMR.testCache()
+        self.assertFalse(ok)  # Confirm that testCache FAILED (< 20 in cache)
+        ok = mAMR.reorganize(inputModelList=archiveModelFileList[20:30], modelSource="ModelArchive", destBaseDir=destBaseDir, useCache=True)
+        self.assertTrue(ok)
+        ok = mAMR.testCache()
+        self.assertTrue(ok)  # Confirm that testCache SUCCEEDED (>= 20 in cache)
 
 
 def fetchModelArchiveModels():

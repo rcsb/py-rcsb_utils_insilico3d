@@ -20,8 +20,11 @@ import datetime
 import logging
 import os.path
 import time
+from pathlib import Path
+# import copy
 import glob
-import requests
+# import re
+# import requests
 
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
@@ -91,17 +94,32 @@ class ModelArchiveModelProvider:
                 logger.info("Checking consistency of cached data with data available on server")
                 for dataSet, pathD in serverDataSetPathD.items():
                     try:
-                        dataSetFilePath = os.path.join(baseUrl, pathD["urlEnd"])
-                        # dataSetFileSize = int(self.__fU.size(dataSetFilePath))
-                        # dataSetFileHeadResp = requests.head(dataSetFilePath)
-                        # dataSetFileModDate = datetime.datetime.strptime(dataSetFileHeadResp.headers["Last-Modified"], "%a, %d %b %Y %H:%M:%S %Z").isoformat()
-                        cacheSpeciesDir = oD[dataSet]["dataDirectory"]
-                        # cacheSpeciesFileSize = oD[dataSet]["archiveFileSizeBytes"]
-                        # cacheSpeciesFileModDate = oD[dataSet]["lastModified"]
-                        if not os.path.exists(cacheSpeciesDir):
+                        cacheArchiveDir = oD[dataSet]["dataDirectory"]
+                        cacheArchiveFileSize = oD[dataSet]["archiveFileSizeBytes"]
+                        cacheArchiveFileDownloadDate = oD[dataSet]["lastDownloaded"]
+                        cacheArchiveFileDownloadAge = (datetime.datetime.now() - datetime.datetime.fromisoformat(cacheArchiveFileDownloadDate)).days
+                        if not os.path.exists(cacheArchiveDir):
                             logger.warning("Missing archive data for dataSet %s from server: %s", dataSet, pathD)
-                        # if cacheSpeciesFileSize != dataSetFileSize or cacheSpeciesFileModDate != dataSetFileModDate:
-                        #     logger.warning("Cached archive data for dataSet %s not up-to-date with data archive on server: %s", dataSet, pathD)
+                        # If 120 days old, check consistency of local cache with data on ModelArchive
+                        # (requires redownloading the entire archive file, since can't get requests.header info from the ModelArchive download URL)
+                        if cacheArchiveFileDownloadAge > 120:
+                            logger.info(
+                                "Cached archive data for dataset %s last downloaded on %s (%d days ago): %s. Redownloading to check consistency with cached data.",
+                                dataSet, cacheArchiveFileDownloadDate, cacheArchiveFileDownloadAge, pathD
+                            )
+                            dataSetFileName = pathD["fileName"]
+                            dataSetFilePath = os.path.join(baseUrl, pathD["urlEnd"])
+                            dataSetDataDumpDir = os.path.join(self.__dirPath, dataSet.replace(" ", "_"))
+                            self.__fU.mkdir(dataSetDataDumpDir)
+                            dataSetFileDumpPath = os.path.join(dataSetDataDumpDir, dataSetFileName)
+                            logger.info("Fetching file %s from server to local path %s", dataSetFilePath, dataSetFileDumpPath)
+                            ok = self.__fU.get(dataSetFilePath, dataSetFileDumpPath)
+                            logger.info("Completed fetch (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
+                            dataSetFileSize = int(self.__fU.size(dataSetFileDumpPath))
+                            if cacheArchiveFileSize != dataSetFileSize:
+                                logger.warning("Cached archive data for dataset %s not up-to-date with data archive on server: %s. You should Rebuild the cache!", dataSet, pathD)
+                            logger.info("Deleting compressed dataset download, %s", dataSetFileDumpPath)
+                            self.__fU.remove(dataSetFileDumpPath)
                     except Exception as e:
                         logger.info("Failing on checking of cache data for dataSet %s: %s", dataSet, pathD)
                         logger.exception("Failing with %s", str(e))
@@ -113,29 +131,35 @@ class ModelArchiveModelProvider:
                     try:
                         dataSetFileName = pathD["fileName"]
                         dataSetFilePath = os.path.join(baseUrl, pathD["urlEnd"])
-                        # print("\n\ndataSetFilePath", dataSetFilePath)
-                        # dataSetFileSize = int(self.__fU.size(dataSetFilePath))
-                        # dataSetFileHeadResp = requests.head(dataSetFilePath)
-                        # dataSetFileModDate = datetime.datetime.strptime(dataSetFileHeadResp.headers["Last-Modified"], "%a, %d %b %Y %H:%M:%S %Z").isoformat()
-                        dataSetDataDumpDir = os.path.join(self.__dirPath, dataSet.replace(" ", "_"), "dataset")
+                        dataSetDataDumpDir = os.path.join(self.__dirPath, dataSet.replace(" ", "_"))
                         self.__fU.mkdir(dataSetDataDumpDir)
                         dataSetFileDumpPath = os.path.join(dataSetDataDumpDir, dataSetFileName)
+                        #
+                        logger.info("Fetching file %s from server to local path %s", dataSetFilePath, dataSetFileDumpPath)
+                        ok = self.__fU.get(dataSetFilePath, dataSetFileDumpPath)
+                        logger.info("Completed fetch (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
+                        dataSetFileSize = int(self.__fU.size(dataSetFileDumpPath))
+                        ok = self.__fU.unbundleZipfile(dataSetFileDumpPath, dirPath=dataSetDataDumpDir)
+                        logger.info("Completed unbundle (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
+                        #
                         sD = {
                             "dataSetName": dataSet,
                             "archiveFileName": dataSetFileName,
-                            # "archiveFileSizeBytes": dataSetFileSize,
-                            # "lastModified": dataSetFileModDate,
+                            "archiveFileSizeBytes": dataSetFileSize,
+                            "lastDownloaded": startDateTime,
                             "dataDirectory": dataSetDataDumpDir,
                         }
-                        logger.info("Fetching file %s from server to local path %s", dataSetFilePath, dataSetFileDumpPath)
-                        ok = self.__fU.get(dataSetFilePath, dataSetFileDumpPath)
-                        ok = self.__fU.uncompress(dataSetFileDumpPath, outputDir=dataSetDataDumpDir)
-                        logger.info("Completed fetch (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
-
+                        #
+                        logger.info("Clearing non-model files from extracted zip bundle...")
+                        for nonModelFile in Path(dataSetDataDumpDir).glob("*.a3m"):
+                            nonModelFile.unlink()
+                        for nonModelFile in Path(dataSetDataDumpDir).glob("*_local_pairwise_qa.cif"):
+                            nonModelFile.unlink()
+                        #
                         if ok:
                             cacheD["data"].update({dataSet: sD})
-                            # self.__fU.remove(dataSetFileDumpPath)
-
+                            self.__fU.remove(dataSetFileDumpPath)
+                    #
                     except Exception as e:
                         logger.info("Failing on fetching and expansion of file for dataSet %s: %s", dataSet, pathD)
                         logger.exception("Failing with %s", str(e))
@@ -174,20 +198,20 @@ class ModelArchiveModelProvider:
 
         for modelDir in inputPathList:
             try:
-                modelFiles = glob.glob(os.path.join(modelDir, "*.cif.gz"))
+                modelFiles = glob.glob(os.path.join(modelDir, "*.cif"))
                 modelFileList = [os.path.abspath(f) for f in modelFiles]
             except Exception as e:
                 logger.exception("Failing with %s", str(e))
 
         return modelFileList
 
-    def getSpeciesDataDownloadDate(self):
+    def getArchiveDataDownloadDate(self):
         return self.__createdDate
 
     def getBaseDataPath(self):
         return self.__dirPath
 
-    def getSpeciesDataCacheFilePath(self):
+    def getArchiveDataCacheFilePath(self):
         return self.__dataSetCacheFile
 
     def getModelReorganizer(self, cachePath=None, useCache=True, **kwargs):

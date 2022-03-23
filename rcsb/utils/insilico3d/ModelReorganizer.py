@@ -139,7 +139,11 @@ class ModelWorker(object):
                 sourceModelUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelFileNameInUrl)
             elif modelSourcePrefix == "MB":
                 modbaseInternalId = modelEntryId.split("model_")[-1]
-                sourceModelUrl = os.path.join("https://salilab.org/modbase/searchbyid?databaseID=", modbaseInternalId)
+                # sourceModelUrl = "https://salilab.org/modbase/searchbyid?modelID=" + modbaseInternalId + "&displaymode=moddetail"  # Directs to entry page
+                sourceModelUrl = "https://salilab.org/modbase/retrieve/modbase/?modelID=" + modbaseInternalId + "&format=mmcif"  # Directs to mmCIF file displayed in web browser
+                # E.g.: https://salilab.org/modbase/retrieve/modbase/?modelID=ecac68b60ee6877ccde36af05cdeac58&format=mmcif
+            elif modelSourcePrefix == "MA":
+                sourceModelUrl = "https://www.modelarchive.org/api/projects/" + modelEntryId + "?type=basic__model_file_name"
             else:
                 logger.error("URL mapping process not ready yet for %s", modelSourcePrefix)
         except Exception as e:

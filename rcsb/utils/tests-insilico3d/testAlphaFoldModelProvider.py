@@ -86,14 +86,18 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
             alphaFoldRequestedSpeciesList=["Helicobacter pylori"]
         )
         speciesDirList = aFMP.getArchiveDirList()
+        print("speciesDirList", speciesDirList)
+        exit()
         ok = True if len(speciesDirList) > 0 else False
         self.assertTrue(ok)
         #
         speciesModelFileList = aFMP.getModelFileList(inputPathList=speciesDirList)
+        # print("speciesModelFileList", speciesModelFileList)
         ok = True if len(speciesModelFileList) > 0 else False
         self.assertTrue(ok)
         ok = aFMP.testCache()
         self.assertTrue(ok)
+        # exit()
         #
         # Next test reorganizing model file directory structure
         ok = aFMP.reorganizeModelFiles(useCache=False, inputModelList=speciesModelFileList[0:10], numProc=4, chunkSize=20, keepSource=True)
