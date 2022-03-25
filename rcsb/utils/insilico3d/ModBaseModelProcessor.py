@@ -39,9 +39,6 @@ logger = logging.getLogger(__name__)
 ModBaseEntry = collections.namedtuple("ModBaseEntry", ["name", "model", "alignment"])
 
 
-## TODO: First filter out only those models that have MPQS > 1.1 & ZDOPE < -1.0!
-##       Do this BEFORE converting all of them!
-##       Then, call these MPU methods from the ModBaseModelProvider class
 class ModBaseModelWorker(object):
     """A skeleton class that implements the interface expected by the multiprocessing
     for converting ModBase PDB files to mmCIF files.
@@ -77,7 +74,6 @@ class ModBaseModelWorker(object):
             for modelE in dataList:
                 convertedCifFileZ = None
                 alignmentFileUsed = None
-                # calculatedDssp = False
                 modelNameRoot, pdbFileZ, alignFileZ = modelE.name, modelE.model, modelE.alignment
                 # First unzip pdb and alignmet files
                 pF = self.__fU.uncompress(pdbFileZ, outputDir=workingDir)
@@ -125,12 +121,9 @@ class ModBaseModelWorker(object):
         # python ./modbase_pdb_to_cif.py   XP_039771084.1_1.pdb   XP_039771084.1_1.cif   -a XP_039771084.1_1.ali.xml   -r /Volumes/ftp.wwpdb.org/pub/pdb/data/structures/divided/mmCIF
 
         try:
-            species = optionsD.get("species")
-            speciesModDate = optionsD.get("speciesModDate")
-            mmCifRepo = modbase.Repository(optionsD.get("mmCifRepoPath"))
+            mmCifRepo = modbase.Repository(optionsD.get("pdbxRepoPath"))
             mmCifOutFileZ = None
             with open(pdbFile, "r", encoding="utf-8") as fh:
-                # sF = modbase.read_pdb(fh, organism_name=species, moddate=speciesModDate)
                 sF = modbase.read_pdb(fh, mmCifRepo)
             systemWithAlign = sF.get_system(alignmentFile)
             # Create quality metric dictionary to only write models with MPQS > 1.1 and ZDOPE < -1.0
@@ -157,19 +150,17 @@ class ModBaseModelWorker(object):
 class ModBaseModelProcessor(object):
     """Generators and accessors for ModBase model files."""
 
-    def __init__(self, cachePath=None, useCache=False, speciesD=None, **kwargs):
+    def __init__(self, cachePath=None, useCache=False, speciesModelDir=None, speciesName=None, speciesPdbModelFileList=None, pdbxRepoPath=None, **kwargs):
         """Initialize ModBaseModelProcessor object.
 
         Args:
             cachePath (str): path to species-specific cache file containing list of processed model files.
             useCache (bool): whether to use the existing data cache or re-run conversion process
-            speciesD (dict): dictionary containing the following necessary key:value pairs for conversion:
-                             "speciesModelDir": path to species data directory
-                             "lastModified": last modified date of the downloaded species archive tarball
-                             "speciesName": name of the species as it is stored in the ModBaseModelProvider cache
-                             "speciesPdbModelFileList": list of the PDB model files to convert
-                             "mmCifRepoPath": path to repository containing divided mmCIF structure files (in current wwpdb archive)
-                                              (e.g., /Volumes/ftp.wwpdb.org/pub/pdb/data/structures/divided/mmCIF)
+            speciesModelDir (str): path to species data directory
+            speciesName (str): name of the species as it is stored in the ModBaseModelProvider cache
+            speciesPdbModelFileList (list): list of the PDB model files to convert
+            pdbxRepoPath (str): path to repository containing divided mmCIF structure files (in current wwpdb archive)
+                                (e.g., /Volumes/ftp.wwpdb.org/pub/pdb/data/structures/divided/mmCIF)
         """
 
         try:
@@ -177,11 +168,10 @@ class ModBaseModelProcessor(object):
             self.__numProc = kwargs.get("numProc", 2)
             self.__chunkSize = kwargs.get("chunkSize", 10)
 
-            self.__speciesModelDir = speciesD.get("speciesModelDir")
-            self.__speciesModDate = speciesD.get("lastModified", None)
-            self.__speciesName = speciesD.get("speciesName")
-            self.__speciesPdbModelFileList = speciesD.get("speciesPdbModelFileList", [])
-            self.__mmCifRepoPath = speciesD.get("mmCifRepoPath")
+            self.__speciesModelDir = speciesModelDir
+            self.__speciesName = speciesName
+            self.__speciesPdbModelFileList = speciesPdbModelFileList if speciesPdbModelFileList else []
+            self.__pdbxRepoPath = pdbxRepoPath
 
             self.__cachePath = cachePath if cachePath else self.__speciesModelDir
             self.__cacheFormat = kwargs.get("cacheFormat", "pickle")
@@ -236,10 +226,9 @@ class ModBaseModelProcessor(object):
                 "version": self.__version,
                 "created": tS,
                 "species": self.__speciesName,
-                "archiveModDate": self.__speciesModDate,
                 "speciesModelDir": self.__speciesModelDir,
                 "modelsCif": mD,
-                "modelsFailed": failD,
+                "modelsFailed": failD,      # Will contain failed models as well as models that didn't meet the minimum quality score requirments
             }
             kwargs = {"indent": indent} if self.__cacheFormat == "json" else {"pickleProtocol": 4}
             modelCachePath = self.__getModelCachePath()
@@ -248,6 +237,9 @@ class ModBaseModelProcessor(object):
         except Exception as e:
             logger.exception("Failing with %s", str(e))
         return ok
+
+    def getModelD(self):
+        return self.__modelD
 
     def reload(self, useCache=True):
         self.__modelD = self.__reload(useCache=useCache)
@@ -315,7 +307,7 @@ class ModBaseModelProcessor(object):
         #
         rWorker = ModBaseModelWorker(workPath=self.__workPath)
         mpu = MultiProcUtil(verbose=True)
-        optD = {"species": self.__speciesName, "speciesModDate": self.__speciesModDate, "mmCifRepoPath": self.__mmCifRepoPath}
+        optD = {"pdbxRepoPath": self.__pdbxRepoPath}
         mpu.setOptions(optD)
         mpu.set(workerObj=rWorker, workerMethod="convert")
         mpu.setWorkingDir(workingDir=self.__workPath)

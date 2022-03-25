@@ -21,10 +21,7 @@ import logging
 import os.path
 import time
 from pathlib import Path
-# import copy
 import glob
-# import re
-# import requests
 
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil

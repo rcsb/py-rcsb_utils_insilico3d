@@ -59,8 +59,7 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
     def testModelArchiveModelProvider(self):
-        redownloadBulkData = False
-        # redownloadBulkData = True
+        redownloadBulkData = True
         #
         # First test fetching model archive
         if redownloadBulkData:
@@ -71,7 +70,7 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
                 configName=self.__configName,
                 numProc=4,
                 chunkSize=20,
-                # modelArchiveRequestedSpeciesList=["Helicobacter pylori"]
+                serverDataSetPathD={"ma-bak-cepc": {"urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name", "fileName": "ma-bak-cepc.zip"}}
             )
             ok = mAMP.testCache()
             self.assertTrue(ok)
@@ -84,10 +83,9 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
             configName=self.__configName,
             numProc=4,
             chunkSize=20,
-            # modelArchiveRequestedSpeciesList=["Helicobacter pylori"]
+            serverDataSetPathD={"ma-bak-cepc": {"urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name", "fileName": "ma-bak-cepc.zip"}}
         )
         archiveDirList = mAMP.getArchiveDirList()
-        print(archiveDirList)
         ok = True if len(archiveDirList) > 0 else False
         self.assertTrue(ok)
         #
