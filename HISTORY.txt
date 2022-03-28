@@ -10,3 +10,7 @@
   18-Oct-2021  - V0.18 Reorganized directory structure and cache of provided model files
   15-Dec-2021  - V0.19 Update location and filenames of AlphaFold models on FTP server
   10-Feb-2022  - V0.20 PyPI Checkpoint
+  10-Mar-2022  - V0.21 Remove SwissModel classes until ready for production;
+                       Update ModBase classes to utilize updated modbase_utils submodule;
+                       Add ModelArchiveProvider classes;
+                       Update caching method and directory tree structure for storing models in all classes

@@ -3,7 +3,7 @@
 # Author:  Dennis Piehl
 # Date:    27-Sep-2021
 #
-# Update:
+# Updates:
 #
 #
 ##
@@ -23,9 +23,10 @@ import platform
 import resource
 import time
 import unittest
+import glob
 
-from rcsb.utils.insilico3d.ModBaseModelProvider import ModBaseModelProvider
 from rcsb.utils.insilico3d.ModBaseModelProcessor import ModBaseModelProcessor
+from rcsb.utils.config.ConfigUtil import ConfigUtil
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 TOPDIR = os.path.dirname(os.path.dirname(os.path.dirname(HERE)))
@@ -39,8 +40,14 @@ class ModBaseModelProcessorTests(unittest.TestCase):
     buildTestingCache = True
 
     def setUp(self):
+        self.__dataPath = os.path.join(HERE, "test-data")
         self.__cachePath = os.path.join(HERE, "test-output", "CACHE")
         self.__startTime = time.time()
+        mockTopPath = os.path.join(TOPDIR, "rcsb", "mock-data")
+        configPath = os.path.join(mockTopPath, "config", "dbload-setup-example.yml")
+        self.__configName = "site_info_configuration"
+        self.__cfgOb = ConfigUtil(configPath=configPath, defaultSectionName=self.__configName, mockTopPath=self.__dataPath)
+        self.__pdbxRepoPath = self.__cfgOb.getPath("PDBX_REPO_PATH", sectionName=self.__configName)
         logger.info("Starting %s at %s", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()))
 
     def tearDown(self):
@@ -53,65 +60,42 @@ class ModBaseModelProcessorTests(unittest.TestCase):
     def testModBaseModelProcessor(self):
         """Test case: convert ModBase PDB models to mmCIF"""
         try:
-            # First download the archived data for processing
-            mProv = ModBaseModelProvider(
-                cachePath=self.__cachePath,
-                useCache=False,
-                modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
-            )
-            ok = mProv.testCache()
-            self.assertTrue(ok)
-            #
-            # Next test reload data for processing
-            mProv = ModBaseModelProvider(
-                cachePath=self.__cachePath,
-                useCache=True,
-                modBaseServerSpeciesDataPathDict={"Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar"}
-            )
-            ok = mProv.testCache()
-            self.assertTrue(ok)
-            speciesNameList = mProv.getSpeciesNameList()
-            ok = True if len(speciesNameList) > 0 else False
-            self.assertTrue(ok)
-            speciesConversionDict = mProv.getSpeciesConversionDict(speciesName=speciesNameList[0])
-            speciesConversionDict["speciesPdbModelFileList"] = speciesConversionDict["speciesPdbModelFileList"][0:20]
-            ok = True if len(speciesConversionDict["speciesPdbModelFileList"]) > 0 else False
-            self.assertTrue(ok)
+            speciesModelDir = os.path.join(self.__dataPath, "ModBase", "Panicum_virgatum")
+            speciesPdbModelFileList = [os.path.abspath(f) for f in glob.glob(os.path.join(speciesModelDir, "model", "*.pdb.xz"))]
             mProc = ModBaseModelProcessor(
                 useCache=False,
+                cachePath=os.path.join(self.__cachePath, "ModBase"),
+                cacheFormat="json",
+                workPath=os.path.join(self.__cachePath, "ModBase", "Panicum_virgatum"),
                 numProc=2,
-                speciesD=speciesConversionDict,
+                speciesModelDir=speciesModelDir,
+                speciesName="Panicum virgatum",
+                speciesPdbModelFileList=speciesPdbModelFileList,
+                pdbxRepoPath=self.__pdbxRepoPath,  # Path to: /pub/pdb/data/structures/divided/mmCIF
             )
-            ok = mProc.generate(updateOnly=False)
+            ok = mProc.generate(updateOnly=False)  # Expect at least one model to fail (intentional), due to not meeting the minimum quality score requirements
             self.assertTrue(ok)
             ok = mProc.generate(updateOnly=True)
             self.assertTrue(ok)
             ok = mProc.reload()
             self.assertTrue(ok)
-            ok = mProc.testCache(minCount=10)
+            ok = mProc.testCache(minCount=5)
             self.assertTrue(ok)
             #
             processedModelCachePath = mProc.getCachePath()
             mProc = ModBaseModelProcessor(
-                cachePath=processedModelCachePath,
                 useCache=True,
+                cachePath=processedModelCachePath,
+                cacheFormat="json",
                 numProc=2,
-                speciesD=speciesConversionDict,
+                speciesModelDir=speciesModelDir,
+                speciesName="Panicum virgatum",
+                speciesPdbModelFileList=speciesPdbModelFileList,
+                pdbxRepoPath=self.__pdbxRepoPath,  # Path to: /pub/pdb/data/structures/divided/mmCIF
             )
-            ok = mProc.testCache(minCount=10)
+            ok = mProc.testCache(minCount=5)
             self.assertTrue(ok)
-            #
-            # ok = mProv.removePdbModelDir(speciesDataDir=speciesConversionDict["speciesModelDir"])
-            # self.assertTrue(ok)
-            # ok = mProv.removeAlignmentDir(speciesDataDir=speciesConversionDict["speciesModelDir"])
-            # self.assertTrue(ok)
-            #
-            # Test reorganize models
-            ok = mProv.testCache()
-            self.assertTrue(ok)
-            ok = mProv.reorganizeModelFiles()
-            self.assertTrue(ok)
-            #
+        #
         except Exception as e:
             logger.exception("Failing with %s", str(e))
             self.fail()

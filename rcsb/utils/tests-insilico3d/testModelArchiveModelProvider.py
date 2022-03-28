@@ -1,14 +1,14 @@
 ##
-# File:    testAlphaFoldModelProvider.py
+# File:    testModelArchiveModelProvider.py
 # Author:  Dennis Piehl
-# Date:    30-Sep-2021
+# Date:    18-Mar-2022
 #
 # Updates:
 #
 #
 ##
 """
-Tests for accessor utilities for AlphaFold 3D Model (mmCIF) data.
+Tests for accessor utilities for ModelArchive 3D Model (mmCIF) data.
 
 """
 
@@ -24,7 +24,7 @@ import resource
 import time
 import unittest
 
-from rcsb.utils.insilico3d.AlphaFoldModelProvider import AlphaFoldModelProvider
+from rcsb.utils.insilico3d.ModelArchiveModelProvider import ModelArchiveModelProvider
 from rcsb.utils.config.ConfigUtil import ConfigUtil
 
 HERE = os.path.abspath(os.path.dirname(__file__))
@@ -35,7 +35,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger()
 
 
-class AlphaFoldModelProviderTests(unittest.TestCase):
+class ModelArchiveModelProviderTests(unittest.TestCase):
 
     def setUp(self):
         # self.__dataPath = os.path.join(HERE, "test-data")
@@ -58,65 +58,65 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         endTime = time.time()
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
-    def testAlphaFoldModelProvider(self):
+    def testModelArchiveModelProvider(self):
         redownloadBulkData = True
         #
         # First test fetching model archive
         if redownloadBulkData:
-            aFMP = AlphaFoldModelProvider(
+            mAMP = ModelArchiveModelProvider(
                 cachePath=self.__cachePath,
                 useCache=False,
                 cfgOb=self.__cfgOb,
                 configName=self.__configName,
                 numProc=4,
                 chunkSize=20,
-                alphaFoldRequestedSpeciesList=["Helicobacter pylori"]
+                serverDataSetPathD={"ma-bak-cepc": {"urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name", "fileName": "ma-bak-cepc.zip"}}
             )
-            ok = aFMP.testCache()
+            ok = mAMP.testCache()
             self.assertTrue(ok)
         #
         # Next test reloading the cache
-        aFMP = AlphaFoldModelProvider(
+        mAMP = ModelArchiveModelProvider(
             cachePath=self.__cachePath,
             useCache=True,
             cfgOb=self.__cfgOb,
             configName=self.__configName,
             numProc=4,
             chunkSize=20,
-            alphaFoldRequestedSpeciesList=["Helicobacter pylori"]
+            serverDataSetPathD={"ma-bak-cepc": {"urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name", "fileName": "ma-bak-cepc.zip"}}
         )
-        speciesDirList = aFMP.getArchiveDirList()
-        ok = True if len(speciesDirList) > 0 else False
+        archiveDirList = mAMP.getArchiveDirList()
+        ok = True if len(archiveDirList) > 0 else False
         self.assertTrue(ok)
         #
-        speciesModelFileList = aFMP.getModelFileList(inputPathList=speciesDirList)
-        ok = True if len(speciesModelFileList) > 0 else False
+        archiveModelFileList = mAMP.getModelFileList(inputPathList=archiveDirList)
+        ok = True if len(archiveModelFileList) > 0 else False
         self.assertTrue(ok)
-        ok = aFMP.testCache()
+        ok = mAMP.testCache()
         self.assertTrue(ok)
         #
         # Next test reorganizing model file directory structure
-        ok = aFMP.reorganizeModelFiles(useCache=False, inputModelList=speciesModelFileList[0:10], numProc=4, chunkSize=20, keepSource=True)
+        ok = mAMP.reorganizeModelFiles(useCache=False, inputModelList=archiveModelFileList[0:10], numProc=4, chunkSize=20, keepSource=True)
         self.assertTrue(ok)
         # Now test using the reorganizer object directly
-        aFMR = aFMP.getModelReorganizer(useCache=False, numProc=4, chunkSize=20, keepSource=True)
-        destBaseDir = aFMP.getComputedModelsDataPath()
-        ok = aFMR.reorganize(inputModelList=speciesModelFileList[10:20], modelSource="AlphaFold", destBaseDir=destBaseDir, useCache=False)
+        mAMR = mAMP.getModelReorganizer(useCache=False, numProc=4, chunkSize=20, keepSource=True)
+        destBaseDir = mAMP.getComputedModelsDataPath()
+        ok = mAMR.reorganize(inputModelList=archiveModelFileList[10:20], modelSource="ModelArchive", destBaseDir=destBaseDir, useCache=False)
         self.assertTrue(ok)
-        ok = aFMR.testCache()
+        ok = mAMR.testCache()
         self.assertFalse(ok)  # Confirm that testCache FAILED (< 20 in cache)
-        ok = aFMR.reorganize(inputModelList=speciesModelFileList[20:30], modelSource="AlphaFold", destBaseDir=destBaseDir, useCache=True)
+        ok = mAMR.reorganize(inputModelList=archiveModelFileList[20:30], modelSource="ModelArchive", destBaseDir=destBaseDir, useCache=True)
         self.assertTrue(ok)
-        ok = aFMR.testCache()
+        ok = mAMR.testCache()
         self.assertTrue(ok)  # Confirm that testCache SUCCEEDED (>= 20 in cache)
 
 
-def fetchAlphaFoldModels():
+def fetchModelArchiveModels():
     suiteSelect = unittest.TestSuite()
-    suiteSelect.addTest(AlphaFoldModelProviderTests("testAlphaFoldModelProvider"))
+    suiteSelect.addTest(ModelArchiveModelProviderTests("testModelArchiveModelProvider"))
     return suiteSelect
 
 
 if __name__ == "__main__":
-    mySuite = fetchAlphaFoldModels()
+    mySuite = fetchModelArchiveModels()
     unittest.TextTestRunner(verbosity=2).run(mySuite)

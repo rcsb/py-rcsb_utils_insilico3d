@@ -3,7 +3,7 @@
 # Author:  Dennis Piehl
 # Date:    27-Sep-2021
 #
-# Update:
+# Updates:
 #
 #
 # To Do:
@@ -28,6 +28,8 @@ import requests
 
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
+from rcsb.utils.insilico3d.ModelReorganizer import ModelReorganizer
+from rcsb.utils.insilico3d.ModBaseModelProcessor import ModBaseModelProcessor
 
 logger = logging.getLogger(__name__)
 
@@ -35,17 +37,22 @@ logger = logging.getLogger(__name__)
 class ModBaseModelProvider:
     """Accessors for ModBase models (PDB)."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, cachePath, useCache=False, cfgOb=None, configName=None, **kwargs):
         # Use the same root cachePath for all types of insilico3D model sources, but with unique dirPath names (sub-directory)
-        self.__cachePath = kwargs.get("cachePath", "./CACHE-insilico3d-models")
+        self.__cachePath = cachePath  # kwargs.get("cachePath", "./CACHE-insilico3d-models")
+        self.__cfgOb = cfgOb
+        self.__configName = configName
         self.__dirPath = os.path.join(self.__cachePath, "ModBase")
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
-        self.__dividedDataPath = os.path.join(self.__cachePath, "computed-models")
+        self.__computedModelsDataPath = self.__cfgOb.getPath("PDBX_COMP_MODEL_SANDBOX_PATH", sectionName=self.__configName, default=os.path.join(self.__cachePath, "computed-models"))
+        self.__pdbxRepoPath = self.__cfgOb.getPath("PDBX_REPO_PATH", sectionName=self.__configName)
+        self.__numProc = kwargs.get("numProc", 4)
+        self.__chunkSize = kwargs.get("chunkSize", 20)
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
         self.__fU = FileUtil(workPath=self.__dirPath)
 
-        self.__oD, self.__createdDate = self.__reload(**kwargs)
+        self.__oD, self.__createdDate = self.__reload(useCache=useCache, **kwargs)
 
     def testCache(self, minCount=0):  # Increase minCount once we are consistently downloading more than one species data set
         if self.__oD and len(self.__oD) > minCount:
@@ -77,9 +84,9 @@ class ModBaseModelProvider:
             #  https://salilab.org/modbase-download/projects/genomes/H_sapiens/2020/Homo_sapiens_2020.tar
             #  https://salilab.org/modbase-download/projects/genomes/H_sapiens/2020/Homo_sapiens_2020.summary.txt
             modBaseServerSpeciesDataPathDict = kwargs.get("modBaseServerSpeciesDataPathDict", {
-                "Homo sapiens": "H_sapiens/2020/Homo_sapiens_2020.tar",
                 "Panicum virgatum": "P_virgatum/2021/p_virgatum_2021.tar",
-                "Arabidopsis thaliana": "A_thaliana/2021/a_thaliana_2021.tar",
+                # "Homo sapiens": "H_sapiens/2020/Homo_sapiens_2020.tar",
+                # "Arabidopsis thaliana": "A_thaliana/2021/a_thaliana_2021.tar",
                 # "Staphylococcus aureus": "S_aureus/2008/staph_aureus.tar",  # Used for tests only
             })
 
@@ -253,37 +260,66 @@ class ModBaseModelProvider:
                 logger.exception("Failing with %s", str(e))
         return ok
 
-    def reorganizeModelFiles(self):
-        """Move model files from organism-wide model listing to hashed directory structure
-        using last two characters of the filename (NCBI ID), excluing the run number suffix."""
+    def getModelProcessor(self, cachePath=None, useCache=False, speciesModelDir=None, speciesName=None, speciesPdbModelFileList=None, pdbxRepoPath=None, **kwargs):
+        cachePath = cachePath if cachePath else self.__cachePath
+        pdbxRepoPath = pdbxRepoPath if pdbxRepoPath else self.__pdbxRepoPath
+        return ModBaseModelProcessor(
+            cachePath=cachePath,
+            useCache=useCache,
+            speciesModelDir=speciesModelDir,
+            speciesName=speciesName,
+            speciesPdbModelFileList=speciesPdbModelFileList,
+            pdbxRepoPath=pdbxRepoPath,
+            **kwargs
+        )
+
+    def getPdbxRepoPath(self):
+        return self.__pdbxRepoPath
+
+    def getModelReorganizer(self, cachePath=None, useCache=True, **kwargs):
+        cachePath = cachePath if cachePath else self.__cachePath
+        return ModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
+
+    def getComputedModelsDataPath(self):
+        return self.__computedModelsDataPath
+
+    def reorganizeModelFiles(self, cachePath=None, useCache=True, inputModelList=None, **kwargs):
+        """Reorganize model files from organism-wide model listing to hashed directory structure and rename files
+        to follow internal identifier naming convention.
+
+        Args:
+            cachePath (str): Path to cache directory.
+            inputModelList (list, optional): List of input model filepaths to reorganize; defaults to all models for all model datasets.
+            **kwargs (optional):
+                numProc (int): number of processes to use; default 2.
+                chunkSize (int): incremental chunk size used for distribute work processes; default 20.
+                keepSource (bool): whether to copy files to new directory (instead of moving them); default False.
+                cacheFilePath (str): full filepath and name for cache file containing a dictionary of all reorganized models.
+
+        Returns:
+            (bool): True if successful; False otherwise.
+        """
 
         try:
-            speciesDirList = self.getSpeciesDirList()
-            for speciesDir in speciesDirList:
-                newModelDirD = {}
-                dividedDataCacheFile = os.path.join(speciesDir, "species-model-files.json")
-                modelFileList = self.getModelFileList(inputPathList=[speciesDir])
-                for model in modelFileList:
-                    modelName = self.__fU.getFileName(model)
-                    modelNameBase = modelName.split('.cif')[0]
-                    if "_" in modelNameBase[0:5] or modelNameBase.startswith("ENS"):
-                        modelNameBaseHash = modelNameBase.split(".")[0]
-                    else:
-                        modelNameBaseHash = modelNameBase.split("_")[0]
-                    sixCharHash = modelNameBaseHash[-6:]
-                    first2 = sixCharHash[0:2]
-                    mid2 = sixCharHash[2:4]
-                    last2 = sixCharHash[4:6]
-                    destDir = os.path.join(self.__dividedDataPath, first2, mid2, last2)
-                    if not self.__fU.exists(destDir):
-                        self.__fU.mkdir(destDir)
-                    destModelPath = os.path.join(destDir, modelName)
-                    self.__fU.replace(model, destModelPath)
-                    newModelDirD[modelName] = destModelPath
-                self.removePdbModelDir(speciesDataDir=speciesDir)
-                self.removeAlignmentDir(speciesDataDir=speciesDir)
-            self.__mU.doExport(dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
-            return True
+            ok = False
+            #
+            mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
+            #
+            if inputModelList:  # Only reorganize given list of model files
+                ok = mR.reorganize(inputModelList=inputModelList, modelSource="ModBase", destBaseDir=self.__computedModelsDataPath, useCache=useCache)
+                if not ok:
+                    logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputModelList[0])
+            #
+            else:  # Reorganize ALL model files for ALL available model datasets
+                archiveDirList = self.getSpeciesDirList()
+                for archiveDir in archiveDirList:
+                    inputModelList = self.getModelFileList(inputPathList=[archiveDir])
+                    ok = mR.reorganize(inputModelList=inputModelList, modelSource="ModBase", destBaseDir=self.__computedModelsDataPath, useCache=useCache)
+                    if not ok:
+                        logger.error("Reorganization of model files failed for dataset archive %s", archiveDir)
+                        break
+            return ok
+        #
         except Exception as e:
             logger.exception("Failing with %s", str(e))
             return False

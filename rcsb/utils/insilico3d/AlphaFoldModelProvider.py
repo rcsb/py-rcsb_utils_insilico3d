@@ -3,9 +3,12 @@
 # Author:  Dennis Piehl
 # Date:    30-Sep-2021
 #
-# Update:
-#  30-Sep-2021 dwp Started class
+# Updates:
 #  15-Dec-2021 dwp Re-introduce use of FTP instead of HTTP for downloading files; proved to be significantly faster
+#  11-Mar-2022 dwp Move reorganizing method to separate class to enable multiprocessing and to make it common to other provider classes;
+#                  During reorganizing process, also rename the file to use an internal identifier instead of the original source filename;
+#                  Change cache file to record new internal identifier, original filename, and accession URL for each model file;
+#                  Add usage of config file object for specifying location for storing model files
 #
 # To Do:
 # - Add check that converted files are consistent with mmCIF dictionaries
@@ -32,6 +35,7 @@ import re
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FtpUtil import FtpUtil
+from rcsb.utils.insilico3d.ModelReorganizer import ModelReorganizer
 
 logger = logging.getLogger(__name__)
 
@@ -39,18 +43,21 @@ logger = logging.getLogger(__name__)
 class AlphaFoldModelProvider:
     """Accessors for AlphaFold models (mmCIF)."""
 
-    def __init__(self, **kwargs):
+    def __init__(self, cachePath, useCache=False, cfgOb=None, configName=None, **kwargs):
         # Use the same root cachePath for all types of insilico3D model sources, but with unique dirPath names (sub-directory)
-        self.__cachePath = kwargs.get("cachePath", "./CACHE-insilico3d-models")
+        self.__cachePath = cachePath
+        self.__cfgOb = cfgOb
+        self.__configName = configName
         self.__dirPath = os.path.join(self.__cachePath, "AlphaFold")
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
-        self.__dividedDataPath = os.path.join(self.__cachePath, "computed-models")
+        # self.__computedModelsDataPath = os.path.join(self.__cachePath, "computed-models")
+        self.__computedModelsDataPath = self.__cfgOb.getPath("PDBX_COMP_MODEL_SANDBOX_PATH", sectionName=self.__configName, default=os.path.join(self.__cachePath, "computed-models"))
 
         self.__mU = MarshalUtil(workPath=self.__dirPath)
         self.__fU = FileUtil(workPath=self.__dirPath)
         self.__ftpU = FtpUtil(workPath=self.__dirPath)
 
-        self.__oD, self.__createdDate = self.__reload(**kwargs)
+        self.__oD, self.__createdDate = self.__reload(useCache=useCache, **kwargs)
 
     def testCache(self, minCount=0):  # Increase minCount once we are consistently downloading more than one species data set
         if self.__oD and len(self.__oD) > minCount:
@@ -218,30 +225,50 @@ class AlphaFoldModelProvider:
     def getSpeciesDataCacheFilePath(self):
         return self.__speciesDataCacheFile
 
-    def reorganizeModelFiles(self):
-        """Move model files from organism-wide model listing to hashed directory structure constructed
-        from the 6-character UniProt ID (e.g., "P52078" will be moved to "./P5/20/78")"""
+    def getModelReorganizer(self, cachePath=None, useCache=True, **kwargs):
+        cachePath = cachePath if cachePath else self.__cachePath
+        return ModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
+
+    def getComputedModelsDataPath(self):
+        return self.__computedModelsDataPath
+
+    def reorganizeModelFiles(self, cachePath=None, useCache=True, inputModelList=None, **kwargs):
+        """Reorganize model files from organism-wide model listing to hashed directory structure and rename files
+        to follow internal identifier naming convention.
+
+        Args:
+            cachePath (str): Path to cache directory.
+            inputModelList (list, optional): List of input model filepaths to reorganize; defaults to all models for all species model sets.
+            **kwargs (optional):
+                numProc (int): number of processes to use; default 2.
+                chunkSize (int): incremental chunk size used for distribute work processes; default 20.
+                keepSource (bool): whether to copy files to new directory (instead of moving them); default False.
+                cacheFilePath (str): full filepath and name for cache file containing a dictionary of all reorganized models.
+
+        Returns:
+            (bool): True if successful; False otherwise.
+        """
 
         try:
-            archiveDirList = self.getArchiveDirList()
-            for archiveDir in archiveDirList:
-                newModelDirD = {}
-                dividedDataCacheFile = os.path.join(archiveDir, "species-model-files.json")
-                modelFileList = self.getModelFileList(inputPathList=[archiveDir])
-                for model in modelFileList:
-                    modelName = self.__fU.getFileName(model)
-                    uniProtID = modelName.split(".cif.gz")[0].split("-")[1]
-                    first2 = uniProtID[0:2]
-                    mid2 = uniProtID[2:4]
-                    last2 = uniProtID[4:6]
-                    destDir = os.path.join(self.__dividedDataPath, first2, mid2, last2)
-                    if not self.__fU.exists(destDir):
-                        self.__fU.mkdir(destDir)
-                    destModelPath = os.path.join(destDir, modelName)
-                    self.__fU.replace(model, destModelPath)
-                    newModelDirD[modelName] = destModelPath
-            self.__mU.doExport(dividedDataCacheFile, newModelDirD, fmt="json", indent=3)
-            return True
+            ok = False
+            #
+            mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
+            #
+            if inputModelList:  # Only reorganize given list of model files
+                ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__computedModelsDataPath, useCache=useCache)
+                if not ok:
+                    logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputModelList[0])
+            #
+            else:  # Reorganize ALL model files for ALL available species model sets
+                archiveDirList = self.getArchiveDirList()
+                for archiveDir in archiveDirList:
+                    inputModelList = self.getModelFileList(inputPathList=[archiveDir])
+                    ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__computedModelsDataPath, useCache=useCache)
+                    if not ok:
+                        logger.error("Reorganization of model files failed for species archive %s", archiveDir)
+                        break
+            return ok
+        #
         except Exception as e:
             logger.exception("Failing with %s", str(e))
             return False
