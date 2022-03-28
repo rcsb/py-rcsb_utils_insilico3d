@@ -320,4 +320,3 @@ class ModelReorganizer(object):
         #
         logger.info("Completed with multi-proc status %r, failures %r, total models with data (%d)", ok, len(failList), len(mD))
         return mD, failD
-
