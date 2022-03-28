@@ -94,7 +94,7 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
         self.assertTrue(ok)
         ok = mAMP.testCache()
         self.assertTrue(ok)
-        
+        #
         # Next test reorganizing model file directory structure
         ok = mAMP.reorganizeModelFiles(useCache=False, inputModelList=archiveModelFileList[0:10], numProc=4, chunkSize=20, keepSource=True)
         self.assertTrue(ok)
