@@ -137,7 +137,7 @@ class AlphaFoldModelProvider:
                         cacheArchiveDir = oD[speciesName]["data_directory"]
                         cacheArchiveFileSize = oD[speciesName]["size_bytes"]
                         cacheSpeciesNumModels = oD[speciesName]["num_predicted_structures"]
-                        if not (os.path.exists(cacheArchiveDir) and reorganized):
+                        if not os.path.exists(cacheArchiveDir) and not reorganized:
                             logger.warning("Species archive data directory for %s not found at cached path %s", archiveFile, cacheArchiveDir)
                         if cacheArchiveFileSize != archiveFileSize:
                             logger.warning("Species archive data file %s not up-to-date with file available on FTP server.", archiveFile)
