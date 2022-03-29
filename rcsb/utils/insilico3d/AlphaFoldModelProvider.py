@@ -50,7 +50,6 @@ class AlphaFoldModelProvider:
         self.__configName = configName
         self.__dirPath = os.path.join(self.__cachePath, "AlphaFold")
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
-        # self.__computedModelsDataPath = os.path.join(self.__cachePath, "computed-models")
         self.__computedModelsDataPath = self.__cfgOb.getPath("PDBX_COMP_MODEL_SANDBOX_PATH", sectionName=self.__configName, default=os.path.join(self.__cachePath, "computed-models"))
 
         self.__ftpHost = kwargs.get("ftpHost", "ftp.ebi.ac.uk")
@@ -191,7 +190,7 @@ class AlphaFoldModelProvider:
 
             if ok:
                 cacheD["data"].update({speciesName: sD})
-                # self.__fU.remove(archiveFileDumpPath)
+                self.__fU.remove(archiveFileDumpPath)
 
         except Exception as e:
             logger.exception("Failing on fetching and expansion of file %s from FTP server, with message:\n%s", archiveD["archive_name"], str(e))
