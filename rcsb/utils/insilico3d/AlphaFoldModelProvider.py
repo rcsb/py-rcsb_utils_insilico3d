@@ -129,7 +129,7 @@ class AlphaFoldModelProvider:
                         #
                         # Check if cache was already reorganized
                         reorganized = archiveD.get("reorganized", False)
-                        reorganizedBaseDir = archiveD.get("reorganizedBaseDir", None) 
+                        reorganizedBaseDir = archiveD.get("reorganizedBaseDir", None)
                         if reorganized and reorganizedBaseDir is not None:
                             if self.__mU.exists(reorganizedBaseDir):
                                 logger.info("Species archive data for %s already reorganized to: %s", speciesName, reorganizedBaseDir)
@@ -284,7 +284,7 @@ class AlphaFoldModelProvider:
                     # First check if cache was already reorganized
                     if cacheD["data"][species]["data_directory"] == archiveDir:
                         reorganized = archiveD.get("reorganized", False)
-                        reorganizedBaseDir = archiveD.get("reorganizedBaseDir", None) 
+                        reorganizedBaseDir = archiveD.get("reorganizedBaseDir", None)
                         if reorganized and reorganizedBaseDir is not None:
                             if self.__mU.exists(reorganizedBaseDir) and reorganizedBaseDir == self.__computedModelsDataPath:
                                 logger.info("Species archive data for %s already reorganized to: %s", species, reorganizedBaseDir)
