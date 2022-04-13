@@ -80,13 +80,27 @@ class ModelWorker(object):
                     # Expecting all computed models to have one container per file. When this becomes no longer the case, update this to handle it accordingly.
                     logger.error("Skipping - model file %s has more than one container (%d)", modelFileNameIn, len(containerList))
                     continue
+                #
+                # Create internal model ID using entry.id and strip away all punctuation and make ALL CAPS
                 sourceModelEntryId = containerList[0].getObj("entry").getValue("id", 0)
-                # Remove all punctuation and make ALL CAPS
                 modelEntryId = "".join(char for char in sourceModelEntryId if char.isalnum()).upper()
                 internalModelId = modelSourcePrefix + "_" + modelEntryId
+                #
+                # Gzip the original file if not already (as the case for ModelArchive model files)
+                if modelFileIn.endswith(".gz"):
+                    modelFileInGzip = modelFileIn
+                else:
+                    ok = self.__fU.compress(modelFileIn, modelFileIn + ".gz")
+                    if ok:
+                        modelFileInGzip = modelFileIn + ".gz"
+                    else:
+                        logger.warning("Failed to gzip input model file: %s", modelFileIn)
+                #
                 internalModelName = internalModelId + ".cif.gz"
+                #
                 # Use last six to last two characters for second-level hashed directory
                 firstDir, secondDir = modelEntryId[-6:-4], modelEntryId[-4:-2]
+                modelPathFromPrefixDir = os.path.join(modelSourcePrefix, firstDir, secondDir, internalModelName)
                 destModelDir = os.path.join(destBaseDir, modelSourcePrefix, firstDir, secondDir)
                 if not self.__fU.exists(destModelDir):
                     self.__fU.mkdir(destModelDir)
@@ -95,15 +109,16 @@ class ModelWorker(object):
                 sourceModelUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, sourceModelEntryId)
                 #
                 modelD["modelId"] = internalModelId
-                modelD["modelPath"] = modelFileOut
+                # modelD["modelPath"] = modelFileOut
+                modelD["modelPath"] = modelPathFromPrefixDir  # Starts at prefix (e.g., "AF/XJ/E6/AF_AFA0A385XJE6F1.cif.gz"); needed like this by RepositoryProvider
                 modelD["sourceModelFileName"] = modelFileNameIn
                 modelD["sourceModelUrl"] = sourceModelUrl
                 #
                 try:
                     if keepSource:
-                        self.__fU.put(modelFileIn, modelFileOut)  # Copies files (only use for testing)
+                        self.__fU.put(modelFileInGzip, modelFileOut)  # Copies files (only use for testing)
                     else:
-                        self.__fU.replace(modelFileIn, modelFileOut)  # Moves files (use for production)
+                        self.__fU.replace(modelFileInGzip, modelFileOut)  # Moves files (use for production)
                     success = True
                     successList.append(modelFileIn)
                 except Exception as e:

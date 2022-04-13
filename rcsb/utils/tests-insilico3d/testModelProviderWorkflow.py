@@ -24,8 +24,8 @@ import resource
 import time
 import unittest
 
-# from rcsb.utils.insilico3d.AlphaFoldModelProvider import AlphaFoldModelProvider
-# from rcsb.utils.insilico3d.ModelArchiveModelProvider import ModelArchiveModelProvider
+from rcsb.utils.insilico3d.AlphaFoldModelProvider import AlphaFoldModelProvider
+from rcsb.utils.insilico3d.ModelArchiveModelProvider import ModelArchiveModelProvider
 from rcsb.utils.insilico3d.ModelProviderWorkflow import ModelProviderWorkflow
 from rcsb.utils.config.ConfigUtil import ConfigUtil
 
@@ -63,83 +63,85 @@ class ModelProviderWorkflowTests(unittest.TestCase):
     def testModelProviderWorkflow(self):
         redownloadBulkData = True
         # redownloadBulkData = False
+        # keepSource = True
+        keepSource = False
+
         #
-        mPWf = ModelProviderWorkflow(
-            cachePath=self.__cachePath,
-            useCache=False,
-            cfgOb=self.__cfgOb,
-            configName=self.__configName,
-            numProc=4,
-            chunkSize=40,
-            redownloadBulkData=redownloadBulkData
-        )
-
-        ok = mPWf.run()
-        self.assertTrue(ok)
-        #
-        # # First test fetching model archive
-        # if redownloadBulkData:
-        #     aFMP = AlphaFoldModelProvider(
-        #         cachePath=self.__cachePath,
-        #         useCache=False,
-        #         cfgOb=self.__cfgOb,
-        #         configName=self.__configName,
-        #         numProc=4,
-        #         chunkSize=40,
-        #         alphaFoldRequestedSpeciesList=["Helicobacter pylori"]
-        #         # alphaFoldRequestedSpeciesList=["Helicobacter pylori", "Escherichia coli", "Methanocaldococcus jannaschii", "Homo sapiens"]
-        #     )
-        #     ok = aFMP.testCache()
-        #     self.assertTrue(ok)
-
-        #     mAMP = ModelArchiveModelProvider(
-        #         cachePath=self.__cachePath,
-        #         useCache=False,
-        #         cfgOb=self.__cfgOb,
-        #         configName=self.__configName,
-        #         numProc=4,
-        #         chunkSize=20,
-        #         serverDataSetPathD={"ma-bak-cepc": {"urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name", "fileName": "ma-bak-cepc.zip"}}
-        #     )
-        #     ok = mAMP.testCache()
-        #     self.assertTrue(ok)
-
-        # #
-        # # Next test reloading the cache
-        # aFMP = AlphaFoldModelProvider(
+        # mPWf = ModelProviderWorkflow(
         #     cachePath=self.__cachePath,
-        #     useCache=True,
+        #     useCache=False,
         #     cfgOb=self.__cfgOb,
         #     configName=self.__configName,
         #     numProc=4,
         #     chunkSize=40,
-        #     alphaFoldRequestedSpeciesList=["Helicobacter pylori"]
-        #     # alphaFoldRequestedSpeciesList=["Helicobacter pylori", "Escherichia coli", "Methanocaldococcus jannaschii", "Homo sapiens"]
+        #     redownloadBulkData=redownloadBulkData
         # )
-        # speciesDirList = aFMP.getArchiveDirList()
-        # ok = True if len(speciesDirList) > 0 else False
+        # ok = mPWf.run()
         # self.assertTrue(ok)
 
-        # mAMP = ModelArchiveModelProvider(
-        #     cachePath=self.__cachePath,
-        #     useCache=True,
-        #     cfgOb=self.__cfgOb,
-        #     configName=self.__configName,
-        #     numProc=4,
-        #     chunkSize=20,
-        #     serverDataSetPathD={"ma-bak-cepc": {"urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name", "fileName": "ma-bak-cepc.zip"}}
-        # )
-        # archiveDirList = mAMP.getArchiveDirList()
-        # ok = True if len(archiveDirList) > 0 else False
-        # self.assertTrue(ok)
+        # First test fetching model archive
+        if redownloadBulkData:
+            aFMP = AlphaFoldModelProvider(
+                cachePath=self.__cachePath,
+                useCache=False,
+                cfgOb=self.__cfgOb,
+                configName=self.__configName,
+                numProc=4,
+                chunkSize=40,
+                # alphaFoldRequestedSpeciesList=["Helicobacter pylori"]
+                alphaFoldRequestedSpeciesList=["Helicobacter pylori", "Escherichia coli", "Methanocaldococcus jannaschii", "Homo sapiens"]
+            )
+            ok = aFMP.testCache()
+            self.assertTrue(ok)
 
-        # #
-        # # Next test reorganizing model file directory structure
-        # ok = aFMP.reorganizeModelFiles(useCache=True, numProc=4, chunkSize=40, keepSource=True)
-        # self.assertTrue(ok)
+            mAMP = ModelArchiveModelProvider(
+                cachePath=self.__cachePath,
+                useCache=False,
+                cfgOb=self.__cfgOb,
+                configName=self.__configName,
+                numProc=4,
+                chunkSize=20,
+                # serverDataSetPathD={"ma-bak-cepc": {"urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name", "fileName": "ma-bak-cepc.zip"}}
+            )
+            ok = mAMP.testCache()
+            self.assertTrue(ok)
 
-        # ok = mAMP.reorganizeModelFiles(useCache=True, numProc=4, chunkSize=20, keepSource=True)
-        # self.assertTrue(ok)
+        #
+        # Next test reloading the cache
+        aFMP = AlphaFoldModelProvider(
+            cachePath=self.__cachePath,
+            useCache=True,
+            cfgOb=self.__cfgOb,
+            configName=self.__configName,
+            numProc=4,
+            chunkSize=40,
+            # alphaFoldRequestedSpeciesList=["Helicobacter pylori"]
+            alphaFoldRequestedSpeciesList=["Helicobacter pylori", "Escherichia coli", "Methanocaldococcus jannaschii", "Homo sapiens"]
+        )
+        speciesDirList = aFMP.getArchiveDirList()
+        ok = True if len(speciesDirList) > 0 else False
+        self.assertTrue(ok)
+
+        mAMP = ModelArchiveModelProvider(
+            cachePath=self.__cachePath,
+            useCache=True,
+            cfgOb=self.__cfgOb,
+            configName=self.__configName,
+            numProc=4,
+            chunkSize=20,
+            # serverDataSetPathD={"ma-bak-cepc": {"urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name", "fileName": "ma-bak-cepc.zip"}}
+        )
+        archiveDirList = mAMP.getArchiveDirList()
+        ok = True if len(archiveDirList) > 0 else False
+        self.assertTrue(ok)
+
+        #
+        # Next test reorganizing model file directory structure
+        ok = aFMP.reorganizeModelFiles(useCache=True, numProc=4, chunkSize=40, keepSource=keepSource)
+        self.assertTrue(ok)
+
+        ok = mAMP.reorganizeModelFiles(useCache=True, numProc=4, chunkSize=20, keepSource=keepSource)
+        self.assertTrue(ok)
 
 
 
