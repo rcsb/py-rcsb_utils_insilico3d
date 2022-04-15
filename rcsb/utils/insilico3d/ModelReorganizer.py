@@ -90,10 +90,10 @@ class ModelWorker(object):
                 if modelFileIn.endswith(".gz"):
                     modelFileInGzip = modelFileIn
                 else:
-                    ok = self.__fU.compress(modelFileIn, modelFileIn + ".gz")
-                    if ok:
-                        modelFileInGzip = modelFileIn + ".gz"
-                    else:
+                    modelFileInGzip = modelFileIn + ".gz"
+                    logger.debug("Compressing model file %s --> %s", modelFileIn, modelFileInGzip)
+                    ok = self.__fU.compress(modelFileIn, modelFileInGzip)
+                    if not ok:
                         logger.warning("Failed to gzip input model file: %s", modelFileIn)
                 #
                 internalModelName = internalModelId + ".cif.gz"

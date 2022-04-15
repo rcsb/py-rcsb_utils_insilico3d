@@ -43,23 +43,31 @@ logger = logging.getLogger(__name__)
 class AlphaFoldModelProvider:
     """Accessors for AlphaFold models (mmCIF)."""
 
-    def __init__(self, cachePath, useCache=False, cfgOb=None, configName=None, **kwargs):
-        # Use the same root cachePath for all types of insilico3D model sources, but with unique dirPath names (sub-directory)
-        self.__cachePath = cachePath
-        self.__cfgOb = cfgOb
-        self.__configName = configName
-        self.__dirPath = os.path.join(self.__cachePath, "AlphaFold")
-        self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
-        self.__computedModelsDataPath = self.__cfgOb.getPath("PDBX_COMP_MODEL_SANDBOX_PATH", sectionName=self.__configName, default=os.path.join(self.__cachePath, "computed-models"))
+    def __init__(self, cachePath, useCache=False, reload=True, **kwargs):
+        """Initialize AlphaFoldModelProvider class.
+
+        Args:
+            cachePath (str): Path to directory where model files will be reorganized and stored permanently (also contains computed-model-cache.json file)  (i.e., 'computed-models'),
+                             and will serve as the parent directory of where model files will be downloaded and where AF-specific cache file will sit (under 'work-dir/AlphaFold').
+            useCache (bool, optional): Start from cache of already downloaded and/or reorganized model files. Defaults to False.
+                                       When True, checks if last downloaded set of files is up-to-date and downloads any newly available models.
+                                       When False (default), redownloads all model files.
+            reload (bool, optional): Peform full reload (i.e., download/update) upon instantiation. Defaults to True.
+        """
+        # Use the same root cachePath for all types of insilico3D model sources, but with unique workPath names (sub-directory)
+        self.__cachePath = cachePath  # Directory where model files will be reorganized and stored permanently (also contains computed-model-cache.json file) (i.e., 'computed-models')
+        self.__workPath = os.path.join(self.__cachePath, "work-dir", "AlphaFold")  # Directory where model files will be downloaded (also contains AF-specific cache file)
+        self.__speciesDataCacheFile = os.path.join(self.__workPath, "model-download-cache.json")
 
         self.__ftpHost = kwargs.get("ftpHost", "ftp.ebi.ac.uk")
         self.__ftpDataPath = kwargs.get("ftpDataPath", "/pub/databases/alphafold/")
 
-        self.__mU = MarshalUtil(workPath=self.__dirPath)
-        self.__fU = FileUtil(workPath=self.__dirPath)
-        self.__ftpU = FtpUtil(workPath=self.__dirPath)
+        self.__mU = MarshalUtil(workPath=self.__workPath)
+        self.__fU = FileUtil(workPath=self.__workPath)
+        self.__ftpU = FtpUtil(workPath=self.__workPath)
 
-        self.__oD, self.__createdDate = self.__reload(useCache=useCache, **kwargs)
+        if reload:
+            self.__oD, self.__createdDate = self.__reload(useCache=useCache, **kwargs)
 
     def testCache(self, minCount=0):  # Increase minCount once we are consistently downloading more than one species data set
         if self.__oD and len(self.__oD) > minCount:
@@ -68,7 +76,10 @@ class AlphaFoldModelProvider:
             return False
 
     def getCacheDirPath(self):
-        return self.__dirPath
+        return self.__workPath
+
+    def reload(self, useCache, **kwargs):
+        self.__oD, self.__createdDate = self.__reload(useCache=useCache, **kwargs)
 
     def __reload(self, **kwargs):
         """Reload cached list of species-specific AlphaFold model data files and check FTP server for updated data sets,
@@ -91,9 +102,9 @@ class AlphaFoldModelProvider:
             excludeArchiveFileRegexListCombined = "(?:% s)" % "|".join(excludeArchiveFileRegexList)
 
             self.__ftpU.connect(self.__ftpHost)
-            self.__fU.mkdir(self.__dirPath)
+            self.__fU.mkdir(self.__workPath)
 
-            latestDataListDumpPath = os.path.join(self.__dirPath, self.__fU.getFileName(alphaFoldLatestDataList))
+            latestDataListDumpPath = os.path.join(self.__workPath, self.__fU.getFileName(alphaFoldLatestDataList))
             ok = self.__fU.get(alphaFoldLatestDataList, latestDataListDumpPath)
             lDL = self.__mU.doImport(latestDataListDumpPath, fmt="json")
 
@@ -174,7 +185,7 @@ class AlphaFoldModelProvider:
             speciesName = sD.get("species", sD.get("label", None))
             archiveFile = sD["archive_name"]
             archiveFilePath = os.path.join(self.__ftpDataPath, "latest", archiveFile)
-            speciesDataDumpDir = os.path.join(self.__dirPath, speciesName.replace(" ", "_").replace("(", "").replace(")", ""))
+            speciesDataDumpDir = os.path.join(self.__workPath, speciesName.replace(" ", "_").replace("(", "").replace(")", ""))
             self.__fU.mkdir(speciesDataDumpDir)
             archiveFileDumpPath = os.path.join(speciesDataDumpDir, archiveFile)
             sD.update({"data_directory": speciesDataDumpDir, "archive_file_path": archiveFileDumpPath})
@@ -236,7 +247,7 @@ class AlphaFoldModelProvider:
         return self.__createdDate
 
     def getBaseDataPath(self):
-        return self.__dirPath
+        return self.__workPath
 
     def getSpeciesDataCacheFilePath(self):
         return self.__speciesDataCacheFile
@@ -246,7 +257,7 @@ class AlphaFoldModelProvider:
         return ModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
 
     def getComputedModelsDataPath(self):
-        return self.__computedModelsDataPath
+        return self.__cachePath
 
     def reorganizeModelFiles(self, cachePath=None, useCache=True, inputModelList=None, **kwargs):
         """Reorganize model files from organism-wide model listing to hashed directory structure and rename files
@@ -264,15 +275,13 @@ class AlphaFoldModelProvider:
         Returns:
             (bool): True if successful; False otherwise.
         """
-
-        ok = False
-
         try:
+            ok = False
             #
             mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
             #
             if inputModelList:  # Only reorganize given list of model files
-                ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__computedModelsDataPath, useCache=useCache)
+                ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
                 if not ok:
                     logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputModelList[0])
             #
@@ -286,19 +295,19 @@ class AlphaFoldModelProvider:
                         reorganized = archiveD.get("reorganized", False)
                         reorganizedBaseDir = archiveD.get("reorganizedBaseDir", None)
                         if reorganized and reorganizedBaseDir is not None:
-                            if self.__mU.exists(reorganizedBaseDir) and reorganizedBaseDir == self.__computedModelsDataPath:
+                            if self.__mU.exists(reorganizedBaseDir) and reorganizedBaseDir == self.__cachePath:
                                 logger.info("Species archive data for %s already reorganized to: %s", species, reorganizedBaseDir)
                                 ok = True
                                 continue
                     # Proceed with reorganization
                     inputModelList = self.getModelFileList(inputPathList=[archiveDir])
-                    ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__computedModelsDataPath, useCache=useCache)
+                    ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
                     if not ok:
                         logger.error("Reorganization of model files failed for species archive %s", archiveDir)
                         break
                     # Update the cache file to indicate that the given species archive has been reorganized
                     if cacheD["data"][species]["data_directory"] == archiveDir:
-                        cacheD["data"][species].update({"reorganized": True, "reorganizedBaseDir": self.__computedModelsDataPath})
+                        cacheD["data"][species].update({"reorganized": True, "reorganizedBaseDir": self.__cachePath})
                         logger.info("Reorganization of model files complete for species, %s, from archive %s", species, archiveDir)
                     ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=4)
         #

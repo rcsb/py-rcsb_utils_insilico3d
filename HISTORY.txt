@@ -16,4 +16,6 @@
                        Update caching method and directory tree structure for storing models in all classes
   29-Mar-2022  - V0.22 Improve AlphaFoldModelProvider usage and handling of cache;
                        Update modbase_utils submodule, now adds conversion script as a new software item;
-                       Add testModelProviderWorkflow class for running through all model types
+                       Add ModelProviderWorkflow class for retrieving and reorganizing all model types;
+                       Remove usage of configuration file for directory path determination, as this program will run on a dedicated instance
+                       in which custom (local) directory paths will need to be specified.
