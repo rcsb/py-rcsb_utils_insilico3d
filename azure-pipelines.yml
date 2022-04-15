@@ -5,7 +5,7 @@ name: $(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.rr)
 
 trigger:
   - master
-  - dev-*
+  # - dev-*
 
 pr:
   - master
