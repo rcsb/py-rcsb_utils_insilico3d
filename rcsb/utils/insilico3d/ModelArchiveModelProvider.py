@@ -33,19 +33,27 @@ logger = logging.getLogger(__name__)
 class ModelArchiveModelProvider:
     """Accessors for ModelArchive 3D in silico models (mmCIF)."""
 
-    def __init__(self, cachePath, useCache=False, cfgOb=None, configName=None, **kwargs):
+    def __init__(self, cachePath, useCache=False, reload=True, **kwargs):
+        """Initialize AlphaFoldModelProvider class.
+
+        Args:
+            cachePath (str): Path to directory where model files will be reorganized and stored permanently (also contains computed-model-cache.json file)  (i.e., 'computed-models'),
+                             and will serve as the parent directory of where model files will be downloaded and where MA-specific cache file will sit (under 'work-dir/ModelArchive').
+            useCache (bool, optional): Start from cache of already downloaded and/or reorganized model files. Defaults to False.
+                                       When True, checks if last downloaded set of files is up-to-date and downloads any newly available models.
+                                       When False (default), redownloads all model files.
+            reload (bool, optional): Peform full reload (i.e., download/update) upon instantiation. Defaults to True.
+        """
         # Use the same root cachePath for all types of insilico3D model sources, but with unique dirPath names (sub-directory)
-        self.__cachePath = cachePath
-        self.__cfgOb = cfgOb
-        self.__configName = configName
-        self.__dirPath = os.path.join(self.__cachePath, "ModelArchive")
-        self.__dataSetCacheFile = os.path.join(self.__dirPath, "ma-model-data.json")
-        self.__computedModelsDataPath = self.__cfgOb.getPath("PDBX_COMP_MODEL_SANDBOX_PATH", sectionName=self.__configName, default=os.path.join(self.__cachePath, "computed-models"))
+        self.__cachePath = cachePath  # Cache path is where all model files will eventually be reorganized and stored in (i.e. "computed-models")
+        self.__workPath = os.path.join(self.__cachePath, "work-dir", "ModelArchive")  # Directory where model files will be downloaded (also contains MA-specific cache file)
+        self.__dataSetCacheFile = os.path.join(self.__workPath, "model-download-cache.json")
 
-        self.__mU = MarshalUtil(workPath=self.__dirPath)
-        self.__fU = FileUtil(workPath=self.__dirPath)
+        self.__mU = MarshalUtil(workPath=self.__workPath)
+        self.__fU = FileUtil(workPath=self.__workPath)
 
-        self.__oD, self.__createdDate = self.__reload(useCache=useCache, **kwargs)
+        if reload:
+            self.__oD, self.__createdDate = self.__reload(useCache=useCache, **kwargs)
 
     def testCache(self, minCount=0):  # Increase minCount once we are consistently downloading more than one data set
         if self.__oD and len(self.__oD) > minCount:
@@ -54,7 +62,10 @@ class ModelArchiveModelProvider:
             return False
 
     def getCacheDirPath(self):
-        return self.__dirPath
+        return self.__workPath
+
+    def reload(self, useCache, **kwargs):
+        self.__oD, self.__createdDate = self.__reload(useCache=useCache, **kwargs)
 
     def __reload(self, **kwargs):
         """Reload cached list of ModelArchive model dataset files and check server for updated data sets,
@@ -72,15 +83,17 @@ class ModelArchiveModelProvider:
             startDateTime = datetime.datetime.now().isoformat()
             useCache = kwargs.get("useCache", True)
             baseUrl = kwargs.get("baseUrl", "https://www.modelarchive.org/api/projects")
-            serverDataSetPathD = kwargs.get("serverDataSetPathD", {
-                "ma-bak-cepc": {
-                    "urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name",
-                    "fileName": "ma-bak-cepc.zip"
-                },
-            })
-
-            self.__fU.mkdir(self.__dirPath)
-
+            modelArchiveRequestedDatasetD = kwargs.get("modelArchiveRequestedDatasetD", {})
+            if not modelArchiveRequestedDatasetD:  # Fill in default
+                modelArchiveRequestedDatasetD = {
+                    "ma-bak-cepc": {
+                        "urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name",
+                        "fileName": "ma-bak-cepc.zip"
+                    },
+                }
+            #
+            self.__fU.mkdir(self.__workPath)
+            #
             logger.info("useCache %r self.__dataSetCacheFile %r", useCache, self.__dataSetCacheFile)
             if useCache and self.__mU.exists(self.__dataSetCacheFile):
                 logger.info("Loading data cache, %s.", self.__dataSetCacheFile)
@@ -89,7 +102,7 @@ class ModelArchiveModelProvider:
                 oD = cacheD["data"]
 
                 logger.info("Checking consistency of cached data with data available on server")
-                for dataSet, pathD in serverDataSetPathD.items():
+                for dataSet, pathD in modelArchiveRequestedDatasetD.items():
                     try:
                         cacheArchiveDir = oD[dataSet]["dataDirectory"]
                         cacheArchiveFileSize = oD[dataSet]["archiveFileSizeBytes"]
@@ -106,7 +119,7 @@ class ModelArchiveModelProvider:
                             )
                             dataSetFileName = pathD["fileName"]
                             dataSetFilePath = os.path.join(baseUrl, pathD["urlEnd"])
-                            dataSetDataDumpDir = os.path.join(self.__dirPath, dataSet.replace(" ", "_"))
+                            dataSetDataDumpDir = os.path.join(self.__workPath, dataSet.replace(" ", "_"))
                             self.__fU.mkdir(dataSetDataDumpDir)
                             dataSetFileDumpPath = os.path.join(dataSetDataDumpDir, dataSetFileName)
                             logger.info("Fetching file %s from server to local path %s", dataSetFilePath, dataSetFileDumpPath)
@@ -124,11 +137,11 @@ class ModelArchiveModelProvider:
                 logger.info("Refetching all files from server.")
                 cacheD = {}
                 cacheD.update({"created": startDateTime, "data": {}})
-                for dataSet, pathD in serverDataSetPathD.items():
+                for dataSet, pathD in modelArchiveRequestedDatasetD.items():
                     try:
                         dataSetFileName = pathD["fileName"]
                         dataSetFilePath = os.path.join(baseUrl, pathD["urlEnd"])
-                        dataSetDataDumpDir = os.path.join(self.__dirPath, dataSet.replace(" ", "_"))
+                        dataSetDataDumpDir = os.path.join(self.__workPath, dataSet.replace(" ", "_"))
                         self.__fU.mkdir(dataSetDataDumpDir)
                         dataSetFileDumpPath = os.path.join(dataSetDataDumpDir, dataSetFileName)
                         #
@@ -206,7 +219,7 @@ class ModelArchiveModelProvider:
         return self.__createdDate
 
     def getBaseDataPath(self):
-        return self.__dirPath
+        return self.__workPath
 
     def getArchiveDataCacheFilePath(self):
         return self.__dataSetCacheFile
@@ -216,7 +229,7 @@ class ModelArchiveModelProvider:
         return ModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
 
     def getComputedModelsDataPath(self):
-        return self.__computedModelsDataPath
+        return self.__cachePath
 
     def reorganizeModelFiles(self, cachePath=None, useCache=True, inputModelList=None, **kwargs):
         """Reorganize model files from organism-wide model listing to hashed directory structure and rename files
@@ -234,14 +247,13 @@ class ModelArchiveModelProvider:
         Returns:
             (bool): True if successful; False otherwise.
         """
-
         try:
             ok = False
             #
             mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
             #
             if inputModelList:  # Only reorganize given list of model files
-                ok = mR.reorganize(inputModelList=inputModelList, modelSource="ModelArchive", destBaseDir=self.__computedModelsDataPath, useCache=useCache)
+                ok = mR.reorganize(inputModelList=inputModelList, modelSource="ModelArchive", destBaseDir=self.__cachePath, useCache=useCache)
                 if not ok:
                     logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputModelList[0])
             #
@@ -249,7 +261,7 @@ class ModelArchiveModelProvider:
                 archiveDirList = self.getArchiveDirList()
                 for archiveDir in archiveDirList:
                     inputModelList = self.getModelFileList(inputPathList=[archiveDir])
-                    ok = mR.reorganize(inputModelList=inputModelList, modelSource="ModelArchive", destBaseDir=self.__computedModelsDataPath, useCache=useCache)
+                    ok = mR.reorganize(inputModelList=inputModelList, modelSource="ModelArchive", destBaseDir=self.__cachePath, useCache=useCache)
                     if not ok:
                         logger.error("Reorganization of model files failed for dataset archive %s", archiveDir)
                         break

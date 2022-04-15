@@ -65,7 +65,7 @@ class ModelWorker(object):
         diagList = []
 
         try:
-            modelSourcePrefix = optionsD.get("modelSourcePrefix")  # e.g., "af" or "ma"
+            modelSourcePrefix = optionsD.get("modelSourcePrefix")  # e.g., "AF" or "MA"
             destBaseDir = optionsD.get("destBaseDir")  # base path for all computed models (i.e., "computed-models"); Or will be root path at HTTP endpoint
             keepSource = optionsD.get("keepSource", False)  # whether to copy files over (instead of moving them)
             #
@@ -80,30 +80,45 @@ class ModelWorker(object):
                     # Expecting all computed models to have one container per file. When this becomes no longer the case, update this to handle it accordingly.
                     logger.error("Skipping - model file %s has more than one container (%d)", modelFileNameIn, len(containerList))
                     continue
-                modelEntryId = containerList[0].getObj("entry").getValue("id", 0)
-                # Remove all punctuation and make ALL CAPS
-                modelEntryId = "".join(char for char in modelEntryId if char.isalnum()).upper()
+                #
+                # Create internal model ID using entry.id and strip away all punctuation and make ALL CAPS
+                sourceModelEntryId = containerList[0].getObj("entry").getValue("id", 0)
+                modelEntryId = "".join(char for char in sourceModelEntryId if char.isalnum()).upper()
                 internalModelId = modelSourcePrefix + "_" + modelEntryId
+                #
+                # Gzip the original file if not already (as the case for ModelArchive model files)
+                if modelFileIn.endswith(".gz"):
+                    modelFileInGzip = modelFileIn
+                else:
+                    modelFileInGzip = modelFileIn + ".gz"
+                    logger.debug("Compressing model file %s --> %s", modelFileIn, modelFileInGzip)
+                    ok = self.__fU.compress(modelFileIn, modelFileInGzip)
+                    if not ok:
+                        logger.warning("Failed to gzip input model file: %s", modelFileIn)
+                #
                 internalModelName = internalModelId + ".cif.gz"
+                #
                 # Use last six to last two characters for second-level hashed directory
                 firstDir, secondDir = modelEntryId[-6:-4], modelEntryId[-4:-2]
+                modelPathFromPrefixDir = os.path.join(modelSourcePrefix, firstDir, secondDir, internalModelName)
                 destModelDir = os.path.join(destBaseDir, modelSourcePrefix, firstDir, secondDir)
                 if not self.__fU.exists(destModelDir):
                     self.__fU.mkdir(destModelDir)
                 modelFileOut = os.path.join(destModelDir, internalModelName)
                 #
-                sourceModelUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, modelEntryId)
+                sourceModelUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, sourceModelEntryId)
                 #
                 modelD["modelId"] = internalModelId
-                modelD["modelPath"] = modelFileOut
+                # modelD["modelPath"] = modelFileOut
+                modelD["modelPath"] = modelPathFromPrefixDir  # Starts at prefix (e.g., "AF/XJ/E6/AF_AFA0A385XJE6F1.cif.gz"); needed like this by RepositoryProvider
                 modelD["sourceModelFileName"] = modelFileNameIn
                 modelD["sourceModelUrl"] = sourceModelUrl
                 #
                 try:
                     if keepSource:
-                        self.__fU.put(modelFileIn, modelFileOut)  # Copies files (only use for testing)
+                        self.__fU.put(modelFileInGzip, modelFileOut)  # Copies files (only use for testing)
                     else:
-                        self.__fU.replace(modelFileIn, modelFileOut)  # Moves files (use for production)
+                        self.__fU.replace(modelFileInGzip, modelFileOut)  # Moves files (use for production)
                     success = True
                     successList.append(modelFileIn)
                 except Exception as e:
@@ -121,14 +136,16 @@ class ModelWorker(object):
 
         return successList, retList, diagList
 
-    def __getSourceUrl(self, modelSourcePrefix, sourceModelFileName, modelEntryId):
+    def __getSourceUrl(self, modelSourcePrefix, sourceModelFileName, sourceModelEntryId):
         """Construct model accession URL for each model source.
 
         Args:
-            modelFileList (list): List of model file paths.
+            modelSourcePrefix (str): Prefix for given model source (e.g., "AF" or "MA").
+            sourceModelFileName (str): filename of model as provided by the source.
+            sourceModelEntryId (str): model entry.id value as in the provided mmCIF file
 
         Returns:
-            (list): list of dictionary mapping betwen source model filenames and accession URLs.
+            (str): Accession URL for the specified model file and source.
                     Note that file-specific downloads aren't gzipped, unlike model files in species tarball.
                     E.g., "https://alphafold.ebi.ac.uk/files/AF-Q9RQP8-F1-model_v2.cif"
         """
@@ -138,14 +155,15 @@ class ModelWorker(object):
                 modelFileNameInUrl = sourceModelFileName.split(".gz")[0]
                 sourceModelUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelFileNameInUrl)
             elif modelSourcePrefix == "MB":
-                modbaseInternalId = modelEntryId.split("model_")[-1]
+                modbaseInternalId = sourceModelEntryId.split("model_")[-1]
                 # sourceModelUrl = "https://salilab.org/modbase/searchbyid?modelID=" + modbaseInternalId + "&displaymode=moddetail"  # Directs to entry page
                 sourceModelUrl = "https://salilab.org/modbase/retrieve/modbase/?modelID=" + modbaseInternalId + "&format=mmcif"  # Directs to mmCIF file displayed in web browser
                 # E.g.: https://salilab.org/modbase/retrieve/modbase/?modelID=ecac68b60ee6877ccde36af05cdeac58&format=mmcif
             elif modelSourcePrefix == "MA":
-                sourceModelUrl = "https://www.modelarchive.org/api/projects/" + modelEntryId + "?type=basic__model_file_name"
+                modelFileNameInUrl = sourceModelFileName.split(".cif")[0]
+                sourceModelUrl = "https://www.modelarchive.org/api/projects/" + modelFileNameInUrl + "?type=basic__model_file_name"
             else:
-                logger.error("URL mapping process not ready yet for %s", modelSourcePrefix)
+                logger.error("URL generation process not ready yet for %s", modelSourcePrefix)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
 
@@ -173,7 +191,8 @@ class ModelReorganizer(object):
             self.__cachePath = cachePath if cachePath else "."
             self.__cacheFormat = kwargs.get("cacheFormat", "json")
             # self.__cacheFormat = kwargs.get("cacheFormat", "pickle")
-            self.__cacheFile = kwargs.get("cacheFile", "computed-models-cache." + self.__cacheFormat)
+            cacheExt = "pic" if self.__cacheFormat == "pickle" else "json"
+            self.__cacheFile = kwargs.get("cacheFile", "computed-models-cache." + cacheExt)
             self.__cacheFilePath = kwargs.get("cacheFilePath", os.path.join(self.__cachePath, self.__cacheFile))
             self.__numProc = kwargs.get("numProc", 2)
             self.__chunkSize = kwargs.get("chunkSize", 20)

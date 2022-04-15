@@ -133,7 +133,6 @@ class ModBaseModelWorker(object):
             #
             if (float(qMD['MPQS']) > 1.1 and float(qMD['zDOPE']) < -1.0):
                 with open(mmCifOutFile, "w", encoding="utf-8") as fh:
-                    # sF.write_mmcif(fh, alignmentFile)
                     modelcif.dumper.write(fh, [systemWithAlign], format="mmCIF")
                 mmCifOutFileZ = mmCifOutFile + ".gz"
                 self.__fU.compress(inpPath=mmCifOutFile, outPath=mmCifOutFileZ)
