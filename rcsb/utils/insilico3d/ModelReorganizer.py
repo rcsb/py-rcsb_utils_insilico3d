@@ -119,6 +119,8 @@ class ModelWorker(object):
                         self.__fU.put(modelFileInGzip, modelFileOut)  # Copies files (only use for testing)
                     else:
                         self.__fU.replace(modelFileInGzip, modelFileOut)  # Moves files (use for production)
+                        if self.__mU.exists(modelFileIn):   # Remove unzipped file too if it exists
+                            self.__mU.remove(modelFileIn)
                     success = True
                     successList.append(modelFileIn)
                 except Exception as e:
