@@ -56,7 +56,7 @@ class ModelProviderWorkflowTests(unittest.TestCase):
             useCache=True,
             numProc=6,
             chunkSize=40,
-            # alphaFoldRequestedSpeciesList=["Swiss-Prot (CIF files)"],  # This sometimes slows down significantly after only a few GBs (out of 36 GB) are downloaded, so ends up not finishing...
+            # alphaFoldRequestedSpeciesList=["Swiss-Prot (CIF files)"],  # This sometimes slows down significantly after only a few GBs (out of 36 GB) are downloaded, so may not finish
             alphaFoldRequestedSpeciesList=[
                 "Arabidopsis thaliana",  # 27,434
                 "Caenorhabditis elegans",  # 19,694
