@@ -21,4 +21,5 @@
                        in which custom (local) directory paths will need to be specified;
                        Update ModelReorganizer for handling of unzipped model files.
   16-Apr-2022  - V0.23 Bug fix in ModelReorganizer;
-                       Add runModelProviderWorkflow script for running through the entire workflow in production
+                       Add runModelProviderWorkflow script for running through the entire workflow in production;
+                       Update logging format for all classes to include timestamp

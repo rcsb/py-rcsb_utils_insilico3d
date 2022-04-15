@@ -31,6 +31,7 @@ from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.insilico3d.ModelReorganizer import ModelReorganizer
 from rcsb.utils.insilico3d.ModBaseModelProcessor import ModBaseModelProcessor
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
