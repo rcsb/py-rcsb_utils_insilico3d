@@ -31,6 +31,7 @@ from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.insilico3d.ModelReorganizer import ModelReorganizer
 from rcsb.utils.insilico3d.ModBaseModelProcessor import ModBaseModelProcessor
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -44,7 +45,7 @@ class ModBaseModelProvider:
         self.__configName = configName
         self.__dirPath = os.path.join(self.__cachePath, "ModBase")
         self.__speciesDataCacheFile = os.path.join(self.__dirPath, "species-model-data.json")
-        self.__computedModelsDataPath = self.__cfgOb.getPath("PDBX_COMP_MODEL_SANDBOX_PATH", sectionName=self.__configName, default=os.path.join(self.__cachePath, "computed-models"))
+        self.__computedModelsDataPath = self.__cfgOb.getPath("PDBX_COMP_MODEL_REPO_PATH", sectionName=self.__configName, default=os.path.join(self.__cachePath, "computed-models"))
         self.__pdbxRepoPath = self.__cfgOb.getPath("PDBX_REPO_PATH", sectionName=self.__configName)
         self.__numProc = kwargs.get("numProc", 4)
         self.__chunkSize = kwargs.get("chunkSize", 20)

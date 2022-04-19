@@ -29,6 +29,7 @@ from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.multiproc.MultiProcUtil import MultiProcUtil
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -111,6 +112,7 @@ class ModelWorker(object):
                 modelD["modelId"] = internalModelId
                 # modelD["modelPath"] = modelFileOut
                 modelD["modelPath"] = modelPathFromPrefixDir  # Starts at prefix (e.g., "AF/XJ/E6/AF_AFA0A385XJE6F1.cif.gz"); needed like this by RepositoryProvider
+                modelD["sourceId"] = sourceModelEntryId
                 modelD["sourceModelFileName"] = modelFileNameIn
                 modelD["sourceModelUrl"] = sourceModelUrl
                 #
@@ -119,6 +121,8 @@ class ModelWorker(object):
                         self.__fU.put(modelFileInGzip, modelFileOut)  # Copies files (only use for testing)
                     else:
                         self.__fU.replace(modelFileInGzip, modelFileOut)  # Moves files (use for production)
+                        if self.__mU.exists(modelFileIn):   # Remove unzipped file too if it exists
+                            self.__mU.remove(modelFileIn)
                     success = True
                     successList.append(modelFileIn)
                 except Exception as e:
