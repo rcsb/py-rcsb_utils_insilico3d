@@ -45,7 +45,7 @@ class ModBaseModelProviderTests(unittest.TestCase):
         self.__configName = "site_info_configuration"
         self.__cfgOb = ConfigUtil(configPath=configPath, defaultSectionName=self.__configName, mockTopPath=self.__dataPath)
         self.__pdbxRepoPath = self.__cfgOb.getPath("PDBX_REPO_PATH", sectionName=self.__configName)
-        self.__cacheSandboxPath = os.path.join(self.__cachePath, "MOCK_COMP_MODEL_SANDBOX")
+        self.__cacheSandboxPath = os.path.join(self.__cachePath, "MOCK_COMP_MODEL_REPO")
         logger.info("Starting %s at %s", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()))
 
     def tearDown(self):

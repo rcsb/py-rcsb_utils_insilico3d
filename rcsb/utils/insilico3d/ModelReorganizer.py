@@ -112,6 +112,7 @@ class ModelWorker(object):
                 modelD["modelId"] = internalModelId
                 # modelD["modelPath"] = modelFileOut
                 modelD["modelPath"] = modelPathFromPrefixDir  # Starts at prefix (e.g., "AF/XJ/E6/AF_AFA0A385XJE6F1.cif.gz"); needed like this by RepositoryProvider
+                modelD["sourceId"] = sourceModelEntryId
                 modelD["sourceModelFileName"] = modelFileNameIn
                 modelD["sourceModelUrl"] = sourceModelUrl
                 #
