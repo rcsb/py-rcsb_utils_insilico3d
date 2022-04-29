@@ -25,3 +25,6 @@
                        Update logging format for all classes to include timestamp;
                        Add sourceId of model to computed-models-cache file;
                        Update mock-data
+  28-Apr-2022  - V0.24 Add ModelCacheProvider class;
+                       Updates to model cache file content and structure;
+                       Added lastModifiedDate to computed-model cache file
