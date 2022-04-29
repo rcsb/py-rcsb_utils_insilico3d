@@ -24,6 +24,8 @@ __license__ = "Apache 2.0"
 import logging
 import os.path
 import copy
+from datetime import datetime
+import pytz
 
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FileUtil import FileUtil
@@ -67,14 +69,17 @@ class ModelWorker(object):
 
         try:
             modelSourcePrefix = optionsD.get("modelSourcePrefix")  # e.g., "AF" or "MA"
+            modelSourceDbMap = optionsD.get("modelSourceDbMap")
             destBaseDir = optionsD.get("destBaseDir")  # base path for all computed models (i.e., "computed-models"); Or will be root path at HTTP endpoint
             keepSource = optionsD.get("keepSource", False)  # whether to copy files over (instead of moving them)
+            reorganizeDate = optionsD.get("reorganizeDate", False)  # whether to copy files over (instead of moving them)
             #
             for modelFileIn in dataList:
                 modelD = {}
                 success = False
                 modelFileOut = None
                 modelFileNameIn = self.__fU.getFileName(modelFileIn)
+                modelSourceDb = modelSourceDbMap[modelSourcePrefix]
                 #
                 containerList = self.__mU.doImport(modelFileIn, fmt="mmcif")
                 if len(containerList) > 1:
@@ -86,6 +91,13 @@ class ModelWorker(object):
                 sourceModelEntryId = containerList[0].getObj("entry").getValue("id", 0)
                 modelEntryId = "".join(char for char in sourceModelEntryId if char.isalnum()).upper()
                 internalModelId = modelSourcePrefix + "_" + modelEntryId
+                #
+                # Get the revision date if it exists
+                if containerList[0].exists("pdbx_audit_revision_history"):
+                    lastModifiedDate = containerList[0].getObj("pdbx_audit_revision_history").getValue("revision_date", -1)
+                    lastModifiedDate = datetime.strptime(lastModifiedDate, '%Y-%m-%d').replace(microsecond=0).replace(tzinfo=pytz.UTC).isoformat()
+                else:
+                    lastModifiedDate = reorganizeDate
                 #
                 # Gzip the original file if not already (as the case for ModelArchive model files)
                 if modelFileIn.endswith(".gz"):
@@ -110,11 +122,12 @@ class ModelWorker(object):
                 sourceModelUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, sourceModelEntryId)
                 #
                 modelD["modelId"] = internalModelId
-                # modelD["modelPath"] = modelFileOut
                 modelD["modelPath"] = modelPathFromPrefixDir  # Starts at prefix (e.g., "AF/XJ/E6/AF_AFA0A385XJE6F1.cif.gz"); needed like this by RepositoryProvider
                 modelD["sourceId"] = sourceModelEntryId
+                modelD["sourceDb"] = modelSourceDb
                 modelD["sourceModelFileName"] = modelFileNameIn
                 modelD["sourceModelUrl"] = sourceModelUrl
+                modelD["lastModifiedDate"] = lastModifiedDate
                 #
                 try:
                     if keepSource:
@@ -274,8 +287,6 @@ class ModelReorganizer(object):
             if useCache:
                 self.__mD = self.__reload(cacheFilePath=self.__cacheFilePath, useCache=useCache)
                 for modelId, modelD in mD.items():
-                    # if modelId not in self.__mD:
-                    #     self.__mD[modelId] = modelD
                     self.__mD.update({modelId: modelD})
             else:
                 self.__mD = copy.deepcopy(mD)
@@ -312,20 +323,28 @@ class ModelReorganizer(object):
         """
         mD = {}
         failD = {}
+        tS = datetime.now().replace(microsecond=0).replace(tzinfo=pytz.UTC).isoformat()  # Desired format:  2022-04-15T12:00:00+00:00
         #
-        logger.info("Starting with %d models, numProc %d", len(inputModelList), numProc)
+        logger.info("Starting with %d models, numProc %d at %r", len(inputModelList), numProc, tS)
         #
         # Create the base destination directory if it doesn't exist
         if not self.__fU.exists(destBaseDir):
             logger.info("Creating base destination directory for model file reorganization, %s", destBaseDir)
             self.__fU.mkdir(destBaseDir)
         #
-        modelSourcePrefixD = {"AlphaFold": "AF", "ModBase": "MB", "ModelArchive": "MA", "SwissModel": "SM"}
+        modelSourcePrefixD = {"AlphaFold": "AF", "ModBase": "MB", "ModelArchive": "MA", "SwissModelRepository": "SMR"}
+        modelSourceDbMap = {"AF": "AlphaFoldDB", "MB": "ModBase", "MA": "ModelArchive", "SMR": "SwissModelRepository"}
         modelSourcePrefix = modelSourcePrefixD[modelSource]
         #
         rWorker = ModelWorker(workPath=self.__workPath)
         mpu = MultiProcUtil(verbose=True)
-        optD = {"modelSourcePrefix": modelSourcePrefix, "destBaseDir": destBaseDir, "keepSource": self.__keepSource}
+        optD = {
+            "modelSourcePrefix": modelSourcePrefix,
+            "modelSourceDbMap": modelSourceDbMap,
+            "destBaseDir": destBaseDir,
+            "keepSource": self.__keepSource,
+            "reorganizeDate": tS
+        }
         mpu.setOptions(optD)
         mpu.set(workerObj=rWorker, workerMethod="reorganize")
         mpu.setWorkingDir(workingDir=self.__workPath)
