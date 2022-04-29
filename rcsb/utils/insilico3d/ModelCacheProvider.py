@@ -6,8 +6,8 @@
 # Updates:
 #
 # To Do:
-#   - Need to make this able to retrieve from git stash or build locker (to get most recent set of models) from BOTH coasts
-#     Because east can't access computed-models-internal-west server on west, and vice versa
+#   - Need to make this able to retrieve from git stash or build locker (to get most recent set of models),
+#     so that both coasts use the exact same set of data and cache (including populated timestamps)
 ##
 
 """
