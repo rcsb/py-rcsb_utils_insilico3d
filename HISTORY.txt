@@ -28,3 +28,4 @@
   28-Apr-2022  - V0.24 Add ModelCacheProvider class;
                        Updates to model cache file content and structure;
                        Added lastModifiedDate to computed-model cache file
+                       Moved ModBaseModelProvider and ModBaseModelProcessor classes to separate dev branch
