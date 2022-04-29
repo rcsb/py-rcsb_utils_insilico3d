@@ -68,8 +68,8 @@ class ModelCacheProviderTests(unittest.TestCase):
         compModelId = mcP.getInternalCompModelId("ma-bak-cepc-1100")
         ok = compModelId is not None
         self.assertTrue(ok)
-        souceUrl = mcP.getCompModelSourceUrl(compModelId)
-        ok = souceUrl is not None
+        modelD = mcP.getCompModelData(compModelId)
+        ok = modelD is not None
         self.assertTrue(ok)
 
     #
