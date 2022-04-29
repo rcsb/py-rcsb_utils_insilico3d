@@ -120,7 +120,7 @@ class ModelCacheProvider(StashableBase):
         return compModelIdMapD
 
     def getInternalCompModelId(self, sourceId):
-        """Get the mapped internal ID of computed model provided the original source ID
+        """Get the mapped internal ID of computed model provided the original source ID.
 
         Args:
             sourceId (str): entry.id of computed model (e.g., "AF-P96541-F1")
@@ -130,31 +130,25 @@ class ModelCacheProvider(StashableBase):
         #
         try:
             compModelInternalId = compModelIdMapD.get(sourceId, None)
-            if compModelInternalId is None:
-                logger.error("Unable to map computed-model sourceId (%s) to internal identifier - sourceId key not found.", sourceId)
             logger.debug("Computed-model sourceId (%s) mapped to internalId (%r)", sourceId, compModelInternalId)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
         #
         return compModelInternalId
 
-    def getCompModelSourceUrl(self, compModelInternalId):
-        """Get the source download URL for a model file
+    def getCompModelData(self, compModelInternalId):
+        """Get the associated metadata dict for a specific computed model.
 
         Args:
             compModelInternalId (str): internal computed-model identifier (e.g., "AF_AFP96541F1")
         """
-        #
-        if compModelInternalId is None:
-            return None
-        #
-        sourceUrl = None
+        compModelD = {}
         try:
-            sourceUrl = self.__mD[compModelInternalId].get(sourceUrl, None)
-            if sourceUrl is None:
+            compModelD = self.__mD.get(compModelInternalId, {})
+            if not compModelD:
                 logger.error("Unable to retrieve source URL for computed-model (%s)", compModelInternalId)
-            logger.debug("Computed-model internalId (%s) sourceUrl (%r)", compModelInternalId, sourceUrl)
+            logger.debug("Computed-model internalId (%s) modelData (%r)", compModelInternalId, compModelD)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
         #
-        return compModelInternalId
+        return compModelD
