@@ -69,6 +69,7 @@ class ModelWorker(object):
 
         try:
             modelSourcePrefix = optionsD.get("modelSourcePrefix")  # e.g., "AF" or "MA"
+            modelSourceDbMap = optionsD.get("modelSourceDbMap")
             destBaseDir = optionsD.get("destBaseDir")  # base path for all computed models (i.e., "computed-models"); Or will be root path at HTTP endpoint
             keepSource = optionsD.get("keepSource", False)  # whether to copy files over (instead of moving them)
             reorganizeDate = optionsD.get("reorganizeDate", False)  # whether to copy files over (instead of moving them)
@@ -78,6 +79,7 @@ class ModelWorker(object):
                 success = False
                 modelFileOut = None
                 modelFileNameIn = self.__fU.getFileName(modelFileIn)
+                modelSourceDb = modelSourceDbMap[modelSourcePrefix]
                 #
                 containerList = self.__mU.doImport(modelFileIn, fmt="mmcif")
                 if len(containerList) > 1:
@@ -120,9 +122,9 @@ class ModelWorker(object):
                 sourceModelUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, sourceModelEntryId)
                 #
                 modelD["modelId"] = internalModelId
-                # modelD["modelPath"] = modelFileOut
                 modelD["modelPath"] = modelPathFromPrefixDir  # Starts at prefix (e.g., "AF/XJ/E6/AF_AFA0A385XJE6F1.cif.gz"); needed like this by RepositoryProvider
                 modelD["sourceId"] = sourceModelEntryId
+                modelD["sourceDb"] = modelSourceDb
                 modelD["sourceModelFileName"] = modelFileNameIn
                 modelD["sourceModelUrl"] = sourceModelUrl
                 modelD["lastModifiedDate"] = lastModifiedDate
@@ -330,12 +332,19 @@ class ModelReorganizer(object):
             logger.info("Creating base destination directory for model file reorganization, %s", destBaseDir)
             self.__fU.mkdir(destBaseDir)
         #
-        modelSourcePrefixD = {"AlphaFold": "AF", "ModBase": "MB", "ModelArchive": "MA", "SwissModel": "SM"}
+        modelSourcePrefixD = {"AlphaFold": "AF", "ModBase": "MB", "ModelArchive": "MA", "SwissModelRepository": "SMR"}
+        modelSourceDbMap = {"AF": "AlphaFoldDB", "MB": "ModBase", "MA": "ModelArchive", "SMR": "SwissModelRepository"}
         modelSourcePrefix = modelSourcePrefixD[modelSource]
         #
         rWorker = ModelWorker(workPath=self.__workPath)
         mpu = MultiProcUtil(verbose=True)
-        optD = {"modelSourcePrefix": modelSourcePrefix, "destBaseDir": destBaseDir, "keepSource": self.__keepSource, "reorganizeDate": tS}
+        optD = {
+            "modelSourcePrefix": modelSourcePrefix,
+            "modelSourceDbMap": modelSourceDbMap,
+            "destBaseDir": destBaseDir,
+            "keepSource": self.__keepSource,
+            "reorganizeDate": tS
+        }
         mpu.setOptions(optD)
         mpu.set(workerObj=rWorker, workerMethod="reorganize")
         mpu.setWorkingDir(workingDir=self.__workPath)
