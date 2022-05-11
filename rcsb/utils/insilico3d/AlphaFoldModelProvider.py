@@ -107,7 +107,6 @@ class AlphaFoldModelProvider:
             self.__fU.mkdir(self.__workPath)
 
             latestDataListDumpPath = os.path.join(self.__workPath, self.__fU.getFileName(alphaFoldLatestDataList))
-            # ok = self.__fU.get(alphaFoldLatestDataList, latestDataListDumpPath)
             ok = self.__ftpU.get(alphaFoldLatestDataList, latestDataListDumpPath)
             lDL = self.__mU.doImport(latestDataListDumpPath, fmt="json")
 
