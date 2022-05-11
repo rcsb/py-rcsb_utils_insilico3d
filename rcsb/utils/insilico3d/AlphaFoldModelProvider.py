@@ -97,7 +97,8 @@ class AlphaFoldModelProvider:
             startDateTime = datetime.datetime.now().isoformat()
             useCache = kwargs.get("useCache", True)
 
-            alphaFoldLatestDataList = "https://ftp.ebi.ac.uk/pub/databases/alphafold/download_metadata.json"
+            # alphaFoldLatestDataList = "https://ftp.ebi.ac.uk/pub/databases/alphafold/download_metadata.json"
+            alphaFoldLatestDataList = "pub/databases/alphafold/download_metadata.json"
             alphaFoldRequestedSpeciesList = kwargs.get("alphaFoldRequestedSpeciesList", [])
             excludeArchiveFileRegexList = ["swissprot_pdb_v[0-9]+.tar"]
             excludeArchiveFileRegexListCombined = "(?:% s)" % "|".join(excludeArchiveFileRegexList)
@@ -106,7 +107,8 @@ class AlphaFoldModelProvider:
             self.__fU.mkdir(self.__workPath)
 
             latestDataListDumpPath = os.path.join(self.__workPath, self.__fU.getFileName(alphaFoldLatestDataList))
-            ok = self.__fU.get(alphaFoldLatestDataList, latestDataListDumpPath)
+            # ok = self.__fU.get(alphaFoldLatestDataList, latestDataListDumpPath)
+            ok = self.__ftpU.get(alphaFoldLatestDataList, latestDataListDumpPath)
             lDL = self.__mU.doImport(latestDataListDumpPath, fmt="json")
 
             # Exclude undesired archives (defined in excludeArchiveFileRegexList)
