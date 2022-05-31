@@ -196,7 +196,7 @@ class ModelReorganizer(object):
         Args:
             cachePath (str): directory path for storing cache file containing a dictionary of all reorganized models.
             useCache (bool): whether to use the existing data cache or re-run entire model reorganization process.
-            cacheFile (str, optional): filename for cache file; default "computed-models-cache.json".
+            cacheFile (str, optional): filename for cache file; default "computed-models-holdings.json.gz".
             cacheFilePath (str, optional): full filepath and name for cache file (will override "cachePath" and "cacheFile" if provided).
             numProc (int, optional): number of processes to use; default 2.
             chunkSize (int, optional): incremental chunk size used for distribute work processes; default 20.
@@ -206,18 +206,59 @@ class ModelReorganizer(object):
 
         try:
             self.__cachePath = cachePath if cachePath else "."
-            self.__cacheFormat = kwargs.get("cacheFormat", "json")
-            # self.__cacheFormat = kwargs.get("cacheFormat", "pickle")
-            cacheExt = "pic" if self.__cacheFormat == "pickle" else "json"
-            self.__cacheFile = kwargs.get("cacheFile", "computed-models-cache." + cacheExt)
-            self.__cacheFilePath = kwargs.get("cacheFilePath", os.path.join(self.__cachePath, self.__cacheFile))
+
             self.__numProc = kwargs.get("numProc", 2)
             self.__chunkSize = kwargs.get("chunkSize", 20)
-            self.__workPath = kwargs.get("workPath", self.__cachePath)
+            self.__workPath = kwargs.get("workPath", os.path.join(self.__cachePath, "work-dir"))
             self.__keepSource = kwargs.get("keepSource", False)
 
             self.__mU = MarshalUtil(workPath=self.__workPath)
             self.__fU = FileUtil(workPath=self.__workPath)
+
+            self.__holdingsPath = os.path.join(self.__cachePath, "holdings")
+            self.__cacheFormat = kwargs.get("cacheFormat", "json")
+            # self.__cacheFormat = kwargs.get("cacheFormat", "pickle")
+            cacheExt = "pic" if self.__cacheFormat == "pickle" else "json"
+            cacheFile = kwargs.get("cacheFile", "computed-models-holdings." + cacheExt + ".gz")
+            cacheFilePath = kwargs.get("cacheFilePath", None)
+            if not cacheFilePath:
+                self.__holdingsPath = os.path.join(self.__cachePath, "holdings")
+                cacheFilePath = os.path.join(self.__holdingsPath, cacheFile)
+            else:
+                self.__holdingsPath = os.path.dirname(self.__fU.getFilePath(cacheFilePath))
+            if cacheFilePath.lower().endswith(".gz"):
+                self.__cacheFilePathGzip = cacheFilePath
+                if self.__fU.exists(cacheFilePath):
+                    ok = self.__fU.uncompress(cacheFilePath, self.__holdingsPath)
+                    if ok:
+                        self.__cacheFile = cacheFile[0:-3]
+                    else:
+                        logger.error("Unable to uncompress cacheFilePath %s", cacheFilePath)
+                        # self.__cacheFile = cacheFile  # if file is already uncompressed but still has ".gz" in the filename
+                        raise ValueError("Error while trying to uncompress computed-models holdings cache file.")
+                else:
+                    self.__cacheFile = cacheFile[0:-3]
+            else:
+                self.__cacheFilePathGzip = cacheFilePath + ".gz"
+                if self.__fU.exists(self.__cacheFilePathGzip) and not self.__fU.exists(cacheFilePath):
+                    ok = self.__fU.uncompress(self.__cacheFilePathGzip, self.__holdingsPath)
+                    logger.info("Uncompressing cacheFilePathGzip %s to holdingsPath %s (status %r)", self.__cacheFilePathGzip, self.__holdingsPath, ok)
+                    if ok:
+                        self.__cacheFile = cacheFile
+                    else:
+                        logger.error("Unable to uncompress cacheFilePathGzip %s", self.__cacheFilePathGzip)
+                        raise ValueError("Error while trying to uncompress computed-models holdings cache file.")
+
+            self.__cacheFilePath = os.path.join(self.__holdingsPath, self.__cacheFile)
+
+            logger.info(
+                "Reorganizing models using cachePath %s, holdingsPath %s, cacheFile %s, cacheFilePath %s, cacheFilePathGzip %s",
+                self.__cachePath,
+                self.__holdingsPath,
+                self.__cacheFile,
+                self.__cacheFilePath,
+                self.__cacheFilePathGzip,
+            )
 
             self.__mD = self.__reload(cacheFilePath=self.__cacheFilePath, useCache=useCache)
 
@@ -292,6 +333,12 @@ class ModelReorganizer(object):
                 self.__mD = copy.deepcopy(mD)
             ok = self.__mU.doExport(self.__cacheFilePath, self.__mD, fmt=self.__cacheFormat, **kwargs)
             logger.info("Wrote %r status %r", self.__cacheFilePath, ok)
+            if ok:
+                ok2 = self.__fU.compress(self.__cacheFilePath, self.__cacheFilePathGzip)
+                logger.info("Compressed %r status %r", self.__cacheFilePathGzip, ok2)
+                if ok2:
+                    ok3 = self.__fU.remove(self.__cacheFilePath)
+                    logger.info("Removing uncompressed holdings cache file %s status %r", self.__cacheFilePath, ok3)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
         return ok

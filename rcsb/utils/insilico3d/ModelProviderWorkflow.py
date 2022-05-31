@@ -115,7 +115,7 @@ class ModelProviderWorkflow:
                 if provider == "AlphaFold":
                     ok = self.__aFMP.reorganizeModelFiles(useCache=self.__useCache, numProc=numProc, chunkSize=chunkSize, keepSource=keepSource)
                 if provider == "ModelArchive":
-                    ok = self.__mAMP.reorganizeModelFiles(useCache=self.__useCache, numProc=4, chunkSize=20, keepSource=keepSource)
+                    ok = self.__mAMP.reorganizeModelFiles(useCache=self.__useCache, numProc=numProc, chunkSize=chunkSize, keepSource=keepSource)
                 if not ok:
                     logger.info("Failed to reorganize models for provider, %s", provider)
                     return False

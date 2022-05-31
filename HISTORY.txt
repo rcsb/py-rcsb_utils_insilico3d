@@ -30,3 +30,4 @@
                        Added lastModifiedDate to computed-model cache file
                        Moved ModBaseModelProvider and ModBaseModelProcessor classes to separate dev branch
   11-May-2022  - V0.25 Resolve download issue in AlphaFoldModelProvider (unpredictable stalling)
+  31-May-2022  - V0.26 Update holdings cache file name and path by ModelReorganizer; update runModelProviderWorkflow protocol
