@@ -215,50 +215,18 @@ class ModelReorganizer(object):
             self.__mU = MarshalUtil(workPath=self.__workPath)
             self.__fU = FileUtil(workPath=self.__workPath)
 
-            self.__holdingsPath = os.path.join(self.__cachePath, "holdings")
             self.__cacheFormat = kwargs.get("cacheFormat", "json")
             # self.__cacheFormat = kwargs.get("cacheFormat", "pickle")
             cacheExt = "pic" if self.__cacheFormat == "pickle" else "json"
             cacheFile = kwargs.get("cacheFile", "computed-models-holdings." + cacheExt + ".gz")
-            cacheFilePath = kwargs.get("cacheFilePath", None)
-            if not cacheFilePath:
-                self.__holdingsPath = os.path.join(self.__cachePath, "holdings")
-                cacheFilePath = os.path.join(self.__holdingsPath, cacheFile)
-            else:
-                self.__holdingsPath = os.path.dirname(self.__fU.getFilePath(cacheFilePath))
-            if cacheFilePath.lower().endswith(".gz"):
-                self.__cacheFilePathGzip = cacheFilePath
-                if self.__fU.exists(cacheFilePath):
-                    ok = self.__fU.uncompress(cacheFilePath, self.__holdingsPath)
-                    if ok:
-                        self.__cacheFile = cacheFile[0:-3]
-                    else:
-                        logger.error("Unable to uncompress cacheFilePath %s", cacheFilePath)
-                        # self.__cacheFile = cacheFile  # if file is already uncompressed but still has ".gz" in the filename
-                        raise ValueError("Error while trying to uncompress computed-models holdings cache file.")
-                else:
-                    self.__cacheFile = cacheFile[0:-3]
-            else:
-                self.__cacheFilePathGzip = cacheFilePath + ".gz"
-                if self.__fU.exists(self.__cacheFilePathGzip) and not self.__fU.exists(cacheFilePath):
-                    ok = self.__fU.uncompress(self.__cacheFilePathGzip, self.__holdingsPath)
-                    logger.info("Uncompressing cacheFilePathGzip %s to holdingsPath %s (status %r)", self.__cacheFilePathGzip, self.__holdingsPath, ok)
-                    if ok:
-                        self.__cacheFile = cacheFile
-                    else:
-                        logger.error("Unable to uncompress cacheFilePathGzip %s", self.__cacheFilePathGzip)
-                        raise ValueError("Error while trying to uncompress computed-models holdings cache file.")
+            cacheFilePath = kwargs.get("cacheFilePath", os.path.join(self.__cachePath, "holdings", cacheFile))
+            if not cacheFilePath.lower().endswith(".gz"):
+                logger.error("Holdings cache file must be gzipped, %s", cacheFilePath)
+                raise ValueError("Error: Holdings cache file must be gzipped.")
+            self.__cacheFilePath = cacheFilePath  # self.__cacheFilePath is full path to gzipped cache file
+            self.__cacheFilePathUnzip = cacheFilePath[0:-3]
 
-            self.__cacheFilePath = os.path.join(self.__holdingsPath, self.__cacheFile)
-
-            logger.info(
-                "Reorganizing models using cachePath %s, holdingsPath %s, cacheFile %s, cacheFilePath %s, cacheFilePathGzip %s",
-                self.__cachePath,
-                self.__holdingsPath,
-                self.__cacheFile,
-                self.__cacheFilePath,
-                self.__cacheFilePathGzip,
-            )
+            logger.info("Reorganizing models using cachePath %s, cacheFilePath %s, cacheFilePathUnzip %s", self.__cachePath, self.__cacheFilePath, self.__cacheFilePathUnzip)
 
             self.__mD = self.__reload(cacheFilePath=self.__cacheFilePath, useCache=useCache)
 
@@ -331,14 +299,14 @@ class ModelReorganizer(object):
                     self.__mD.update({modelId: modelD})
             else:
                 self.__mD = copy.deepcopy(mD)
-            ok = self.__mU.doExport(self.__cacheFilePath, self.__mD, fmt=self.__cacheFormat, **kwargs)
-            logger.info("Wrote %r status %r", self.__cacheFilePath, ok)
+            ok = self.__mU.doExport(self.__cacheFilePathUnzip, self.__mD, fmt=self.__cacheFormat, **kwargs)
+            logger.info("Wrote %r status %r", self.__cacheFilePathUnzip, ok)
             if ok:
-                ok2 = self.__fU.compress(self.__cacheFilePath, self.__cacheFilePathGzip)
-                logger.info("Compressed %r status %r", self.__cacheFilePathGzip, ok2)
+                ok2 = self.__fU.compress(self.__cacheFilePathUnzip, self.__cacheFilePath)
+                logger.info("Compressed %r status %r", self.__cacheFilePath, ok2)
                 if ok2:
-                    ok3 = self.__fU.remove(self.__cacheFilePath)
-                    logger.info("Removing uncompressed holdings cache file %s status %r", self.__cacheFilePath, ok3)
+                    ok3 = self.__fU.remove(self.__cacheFilePathUnzip)
+                    logger.info("Removing uncompressed holdings cache file %s status %r", self.__cacheFilePathUnzip, ok3)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
         return ok

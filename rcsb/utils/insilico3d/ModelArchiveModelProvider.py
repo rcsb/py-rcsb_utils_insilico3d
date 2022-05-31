@@ -131,6 +131,11 @@ class ModelArchiveModelProvider:
                                 logger.warning("Cached archive data for dataset %s not up-to-date with data archive on server: %s. You should Rebuild the cache!", dataSet, pathD)
                             logger.info("Deleting compressed dataset download, %s", dataSetFileDumpPath)
                             self.__fU.remove(dataSetFileDumpPath)
+                        else:
+                            logger.info(
+                                "Cached archive data for dataset %s last downloaded on %s (%d days ago): %s. Skipping redownload of data.",
+                                dataSet, cacheArchiveFileDownloadDate, cacheArchiveFileDownloadAge, pathD
+                            )
                     except Exception as e:
                         logger.info("Failing on checking of cache data for dataSet %s: %s", dataSet, pathD)
                         logger.exception("Failing with %s", str(e))
