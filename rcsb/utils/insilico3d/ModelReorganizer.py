@@ -196,7 +196,7 @@ class ModelReorganizer(object):
         Args:
             cachePath (str): directory path for storing cache file containing a dictionary of all reorganized models.
             useCache (bool): whether to use the existing data cache or re-run entire model reorganization process.
-            cacheFile (str, optional): filename for cache file; default "computed-models-cache.json".
+            cacheFile (str, optional): filename for cache file; default "computed-models-holdings.json.gz".
             cacheFilePath (str, optional): full filepath and name for cache file (will override "cachePath" and "cacheFile" if provided).
             numProc (int, optional): number of processes to use; default 2.
             chunkSize (int, optional): incremental chunk size used for distribute work processes; default 20.
@@ -206,18 +206,27 @@ class ModelReorganizer(object):
 
         try:
             self.__cachePath = cachePath if cachePath else "."
-            self.__cacheFormat = kwargs.get("cacheFormat", "json")
-            # self.__cacheFormat = kwargs.get("cacheFormat", "pickle")
-            cacheExt = "pic" if self.__cacheFormat == "pickle" else "json"
-            self.__cacheFile = kwargs.get("cacheFile", "computed-models-cache." + cacheExt)
-            self.__cacheFilePath = kwargs.get("cacheFilePath", os.path.join(self.__cachePath, self.__cacheFile))
+
             self.__numProc = kwargs.get("numProc", 2)
             self.__chunkSize = kwargs.get("chunkSize", 20)
-            self.__workPath = kwargs.get("workPath", self.__cachePath)
+            self.__workPath = kwargs.get("workPath", os.path.join(self.__cachePath, "work-dir"))
             self.__keepSource = kwargs.get("keepSource", False)
 
             self.__mU = MarshalUtil(workPath=self.__workPath)
             self.__fU = FileUtil(workPath=self.__workPath)
+
+            self.__cacheFormat = kwargs.get("cacheFormat", "json")
+            # self.__cacheFormat = kwargs.get("cacheFormat", "pickle")
+            cacheExt = "pic" if self.__cacheFormat == "pickle" else "json"
+            cacheFile = kwargs.get("cacheFile", "computed-models-holdings." + cacheExt + ".gz")
+            cacheFilePath = kwargs.get("cacheFilePath", os.path.join(self.__cachePath, "holdings", cacheFile))
+            if not cacheFilePath.lower().endswith(".gz"):
+                logger.error("Holdings cache file must be gzipped, %s", cacheFilePath)
+                raise ValueError("Error: Holdings cache file must be gzipped.")
+            self.__cacheFilePath = cacheFilePath  # self.__cacheFilePath is full path to gzipped cache file
+            self.__cacheFilePathUnzip = cacheFilePath[0:-3]
+
+            logger.info("Reorganizing models using cachePath %s, cacheFilePath %s, cacheFilePathUnzip %s", self.__cachePath, self.__cacheFilePath, self.__cacheFilePathUnzip)
 
             self.__mD = self.__reload(cacheFilePath=self.__cacheFilePath, useCache=useCache)
 
@@ -290,8 +299,14 @@ class ModelReorganizer(object):
                     self.__mD.update({modelId: modelD})
             else:
                 self.__mD = copy.deepcopy(mD)
-            ok = self.__mU.doExport(self.__cacheFilePath, self.__mD, fmt=self.__cacheFormat, **kwargs)
-            logger.info("Wrote %r status %r", self.__cacheFilePath, ok)
+            ok = self.__mU.doExport(self.__cacheFilePathUnzip, self.__mD, fmt=self.__cacheFormat, **kwargs)
+            logger.info("Wrote %r status %r", self.__cacheFilePathUnzip, ok)
+            if ok:
+                ok2 = self.__fU.compress(self.__cacheFilePathUnzip, self.__cacheFilePath)
+                logger.info("Compressed %r status %r", self.__cacheFilePath, ok2)
+                if ok2:
+                    ok3 = self.__fU.remove(self.__cacheFilePathUnzip)
+                    logger.info("Removing uncompressed holdings cache file %s status %r", self.__cacheFilePathUnzip, ok3)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
         return ok

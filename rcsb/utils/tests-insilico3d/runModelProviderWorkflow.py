@@ -37,7 +37,10 @@ class ModelProviderWorkflowTests(unittest.TestCase):
     runEntireWorkflowForAllProviderSources = False
 
     def setUp(self):
-        self.__cachePath = "/mnt/vdb1/computed-models/"
+        # self.__cachePath = "/mnt/vdb1/computed-models-B/"
+        self.__cachePath = os.path.join(HERE, "test-output", "computed-models")
+        self.__fetchModelArchive = True
+        self.__fetchAlphaFold = True
         self.__startTime = time.time()
         logger.info("Starting %s at %s", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()))
 
@@ -50,53 +53,93 @@ class ModelProviderWorkflowTests(unittest.TestCase):
 
     @unittest.skipUnless(runEntireWorkflowForAllProviderSources, "Skip running the entire workflow")
     def runModelProviderWorkflow(self):
-        mPWf = ModelProviderWorkflow(
-            destDir=self.__cachePath,
-            modelProviders=["ModelArchive", "AlphaFold"],
-            useCache=True,
-            numProc=6,
-            chunkSize=40,
-            # alphaFoldRequestedSpeciesList=["Swiss-Prot (CIF files)"],  # This sometimes slows down significantly after only a few GBs (out of 36 GB) are downloaded, so may not finish
-            alphaFoldRequestedSpeciesList=[
-                "Arabidopsis thaliana",  # 27,434
-                "Caenorhabditis elegans",  # 19,694
-                "Candida albicans",  # 5,974
-                "Danio rerio",  # 24,664
-                "Dictyostelium discoideum",  # 12,622
-                "Drosophila melanogaster",  # 13,458
-                "Escherichia coli",  # 4,363
-                "Glycine max",  # 55,799
-                "Homo sapiens",  # 23,391
-                "Methanocaldococcus jannaschii",  # 1,773
-                "Mus musculus",  # 21,615
-                "Oryza sativa",  # 43,649
-                "Rattus norvegicus",  # 21,272
-                "Saccharomyces cerevisiae",  # 6,040
-                "Schizosaccharomyces pombe",  # 5,128
-                "Zea mays",  # 39,299
-                "Ajellomyces capsulatus",  # 9,199
-                "Brugia malayi",  # 8,743
-                "Campylobacter jejuni",  # 1,620
-                "Cladophialophora carrionii",  # 11,170
-                "Dracunculus medinensis",  # 10,834
-                "Enterococcus faecium",  # 2,823
-                "Fonsecaea pedrosoi",  # 12,509
-                "Haemophilus influenzae",  # 1,662
-                "Helicobacter pylori",  # 1,538
-            ],
-        )
-        ok = mPWf.download()
-        self.assertTrue(ok)
-        ok = mPWf.reorganize()
-        self.assertTrue(ok)
+        if self.__fetchModelArchive:
+            mPWf = ModelProviderWorkflow(
+                destDir=self.__cachePath,
+                modelProviders=["ModelArchive"],
+                useCache=True,
+                numProc=6,
+                chunkSize=40,
+            )
+            ok = mPWf.download()
+            self.assertTrue(ok)
+            ok = mPWf.reorganize()
+            self.assertTrue(ok)
+
+        alphaFoldSpeciesList = [
+            "Helicobacter pylori",  # 1538,
+            # "Swiss-Prot (CIF files)",  # 542380; This sometimes slows down significantly after only a few GBs (out of 36 GB) are downloaded, so may not finish
+            #
+            # "Arabidopsis thaliana",  # 27434
+            # "Caenorhabditis elegans",  # 19694
+            # "Candida albicans",  # 5974,
+            # "Danio rerio",  # 24664
+            # "Dictyostelium discoideum",  # 12622
+            # "Drosophila melanogaster",  # 13458
+            # "Escherichia coli",  # 4363,
+            # "Glycine max",  # 55799
+            # "Homo sapiens",  # 23391
+            # "Methanocaldococcus jannaschii",  # 1773,
+            # "Mus musculus",  # 21615
+            # "Oryza sativa",  # 43649
+            # "Rattus norvegicus",  # 21272
+            # "Saccharomyces cerevisiae",  # 6040,
+            # "Schizosaccharomyces pombe",  # 5128,
+            # "Zea mays",  # 39299
+            # "Ajellomyces capsulatus",  # 9199,
+            # "Brugia malayi",  # 8743,
+            # "Campylobacter jejuni",  # 1620,
+            # "Cladophialophora carrionii",  # 11170
+            # "Dracunculus medinensis",  # 10834
+            # "Enterococcus faecium",  # 2823,
+            # "Fonsecaea pedrosoi",  # 12509
+            # "Haemophilus influenzae",  # 1662,
+            # "Klebsiella pneumoniae",  # 5727,
+            # "Leishmania infantum",  # 7924,
+            # "Madurella mycetomatis",  # 9561,
+            # "Mycobacterium leprae",  # 1602,
+            # "Mycobacterium tuberculosis",  # 3988,
+            # "Mycobacterium ulcerans",  # 9033,
+            # "Neisseria gonorrhoeae",  # 2106,
+            # "Nocardia brasiliensis",  # 8372,
+            # "Onchocerca volvulus",  # 12047
+            # "Paracoccidioides lutzii",  # 8794,
+            # "Plasmodium falciparum",  # 5187,
+            # "Pseudomonas aeruginosa",  # 5556,
+            # "Salmonella typhimurium",  # 4526,
+            # "Schistosoma mansoni",  # 13865
+            # "Shigella dysenteriae",  # 3893,
+            # "Sporothrix schenckii",  # 8652,
+            # "Staphylococcus aureus",  # 2888,
+            # "Streptococcus pneumoniae",  # 2030,
+            # "Strongyloides stercoralis",  # 12613
+            # "Trichuris trichiura",  # 9564,
+            # "Trypanosoma brucei",  # 8491,
+            # "Trypanosoma cruzi",  # 19036
+            # "Wuchereria bancrofti",  # 12721
+        ]
+        if self.__fetchAlphaFold and len(alphaFoldSpeciesList) > 0:
+            for species in alphaFoldSpeciesList:
+                mPWf = ModelProviderWorkflow(
+                    destDir=self.__cachePath,
+                    modelProviders=["AlphaFold"],
+                    useCache=True,
+                    numProc=6,
+                    chunkSize=40,
+                    alphaFoldRequestedSpeciesList=[species],
+                )
+                ok = mPWf.download()
+                self.assertTrue(ok)
+                ok = mPWf.reorganize()
+                self.assertTrue(ok)
 
 
-def fetchAlphaFoldModels():
+def modelProviderSuite():
     suiteSelect = unittest.TestSuite()
     suiteSelect.addTest(ModelProviderWorkflowTests("runModelProviderWorkflow"))
     return suiteSelect
 
 
 if __name__ == "__main__":
-    mySuite = fetchAlphaFoldModels()
+    mySuite = modelProviderSuite()
     unittest.TextTestRunner(verbosity=2).run(mySuite)
