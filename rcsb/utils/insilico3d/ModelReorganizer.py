@@ -194,7 +194,7 @@ class ModelWorker(object):
     def __addDepositedAssembly(self, dataContainer):
         """Add the deposited coordinates as an additional separate assembly labeled as 'deposited'
         to categories, pdbx_struct_assembly and pdb_struct_assembly_gen.
-        
+
         Method copied from rcsb.utils.dictionary.DictMethodAssemblyHelper.
 
         Args:
