@@ -27,6 +27,7 @@ import copy
 from datetime import datetime
 import pytz
 
+from mmcif.api.DataCategory import DataCategory
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.multiproc.MultiProcUtil import MultiProcUtil
@@ -87,17 +88,22 @@ class ModelWorker(object):
                     logger.error("Skipping - model file %s has more than one container (%d)", modelFileNameIn, len(containerList))
                     continue
                 #
+                dataContainer = containerList[0]
+                #
                 # Create internal model ID using entry.id and strip away all punctuation and make ALL CAPS
-                sourceModelEntryId = containerList[0].getObj("entry").getValue("id", 0)
+                sourceModelEntryId = dataContainer.getObj("entry").getValue("id", 0)
                 modelEntryId = "".join(char for char in sourceModelEntryId if char.isalnum()).upper()
                 internalModelId = modelSourcePrefix + "_" + modelEntryId
                 #
                 # Get the revision date if it exists
-                if containerList[0].exists("pdbx_audit_revision_history"):
-                    lastModifiedDate = containerList[0].getObj("pdbx_audit_revision_history").getValue("revision_date", -1)
+                if dataContainer.exists("pdbx_audit_revision_history"):
+                    lastModifiedDate = dataContainer.getObj("pdbx_audit_revision_history").getValue("revision_date", -1)
                     lastModifiedDate = datetime.strptime(lastModifiedDate, '%Y-%m-%d').replace(microsecond=0).replace(tzinfo=pytz.UTC).isoformat()
                 else:
                     lastModifiedDate = reorganizeDate
+                #
+                # Insert default deposited pdbx_assembly information into CIF
+                dataContainer = self.__addDepositedAssembly(dataContainer=dataContainer)
                 #
                 # Gzip the original file if not already (as the case for ModelArchive model files)
                 if modelFileIn.endswith(".gz"):
@@ -130,10 +136,9 @@ class ModelWorker(object):
                 modelD["lastModifiedDate"] = lastModifiedDate
                 #
                 try:
-                    if keepSource:
-                        self.__fU.put(modelFileInGzip, modelFileOut)  # Copies files (only use for testing)
-                    else:
-                        self.__fU.replace(modelFileInGzip, modelFileOut)  # Moves files (use for production)
+                    self.__mU.doExport(modelFileOut, containerList, fmt="mmcif")
+                    if not keepSource:
+                        self.__mU.remove(modelFileInGzip)  # Remove original file
                         if self.__mU.exists(modelFileIn):   # Remove unzipped file too if it exists
                             self.__mU.remove(modelFileIn)
                     success = True
@@ -185,6 +190,95 @@ class ModelWorker(object):
             logger.exception("Failing with %s", str(e))
 
         return sourceModelUrl
+
+    def __addDepositedAssembly(self, dataContainer):
+        """Add the deposited coordinates as an additional separate assembly labeled as 'deposited'
+        to categories, pdbx_struct_assembly and pdb_struct_assembly_gen.
+        
+        Method copied from rcsb.utils.dictionary.DictMethodAssemblyHelper.
+
+        Args:
+            dataContainer (object): mmcif.api.DataContainer object instance
+
+        Returns:
+            bool: True for success or False otherwise
+
+        """
+        if not dataContainer.exists("pdbx_struct_assembly"):
+            dataContainer.append(
+                DataCategory(
+                    "pdbx_struct_assembly",
+                    attributeNameList=["id", "details", "method_details", "oligomeric_details", "oligomeric_count", "rcsb_details", "rcsb_candidate_assembly"],
+                )
+            )
+        if not dataContainer.exists("pdbx_struct_assembly_gen"):
+            dataContainer.append(DataCategory("pdbx_struct_assembly_gen", attributeNameList=["assembly_id", "oper_expression", "asym_id_list", "ordinal"]))
+
+        if not dataContainer.exists("pdbx_struct_oper_list"):
+            row = [
+                "1",
+                "identity operation",
+                "1_555",
+                "x, y, z",
+                "1.0000000000",
+                "0.0000000000",
+                "0.0000000000",
+                "0.0000000000",
+                "0.0000000000",
+                "1.0000000000",
+                "0.0000000000",
+                "0.0000000000",
+                "0.0000000000",
+                "0.0000000000",
+                "1.0000000000",
+                "0.0000000000",
+            ]
+            atList = [
+                "id",
+                "type",
+                "name",
+                "symmetry_operation",
+                "matrix[1][1]",
+                "matrix[1][2]",
+                "matrix[1][3]",
+                "vector[1]",
+                "matrix[2][1]",
+                "matrix[2][2]",
+                "matrix[2][3]",
+                "vector[2]",
+                "matrix[3][1]",
+                "matrix[3][2]",
+                "matrix[3][3]",
+                "vector[3]",
+            ]
+            dataContainer.append(DataCategory("pdbx_struct_oper_list", attributeNameList=atList, rowList=[row]))
+        #
+        logger.debug("Add deposited assembly for %s", dataContainer.getName())
+        cObj = dataContainer.getObj("struct_asym")
+        asymIdL = cObj.getAttributeValueList("id")
+        logger.debug("AsymIdL %r", asymIdL)
+        #
+        # Ordinal is added by subsequent attribure-level method.
+        tObj = dataContainer.getObj("pdbx_struct_assembly_gen")
+        rowIdx = tObj.getRowCount()
+        tObj.setValue("deposited", "assembly_id", rowIdx)
+        tObj.setValue("1", "oper_expression", rowIdx)
+        tObj.setValue("1", "ordinal", rowIdx)
+        tObj.setValue(",".join(asymIdL), "asym_id_list", rowIdx)
+        #
+        tObj = dataContainer.getObj("pdbx_struct_assembly")
+        rowIdx = tObj.getRowCount()
+        tObj.setValue("deposited", "id", rowIdx)
+        tObj.setValue("deposited_coordinates", "details", rowIdx)
+        tObj.setValue("Y", "rcsb_candidate_assembly", rowIdx)
+        #
+        for atName in ["oligomeric_details", "method_details", "oligomeric_count"]:
+            if tObj.hasAttribute(atName):
+                tObj.setValue("?", atName, rowIdx)
+        #
+        tObj.setValue(str(len(asymIdL)), "oligomeric_count", rowIdx)
+
+        return dataContainer
 
 
 class ModelReorganizer(object):
