@@ -124,6 +124,7 @@ class ModelWorker(object):
                 if not self.__fU.exists(destModelDir):
                     self.__fU.mkdir(destModelDir)
                 modelFileOut = os.path.join(destModelDir, internalModelName)
+                modelFileOutUnzip = modelFileOut.split(".gz")[0]
                 #
                 sourceModelUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, sourceModelEntryId)
                 #
@@ -136,7 +137,9 @@ class ModelWorker(object):
                 modelD["lastModifiedDate"] = lastModifiedDate
                 #
                 try:
-                    self.__mU.doExport(modelFileOut, containerList, fmt="mmcif")
+                    self.__mU.doExport(modelFileOutUnzip, containerList, fmt="mmcif")
+                    self.__fU.compress(modelFileOutUnzip, modelFileOut)
+                    self.__mU.remove(modelFileOutUnzip)
                     if not keepSource:
                         self.__mU.remove(modelFileInGzip)  # Remove original file
                         if self.__mU.exists(modelFileIn):   # Remove unzipped file too if it exists
