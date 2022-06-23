@@ -91,9 +91,13 @@ class ModelWorker(object):
                 dataContainer = containerList[0]
                 #
                 # Create internal model ID using entry.id and strip away all punctuation and make ALL CAPS
-                sourceModelEntryId = dataContainer.getObj("entry").getValue("id", 0)
+                tObj = dataContainer.getObj("entry")
+                sourceModelEntryId = tObj.getValue("id", 0)
                 modelEntryId = "".join(char for char in sourceModelEntryId if char.isalnum()).upper()
                 internalModelId = modelSourcePrefix + "_" + modelEntryId
+                #
+                # Set the entry.id to be the RCSB internal ID
+                tObj.setValue(internalModelId, "id", 0)
                 #
                 # Get the revision date if it exists
                 if dataContainer.exists("pdbx_audit_revision_history"):
