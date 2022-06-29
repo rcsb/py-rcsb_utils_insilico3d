@@ -4,15 +4,16 @@
 # Date:    10-Mar-2022
 #
 # Updates:
+#   28-Jun-2022  dwp Add __rebuildEntryIds() method to replace (or remove) source entry identifiers with internal IDs, to enable operability with RCSB.org tools.
+#                    Note that these modified data files will NOT be publicly served or available, and proper attribution using the source entry IDs will be given.
 #
 # To Do:
 # - pylint: disable=fixme
 # - Add mkdssp calculation
-# - Add check that model files are consistent with mmCIF dictionaries
 ##
 
 """
-Common worker methods for processing and handling computed model files.
+Multiprocessor worker methods for processing and organizing computed model files.
 
 """
 
@@ -91,9 +92,12 @@ class ModelWorker(object):
                 dataContainer = containerList[0]
                 #
                 # Create internal model ID using entry.id and strip away all punctuation and make ALL CAPS
-                sourceModelEntryId = dataContainer.getObj("entry").getValue("id", 0)
+                tObj = dataContainer.getObj("entry")
+                sourceModelEntryId = tObj.getValue("id", 0)
                 modelEntryId = "".join(char for char in sourceModelEntryId if char.isalnum()).upper()
                 internalModelId = modelSourcePrefix + "_" + modelEntryId
+                #
+                dataContainer = self.__rebuildEntryIds(dataContainer=dataContainer, internalModelId=internalModelId)
                 #
                 # Get the revision date if it exists
                 if dataContainer.exists("pdbx_audit_revision_history"):
@@ -194,6 +198,72 @@ class ModelWorker(object):
 
         return sourceModelUrl
 
+    def __rebuildEntryIds(self, dataContainer, internalModelId):
+        """Replace or remove occurrences of source entry ID with internal ID
+
+        Change the entry ID to internal ID for the following items:
+        - Top-level "data_" block name (e.g., data_ma-bak-cepc-1100)
+        - _entry.id
+        - _struct.entry_id
+        - _atom_sites.entry_id
+        - _struct_ref_seq.pdbx_PDB_id_code
+
+        Remove the following categories (or attributes) from the mmCIF completely:
+        - _entry.ma_collection_id
+        - _pdbx_database_status.*
+        - _database_2.*  (entire category loop)
+        - _ma_entry_associated_files.*  (entire category loop)
+
+        Args:
+            dataContainer (object): mmcif.api.DataContainer object instance
+            internalModelId (str): internal entry ID
+
+        Returns:
+            dataContainer: updated dataContainer object
+        """
+        # Replace "data_" block name
+        dataContainer.setName(internalModelId)
+
+        # Replace entry.id
+        tObj = dataContainer.getObj("entry")
+        tObj.setValue(internalModelId, "id", 0)
+
+        # Remove entry.ma_collection_id attribute (if present)
+        if tObj.hasAttribute("ma_collection_id"):
+            tObj.removeAttribute("ma_collection_id")
+
+        # Replace struct.entry_id
+        if dataContainer.exists("struct"):
+            tObj = dataContainer.getObj("struct")
+            if tObj.hasAttribute("entry_id"):
+                tObj.setValue(internalModelId, "entry_id", 0)
+
+        # Replace atom_sites.entry_id
+        if dataContainer.exists("atom_sites"):
+            tObj = dataContainer.getObj("atom_sites")
+            if tObj.hasAttribute("entry_id"):
+                tObj.setValue(internalModelId, "entry_id", 0)
+
+        # Replace struct_ref_seq.pdbx_PDB_id_code
+        if dataContainer.exists("struct_ref_seq"):
+            tObj = dataContainer.getObj("struct_ref_seq")
+            if tObj.hasAttribute("pdbx_PDB_id_code"):
+                tObj.setValue(internalModelId, "pdbx_PDB_id_code", 0)
+
+        # Remove pdbx_database_status.*
+        if dataContainer.exists("pdbx_database_status"):
+            dataContainer.remove("pdbx_database_status")
+
+        # Remove database_2.*  (entire category loop)
+        if dataContainer.exists("database_2"):
+            dataContainer.remove("database_2")
+
+        # Remove ma_entry_associated_files.*  (entire category loop)
+        if dataContainer.exists("ma_entry_associated_files"):
+            dataContainer.remove("ma_entry_associated_files")
+
+        return dataContainer
+
     def __addDepositedAssembly(self, dataContainer):
         """Add the deposited coordinates as an additional separate assembly labeled as 'deposited'
         to categories, pdbx_struct_assembly and pdb_struct_assembly_gen.
@@ -204,7 +274,7 @@ class ModelWorker(object):
             dataContainer (object): mmcif.api.DataContainer object instance
 
         Returns:
-            bool: True for success or False otherwise
+            dataContainer: updated dataContainer object
 
         """
         if not dataContainer.exists("pdbx_struct_assembly"):

@@ -33,3 +33,4 @@
   31-May-2022  - V0.26 Update holdings cache file name and path by ModelReorganizer; update runModelProviderWorkflow protocol
   10-Jun-2022  - V0.27 Update ModelReorganizer to insert deposited assembly info
   10-Jun-2022  - V0.28 Bug fix in ModelReorganizer
+  28-Jun-2022  - V0.29 Update ModelReorganizer to use internal IDs for entry identifiers to support operabilty with internal tools
