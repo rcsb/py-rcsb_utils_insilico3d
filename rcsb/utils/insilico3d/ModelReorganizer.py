@@ -143,7 +143,8 @@ class ModelWorker(object):
                 modelD["sourceId"] = sourceModelEntryId
                 modelD["sourceDb"] = modelSourceDb
                 modelD["sourceModelFileName"] = modelFileNameIn
-                modelD["sourceModelUrl"] = sourceModelUrl
+                if sourceModelUrl:
+                    modelD["sourceModelUrl"] = sourceModelUrl
                 modelD["lastModifiedDate"] = lastModifiedDate
                 #
                 try:
@@ -187,6 +188,8 @@ class ModelWorker(object):
         sourceModelUrl = None
         try:
             if modelSourcePrefix == "AF":
+                if not sourceModelEntryId.upper().endswith("F1"):
+                    return None
                 modelFileNameInUrl = sourceModelFileName.split(".gz")[0]
                 sourceModelUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelFileNameInUrl)
             elif modelSourcePrefix == "MB":
@@ -216,7 +219,6 @@ class ModelWorker(object):
 
         Remove the following categories (or attributes) from the mmCIF completely:
         - _entry.ma_collection_id
-        - _pdbx_database_status.*
         - _database_2.*  (entire category loop)  - will repopulate afterwards
         - _ma_entry_associated_files.*  (entire category loop)
 
@@ -261,9 +263,9 @@ class ModelWorker(object):
             if tObj.hasAttribute("pdbx_PDB_id_code"):
                 tObj.setValue(internalModelId, "pdbx_PDB_id_code", 0)
 
-        # Remove pdbx_database_status.*
-        if dataContainer.exists("pdbx_database_status"):
-            dataContainer.remove("pdbx_database_status")
+        # # Remove pdbx_database_status.*
+        # if dataContainer.exists("pdbx_database_status"):
+        #     dataContainer.remove("pdbx_database_status")
 
         # Remove database_2.*  (entire category loop)
         if dataContainer.exists("database_2"):
