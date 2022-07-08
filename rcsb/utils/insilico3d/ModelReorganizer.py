@@ -216,6 +216,7 @@ class ModelWorker(object):
         - _struct.entry_id
         - _atom_sites.entry_id
         - _struct_ref_seq.pdbx_PDB_id_code
+        - _pdbx_database_status.entry_id
 
         Remove the following categories (or attributes) from the mmCIF completely:
         - _entry.ma_collection_id
@@ -263,9 +264,12 @@ class ModelWorker(object):
             if tObj.hasAttribute("pdbx_PDB_id_code"):
                 tObj.setValue(internalModelId, "pdbx_PDB_id_code", 0)
 
-        # # Remove pdbx_database_status.*
-        # if dataContainer.exists("pdbx_database_status"):
-        #     dataContainer.remove("pdbx_database_status")
+        # If pdbx_database_status.* exisits, replace the source ID with internal ID, to match entry.id (parent-child relationship)
+        if dataContainer.exists("pdbx_database_status"):
+            tObj = dataContainer.getObj("pdbx_database_status")
+            if tObj.hasAttribute("entry_id"):
+                if tObj.getValue("entry_id", 0) == sourceModelEntryId:
+                    tObj.setValue(internalModelId, "entry_id", 0)
 
         # Remove database_2.*  (entire category loop)
         if dataContainer.exists("database_2"):
