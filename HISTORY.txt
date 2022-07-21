@@ -35,3 +35,4 @@
   10-Jun-2022  - V0.28 Bug fix in ModelReorganizer
   28-Jun-2022  - V0.29 Update ModelReorganizer to use internal IDs for entry identifiers to support operabilty with internal tools
   29-Jun-2022  - V0.30 Add both source and internal IDs to database_2 category in internal mmCIF file to maintain a reference and mapping to the source DB
+  21-Jul-2022  - V0.31 Update ModelCacheProvider to allow for smaller number of test cases
