@@ -6,6 +6,7 @@
 # Updates:
 #   28-Jun-2022  dwp Add __rebuildEntryIds() method to replace (or remove) source entry identifiers with internal IDs, to enable operability with RCSB.org tools.
 #                    Note that these modified data files will NOT be publicly served or available, and proper attribution using the source entry IDs will be given.
+#   29-Jun-2022  dwp Add both source and internal IDs to database_2 category in internal mmCIF file to maintain a reference and mapping to the source DB
 #
 # To Do:
 # - pylint: disable=fixme
@@ -97,7 +98,12 @@ class ModelWorker(object):
                 modelEntryId = "".join(char for char in sourceModelEntryId if char.isalnum()).upper()
                 internalModelId = modelSourcePrefix + "_" + modelEntryId
                 #
-                dataContainer = self.__rebuildEntryIds(dataContainer=dataContainer, internalModelId=internalModelId)
+                dataContainer = self.__rebuildEntryIds(
+                    dataContainer=dataContainer,
+                    sourceModelEntryId=sourceModelEntryId,
+                    sourceModelDb=modelSourceDb,
+                    internalModelId=internalModelId
+                )
                 #
                 # Get the revision date if it exists
                 if dataContainer.exists("pdbx_audit_revision_history"):
@@ -137,7 +143,8 @@ class ModelWorker(object):
                 modelD["sourceId"] = sourceModelEntryId
                 modelD["sourceDb"] = modelSourceDb
                 modelD["sourceModelFileName"] = modelFileNameIn
-                modelD["sourceModelUrl"] = sourceModelUrl
+                if sourceModelUrl:
+                    modelD["sourceModelUrl"] = sourceModelUrl
                 modelD["lastModifiedDate"] = lastModifiedDate
                 #
                 try:
@@ -181,6 +188,8 @@ class ModelWorker(object):
         sourceModelUrl = None
         try:
             if modelSourcePrefix == "AF":
+                if not sourceModelEntryId.upper().endswith("F1"):
+                    return None
                 modelFileNameInUrl = sourceModelFileName.split(".gz")[0]
                 sourceModelUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelFileNameInUrl)
             elif modelSourcePrefix == "MB":
@@ -198,7 +207,7 @@ class ModelWorker(object):
 
         return sourceModelUrl
 
-    def __rebuildEntryIds(self, dataContainer, internalModelId):
+    def __rebuildEntryIds(self, dataContainer, sourceModelEntryId, sourceModelDb, internalModelId):
         """Replace or remove occurrences of source entry ID with internal ID
 
         Change the entry ID to internal ID for the following items:
@@ -207,15 +216,20 @@ class ModelWorker(object):
         - _struct.entry_id
         - _atom_sites.entry_id
         - _struct_ref_seq.pdbx_PDB_id_code
+        - _pdbx_database_status.entry_id
 
         Remove the following categories (or attributes) from the mmCIF completely:
         - _entry.ma_collection_id
-        - _pdbx_database_status.*
-        - _database_2.*  (entire category loop)
+        - _database_2.*  (entire category loop)  - will repopulate afterwards
         - _ma_entry_associated_files.*  (entire category loop)
+
+        And ADD the following:
+        - _database_2.*  - add references to both sourceDB ID and internal RCSB ID
 
         Args:
             dataContainer (object): mmcif.api.DataContainer object instance
+            sourceModelEntryId (str): source entry ID
+            sourceModelDb (str): source DB of model (must adhere to database_2.database_id enumerations)
             internalModelId (str): internal entry ID
 
         Returns:
@@ -250,9 +264,12 @@ class ModelWorker(object):
             if tObj.hasAttribute("pdbx_PDB_id_code"):
                 tObj.setValue(internalModelId, "pdbx_PDB_id_code", 0)
 
-        # Remove pdbx_database_status.*
+        # If pdbx_database_status.* exisits, replace the source ID with internal ID, to match entry.id (parent-child relationship)
         if dataContainer.exists("pdbx_database_status"):
-            dataContainer.remove("pdbx_database_status")
+            tObj = dataContainer.getObj("pdbx_database_status")
+            if tObj.hasAttribute("entry_id"):
+                if tObj.getValue("entry_id", 0) == sourceModelEntryId:
+                    tObj.setValue(internalModelId, "entry_id", 0)
 
         # Remove database_2.*  (entire category loop)
         if dataContainer.exists("database_2"):
@@ -261,6 +278,12 @@ class ModelWorker(object):
         # Remove ma_entry_associated_files.*  (entire category loop)
         if dataContainer.exists("ma_entry_associated_files"):
             dataContainer.remove("ma_entry_associated_files")
+
+        # RE-ADD database_2.* with corrected references to both sourceDB ID and internal RCSB ID
+        # (Note that the category will still be masked and NOT be loaded into ExDB, just saved to internal file - as of 29-Jun-2022 dwp)
+        dataContainer.append(
+            DataCategory("database_2", attributeNameList=["database_code", "database_id"], rowList=[[sourceModelEntryId, sourceModelDb], [internalModelId, "RCSB"]])
+        )
 
         return dataContainer
 
@@ -515,7 +538,8 @@ class ModelReorganizer(object):
             self.__fU.mkdir(destBaseDir)
         #
         modelSourcePrefixD = {"AlphaFold": "AF", "ModBase": "MB", "ModelArchive": "MA", "SwissModelRepository": "SMR"}
-        modelSourceDbMap = {"AF": "AlphaFoldDB", "MB": "ModBase", "MA": "ModelArchive", "SMR": "SwissModelRepository"}
+        modelSourceDbMap = {"AF": "AlphaFoldDB", "MB": "MODBASE", "MA": "ModelArchive", "SMR": "SWISS-MODEL_REPOSITORY"}
+        # Database name values correspond to _database_2.database_id enumerations (https://mmcif.wwpdb.org/dictionaries/mmcif_pdbx_v50.dic/Items/_database_2.database_id.html)
         modelSourcePrefix = modelSourcePrefixD[modelSource]
         #
         rWorker = ModelWorker(workPath=self.__workPath)

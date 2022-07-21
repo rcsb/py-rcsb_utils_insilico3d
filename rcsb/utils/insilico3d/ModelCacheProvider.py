@@ -8,6 +8,7 @@
 # To Do:
 #   - Need to make this able to retrieve from git stash or build locker (to get most recent set of models),
 #     so that both coasts use the exact same set of data and cache (including populated timestamps)
+# 21-Jul-2022  bv Allow for smaller number of test cases
 ##
 
 """
@@ -91,7 +92,7 @@ class ModelCacheProvider(StashableBase):
 
         return mD, idMapD
 
-    def testCache(self, minCount=10):
+    def testCache(self, minCount=1):
         logger.info("computed-model cache count %d", len(self.__mD))
         if self.__mD and len(self.__mD) > minCount:
             return True
