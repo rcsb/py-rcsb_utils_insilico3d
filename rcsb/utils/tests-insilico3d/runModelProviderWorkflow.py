@@ -37,8 +37,15 @@ class ModelProviderWorkflowTests(unittest.TestCase):
     runEntireWorkflowForAllProviderSources = False
 
     def setUp(self):
-        # self.__cachePath = "/mnt/vdb1/computed-models-B/"
-        self.__cachePath = os.path.join(HERE, "test-output", "computed-models")
+        # This is where the models will be downloaded to and stored, prior to processing and reorganization
+        # should stay the same regardless of where you want to reorganize the processed models
+        self.__workPath = "/mnt/vdb1/source-models"
+
+        # This is where the models will be reorganized into after processing
+        self.__cachePath = "/mnt/vdb1/computed-models/CSM1"
+        # self.__cachePath = os.path.join(HERE, "test-output", "computed-models")
+
+        self.__keepSource = True
         self.__fetchModelArchive = True
         self.__fetchAlphaFold = True
         self.__startTime = time.time()
@@ -55,21 +62,21 @@ class ModelProviderWorkflowTests(unittest.TestCase):
     def runModelProviderWorkflow(self):
         if self.__fetchModelArchive:
             mPWf = ModelProviderWorkflow(
+                srcDir=self.__workPath,
                 destDir=self.__cachePath,
                 modelProviders=["ModelArchive"],
                 useCache=True,
                 numProc=6,
-                chunkSize=40,
+                chunkSize=100,
             )
             ok = mPWf.download()
             self.assertTrue(ok)
-            ok = mPWf.reorganize()
+            ok = mPWf.reorganize(keepSource=self.__keepSource)
             self.assertTrue(ok)
 
         alphaFoldSpeciesList = [
             "Helicobacter pylori",  # 1538,
-            # "Swiss-Prot (CIF files)",  # 542380; This sometimes slows down significantly after only a few GBs (out of 36 GB) are downloaded, so may not finish
-            #
+            # "Staphylococcus aureus",  # 2888,
             # "Arabidopsis thaliana",  # 27434
             # "Caenorhabditis elegans",  # 19694
             # "Candida albicans",  # 5974,
@@ -110,27 +117,28 @@ class ModelProviderWorkflowTests(unittest.TestCase):
             # "Schistosoma mansoni",  # 13865
             # "Shigella dysenteriae",  # 3893,
             # "Sporothrix schenckii",  # 8652,
-            # "Staphylococcus aureus",  # 2888,
             # "Streptococcus pneumoniae",  # 2030,
             # "Strongyloides stercoralis",  # 12613
             # "Trichuris trichiura",  # 9564,
             # "Trypanosoma brucei",  # 8491,
             # "Trypanosoma cruzi",  # 19036
             # "Wuchereria bancrofti",  # 12721
+            # "Swiss-Prot (CIF files)",  # 542380; This sometimes slows down significantly after only a few GBs (out of 36 GB) are downloaded, so may not finish
         ]
         if self.__fetchAlphaFold and len(alphaFoldSpeciesList) > 0:
             for species in alphaFoldSpeciesList:
                 mPWf = ModelProviderWorkflow(
+                    srcDir=self.__workPath,
                     destDir=self.__cachePath,
                     modelProviders=["AlphaFold"],
                     useCache=True,
                     numProc=6,
-                    chunkSize=40,
+                    chunkSize=50,
                     alphaFoldRequestedSpeciesList=[species],
                 )
                 ok = mPWf.download()
                 self.assertTrue(ok)
-                ok = mPWf.reorganize()
+                ok = mPWf.reorganize(keepSource=self.__keepSource)
                 self.assertTrue(ok)
 
 
