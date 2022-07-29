@@ -30,17 +30,18 @@ logger = logging.getLogger(__name__)
 class ModelProviderWorkflow:
     """Provider workflow class for retrieving and storing/reorganizing computed-model files from various sources."""
 
-    def __init__(self, destDir, modelProviders=None, useCache=True, numProc=4, chunkSize=40, **kwargs):
+    def __init__(self, srcDir, destDir, modelProviders=None, useCache=True, numProc=4, chunkSize=40, **kwargs):
         """Initialize Model Provider Workflow instance.
 
         Args:
+            srcDir (str): Directory path to which to download model files
             destDir (str): Path to directory where model files will be reorganized and stored permanently (also contains computed-model-cache.json file)
                            (i.e., path to 'computed-models'volume path). Note that this parameter corresponds to the "cachePath" parameter in the provider-specific classes.
             useCache (bool, optional): Start from cache of already downloaded and/or reorganized model files. Defaults to True.
                                        When True (default), checks if last downloaded set of files is up-to-date and downloads any newly available models.
                                        When False, redownloads all model files.
         """
-
+        self.__srcDir = srcDir
         self.__destDir = destDir
         self.__useCache = useCache
         self.__numProc = numProc
@@ -53,6 +54,7 @@ class ModelProviderWorkflow:
         if "AlphaFold" in self.__modelProviders:
             self.__aFMP = AlphaFoldModelProvider(
                 cachePath=self.__destDir,
+                baseWorkPath=self.__srcDir,
                 useCache=self.__useCache,
                 reload=False,
                 alphaFoldRequestedSpeciesList=self.__alphaFoldRequestedSpeciesList,
@@ -61,6 +63,7 @@ class ModelProviderWorkflow:
         if "ModelArchive" in self.__modelProviders:
             self.__mAMP = ModelArchiveModelProvider(
                 cachePath=self.__destDir,
+                baseWorkPath=self.__srcDir,
                 useCache=self.__useCache,
                 reload=False,
                 modelArchiveRequestedDatasetD=self.__modelArchiveRequestedDatasetD

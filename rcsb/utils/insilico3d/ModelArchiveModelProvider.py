@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 class ModelArchiveModelProvider:
     """Accessors for ModelArchive 3D in silico models (mmCIF)."""
 
-    def __init__(self, cachePath, useCache=False, reload=True, **kwargs):
+    def __init__(self, cachePath, baseWorkPath=None, useCache=False, reload=True, **kwargs):
         """Initialize AlphaFoldModelProvider class.
 
         Args:
@@ -47,7 +47,8 @@ class ModelArchiveModelProvider:
         """
         # Use the same root cachePath for all types of insilico3D model sources, but with unique dirPath names (sub-directory)
         self.__cachePath = cachePath  # Cache path is where all model files will eventually be reorganized and stored in (i.e. "computed-models")
-        self.__workPath = os.path.join(self.__cachePath, "work-dir", "ModelArchive")  # Directory where model files will be downloaded (also contains MA-specific cache file)
+        self.__baseWorkPath = baseWorkPath if baseWorkPath else self.__cachePath
+        self.__workPath = os.path.join(self.__baseWorkPath, "work-dir", "ModelArchive")  # Directory where model files will be downloaded (also contains MA-specific cache file)
         self.__dataSetCacheFile = os.path.join(self.__workPath, "model-download-cache.json")
 
         self.__mU = MarshalUtil(workPath=self.__workPath)
@@ -230,9 +231,10 @@ class ModelArchiveModelProvider:
     def getArchiveDataCacheFilePath(self):
         return self.__dataSetCacheFile
 
-    def getModelReorganizer(self, cachePath=None, useCache=True, **kwargs):
+    def getModelReorganizer(self, cachePath=None, useCache=True, workPath=None, **kwargs):
         cachePath = cachePath if cachePath else self.__cachePath
-        return ModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
+        workPath = workPath if workPath else self.__workPath
+        return ModelReorganizer(cachePath=cachePath, useCache=useCache, workPath=workPath, **kwargs)
 
     def getComputedModelsDataPath(self):
         return self.__cachePath

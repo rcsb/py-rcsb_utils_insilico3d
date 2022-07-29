@@ -49,6 +49,7 @@ class ModelProviderWorkflowTests(unittest.TestCase):
 
     def testModelProviderWorkflow(self):
         mPWf = ModelProviderWorkflow(
+            srcDir=self.__cachePath,
             destDir=self.__cachePath,
             modelProviders=["AlphaFold"],
             useCache=True,

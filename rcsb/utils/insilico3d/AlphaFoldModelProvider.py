@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 class AlphaFoldModelProvider:
     """Accessors for AlphaFold models (mmCIF)."""
 
-    def __init__(self, cachePath, useCache=False, reload=True, **kwargs):
+    def __init__(self, cachePath, baseWorkPath=None, useCache=False, reload=True, **kwargs):
         """Initialize AlphaFoldModelProvider class.
 
         Args:
@@ -57,7 +57,8 @@ class AlphaFoldModelProvider:
         """
         # Use the same root cachePath for all types of insilico3D model sources, but with unique workPath names (sub-directory)
         self.__cachePath = cachePath  # Directory where model files will be reorganized and stored permanently (also contains computed-model-cache.json file) (i.e., 'computed-models')
-        self.__workPath = os.path.join(self.__cachePath, "work-dir", "AlphaFold")  # Directory where model files will be downloaded (also contains AF-specific cache file)
+        self.__baseWorkPath = baseWorkPath if baseWorkPath else self.__cachePath
+        self.__workPath = os.path.join(self.__baseWorkPath, "work-dir", "AlphaFold")  # Directory where model files will be downloaded (also contains AF-specific cache file)
         self.__speciesDataCacheFile = os.path.join(self.__workPath, "model-download-cache.json")
 
         self.__ftpHost = kwargs.get("ftpHost", "ftp.ebi.ac.uk")
@@ -254,9 +255,10 @@ class AlphaFoldModelProvider:
     def getSpeciesDataCacheFilePath(self):
         return self.__speciesDataCacheFile
 
-    def getModelReorganizer(self, cachePath=None, useCache=True, **kwargs):
+    def getModelReorganizer(self, cachePath=None, useCache=True, workPath=None, **kwargs):
         cachePath = cachePath if cachePath else self.__cachePath
-        return ModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
+        workPath = workPath if workPath else self.__workPath
+        return ModelReorganizer(cachePath=cachePath, useCache=useCache, workPath=workPath, **kwargs)
 
     def getComputedModelsDataPath(self):
         return self.__cachePath
