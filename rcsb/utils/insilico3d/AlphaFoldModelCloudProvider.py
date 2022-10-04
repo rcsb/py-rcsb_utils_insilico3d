@@ -30,8 +30,6 @@ from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FtpUtil import FtpUtil
 from rcsb.utils.insilico3d.ModelReorganizer import ModelReorganizer
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = '/Users/dennis/Downloads/lucky-eon-357716-513cecc984bb.json'
-
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
 logger = logging.getLogger(__name__)
 
@@ -55,14 +53,11 @@ class AlphaFoldModelCloudProvider:
         self.__baseWorkPath = baseWorkPath if baseWorkPath else self.__cachePath
         self.__workPath = os.path.join(self.__baseWorkPath, "work-dir", "AlphaFoldCloud")  # Directory where model files will be downloaded (also contains AF-specific cache file)
         self.__speciesDataCacheFile = os.path.join(self.__workPath, "model-download-cache.json")
-        self.__bucketName = "public-datasets-deepmind-alphafold"
 
-        # self.__ftpHost = kwargs.get("ftpHost", "ftp.ebi.ac.uk")
-        # self.__ftpDataPath = kwargs.get("ftpDataPath", "/pub/databases/alphafold/")
+        self.__bucketName = "public-datasets-deepmind-alphafold"
 
         self.__mU = MarshalUtil(workPath=self.__workPath)
         self.__fU = FileUtil(workPath=self.__workPath)
-        # self.__ftpU = FtpUtil(workPath=self.__workPath)
 
         if reload:
             self.__oD, self.__createdDate = self.__reload(useCache=useCache, **kwargs)
@@ -95,23 +90,12 @@ class AlphaFoldModelCloudProvider:
             useCache = kwargs.get("useCache", True)
 
             alphaFoldRequestedSpeciesList = kwargs.get("alphaFoldRequestedSpeciesList", [])
-            # excludeArchiveFileRegexList = ["swissprot_pdb_v[0-9]+.tar"]
-            # excludeArchiveFileRegexListCombined = "(?:% s)" % "|".join(excludeArchiveFileRegexList)
-
-            self.__fU.mkdir(self.__workPath)
-
-            # latestDataListDumpPath = os.path.join(self.__workPath, self.__fU.getFileName(alphaFoldLatestDataList))
-            # ok = self.__ftpU.get(alphaFoldLatestDataList, latestDataListDumpPath)
-            # lDL = self.__mU.doImport(latestDataListDumpPath, fmt="json")
-
-            # Exclude undesired archives (defined in excludeArchiveFileRegexList)
-            # lDL = [s for s in lDL if not re.match(excludeArchiveFileRegexListCombined, s["archive_name"])]
-
-            # If a specific list of species files wasn't requested, set default
             if not alphaFoldRequestedSpeciesList:
                 alphaFoldRequestedSpeciesList = [
-                    {"species": "Switchgrass", "taxIds": ["38727", "206033"]}
+                    {"species": "Panicum virgatum", "common_name": "Switchgrass", "taxIds": ["38727", "206033"]}
                 ]
+
+            self.__fU.mkdir(self.__workPath)
 
             logger.info("useCache %r self.__speciesDataCacheFile %r", useCache, self.__speciesDataCacheFile)
             if useCache and self.__mU.exists(self.__speciesDataCacheFile):
@@ -204,8 +188,11 @@ class AlphaFoldModelCloudProvider:
                         pdbDumpFile.unlink()
 
                     if ok:
-                        cacheD["data"].update({speciesName: sD})
                         self.__fU.remove(archiveFileDumpPath)
+
+                        numFiles = len(os.listdir(speciesDataDumpDir))
+                        sD.update({"num_predicted_structures": numFiles})
+                        cacheD["data"].update({speciesName: sD})
 
         except Exception as e:
             logger.exception("Failing on fetching and expansion of file %s from FTP server, with message:\n%s", archiveD["archive_name"], str(e))

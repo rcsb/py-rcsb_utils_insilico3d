@@ -57,7 +57,7 @@ class AlphaFoldModelCloudProviderTests(unittest.TestCase):
                 useCache=False,
                 numProc=4,
                 chunkSize=20,
-                alphaFoldRequestedSpeciesList=[{"species": "Switchgrass", "taxIds": ["206033"]}]
+                alphaFoldRequestedSpeciesList=[{"species": "Panicum virgatum", "common_name": "Switchgrass", "taxIds": ["206033"]}]
             )
             ok = aFMP.testCache()
             self.assertTrue(ok)
@@ -68,7 +68,7 @@ class AlphaFoldModelCloudProviderTests(unittest.TestCase):
         #     useCache=True,
         #     numProc=4,
         #     chunkSize=20,
-        #     # alphaFoldRequestedSpeciesList=[{"species": "Switchgrass", "taxIds": ["206033"]}]
+        #     # alphaFoldRequestedSpeciesList=[{"species": "Panicum virgatum", "common_name": "Switchgrass", "taxIds": ["206033"]}]
         # )
         # speciesDirList = aFMP.getArchiveDirList()
         # ok = True if len(speciesDirList) > 0 else False
