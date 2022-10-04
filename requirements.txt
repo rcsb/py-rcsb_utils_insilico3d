@@ -2,3 +2,5 @@ rcsb.utils.io >= 1.16
 rcsb.utils.multiproc >= 0.18
 ihm >= 0.25
 modelcif >= 0.3
+gsutil >= 5.14
+google-cloud-storage >= 2.5.0
