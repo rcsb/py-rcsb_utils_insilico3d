@@ -48,7 +48,7 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
     def testModelArchiveModelProvider(self):
-        redownloadBulkData = True
+        redownloadBulkData = False
         #
         # First test fetching model archive
         if redownloadBulkData:
@@ -81,16 +81,16 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
         self.assertTrue(ok)
         #
         # Next test reorganizing model file directory structure
-        ok = mAMP.reorganizeModelFiles(useCache=False, inputModelList=archiveModelFileList[0:10], numProc=4, chunkSize=20, keepSource=True)
+        ok = mAMP.reorganizeModelFiles(useCache=False, inputModelList=archiveModelFileList[0:10], numProc=4, chunkSize=20, keepSource=True, archiveReleaseDate="2021-11-11", archiveLastModifiedDate="2021-11-11")
         self.assertTrue(ok)
         # Now test using the reorganizer object directly
         mAMR = mAMP.getModelReorganizer(useCache=False, numProc=4, chunkSize=20, keepSource=True)
         destBaseDir = mAMP.getComputedModelsDataPath()
-        ok = mAMR.reorganize(inputModelList=archiveModelFileList[10:20], modelSource="ModelArchive", destBaseDir=destBaseDir, useCache=False)
+        ok = mAMR.reorganize(inputModelList=archiveModelFileList[10:20], modelSource="ModelArchive", destBaseDir=destBaseDir, useCache=False, sourceReleaseDate="2021-11-11", sourceModifiedDate="2021-11-11")
         self.assertTrue(ok)
         ok = mAMR.testCache()
         self.assertFalse(ok)  # Confirm that testCache FAILED (< 20 in cache)
-        ok = mAMR.reorganize(inputModelList=archiveModelFileList[20:30], modelSource="ModelArchive", destBaseDir=destBaseDir, useCache=True)
+        ok = mAMR.reorganize(inputModelList=archiveModelFileList[20:30], modelSource="ModelArchive", destBaseDir=destBaseDir, useCache=True, sourceReleaseDate="2021-11-11", sourceModifiedDate="2021-11-11")
         self.assertTrue(ok)
         ok = mAMR.testCache()
         self.assertTrue(ok)  # Confirm that testCache SUCCEEDED (>= 20 in cache)

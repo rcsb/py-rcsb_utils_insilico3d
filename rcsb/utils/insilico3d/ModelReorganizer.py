@@ -75,7 +75,9 @@ class ModelWorker(object):
             modelSourceDbMap = optionsD.get("modelSourceDbMap")
             destBaseDir = optionsD.get("destBaseDir")  # base path for all computed models (i.e., "computed-models"); Or will be root path at HTTP endpoint
             keepSource = optionsD.get("keepSource", False)  # whether to copy files over (instead of moving them)
-            reorganizeDate = optionsD.get("reorganizeDate", False)  # whether to copy files over (instead of moving them)
+            reorganizeDate = optionsD.get("reorganizeDate", None)  # reorganization date
+            sourceReleaseDate = optionsD.get("sourceReleaseDate", None)  # externally obtained revision date (from outside of CIF file); as is the case for ModelArchive models
+            sourceModifiedDate = optionsD.get("sourceModifiedDate", None)  # externally obtained modified date (from outside of CIF file); as is the case for ModelArchive models
             #
             for modelFileIn in dataList:
                 modelD = {}
@@ -97,6 +99,16 @@ class ModelWorker(object):
                 sourceModelEntryId = tObj.getValue("id", 0)
                 modelEntryId = "".join(char for char in sourceModelEntryId if char.isalnum()).upper()
                 internalModelId = modelSourcePrefix + "_" + modelEntryId
+                #
+                if sourceReleaseDate:
+                    dataContainer = self.__rebuildDateDetails(
+                        dataContainer=dataContainer,
+                        sourceModelEntryId=sourceModelEntryId,
+                        sourceModelDb=modelSourceDb,
+                        internalModelId=internalModelId,
+                        sourceReleaseDate=sourceReleaseDate,
+                        sourceModifiedDate=sourceModifiedDate,
+                    )
                 #
                 dataContainer = self.__rebuildEntryIds(
                     dataContainer=dataContainer,
@@ -287,6 +299,60 @@ class ModelWorker(object):
 
         return dataContainer
 
+    def __rebuildDateDetails(self, dataContainer, sourceModelEntryId, sourceModelDb, internalModelId, sourceReleaseDate, sourceModifiedDate):
+        """Add or rebuild release and revision date details for the dataContainer.
+
+        Mainly for ModelArchive models which currently lack this information in the mmCIF file (as of 19-Oct-2022 dwp).
+
+        Args:
+            dataContainer (object): mmcif.api.DataContainer object instance
+            sourceModelEntryId (str): source entry ID
+            sourceModelDb (str): source DB of model (must adhere to database_2.database_id enumerations)
+            internalModelId (str): internal entry ID
+            sourceReleaseDate (str): release date for dataContainer, obtained from source model website (e.g., '2022-09-28')
+            sourceModifiedDate (str): last-modified date for dataContainer, obtained from source model website (e.g., '2022-09-28T17:22:53.310750Z')
+
+        Returns:
+            dataContainer: updated dataContainer object
+        """
+        # If pdbx_database_status.* doesn't exist, create it and add release date
+        if not dataContainer.exists("pdbx_database_status"):
+            dataContainer.append(
+                DataCategory(
+                    "pdbx_database_status",
+                    attributeNameList=["entry_id", "recvd_initial_deposition_date", "status_code"],
+                    rowList=[[sourceModelEntryId, sourceReleaseDate, "REL"]]
+                )
+            )
+        
+        minorRevision = "0"
+        revisionHistoryOrdinal = None
+
+        # If _pdbx_audit_revision_history.* doesn't exist, create it and add modified date
+        if not dataContainer.exists("pdbx_audit_revision_history"):
+            if sourceModifiedDate[0:10] != sourceReleaseDate[0:10]:
+                minorRevision = "1"
+            revisionHistoryOrdinal = "1"
+            dataContainer.append(
+                DataCategory(
+                    "pdbx_audit_revision_history",
+                    attributeNameList=["data_content_type", "major_revision", "minor_revision", "ordinal", "revision_date"],
+                    rowList=[["Structure model", "0", minorRevision, revisionHistoryOrdinal, sourceModifiedDate[0:10]]]
+                )
+            )
+
+        # If _pdbx_audit_revision_details.* doesn't exist, create it only if _history was created above
+        if not dataContainer.exists("pdbx_audit_revision_details") and revisionHistoryOrdinal:
+            dataContainer.append(
+                DataCategory(
+                    "pdbx_audit_revision_details",
+                    attributeNameList=["data_content_type", "ordinal", "revision_ordinal"],
+                    rowList=[["Structure model", revisionHistoryOrdinal, revisionHistoryOrdinal]]
+                )
+            )
+
+        return dataContainer
+
     def __addDepositedAssembly(self, dataContainer):
         """Add the deposited coordinates as an additional separate assembly labeled as 'deposited'
         to categories, pdbx_struct_assembly and pdb_struct_assembly_gen.
@@ -459,7 +525,7 @@ class ModelReorganizer(object):
     def getCacheFilePath(self):
         return self.__cacheFilePath
 
-    def reorganize(self, inputModelList, modelSource, destBaseDir, useCache=True):
+    def reorganize(self, inputModelList, modelSource, destBaseDir, useCache=True, **kwargs):
         """Move model files from organism-wide model listing to hashed directory structure and rename files
         to follow internal identifier naming convention.
 
@@ -472,13 +538,18 @@ class ModelReorganizer(object):
             bool: True for success or False otherwise
         """
         ok = False
+        sourceReleaseDate = kwargs.get("sourceReleaseDate", None)  # Use for ModelArchive files which are currently missing revision date information
+        sourceModifiedDate = kwargs.get("sourceModifiedDate", None)
+        #
         try:
             mD, failD = self.__reorganizeModels(
                 inputModelList=inputModelList,
                 modelSource=modelSource,
                 destBaseDir=destBaseDir,
                 numProc=self.__numProc,
-                chunkSize=self.__chunkSize
+                chunkSize=self.__chunkSize,
+                sourceReleaseDate=sourceReleaseDate,
+                sourceModifiedDate=sourceModifiedDate,
             )
             if len(failD) > 0:
                 logger.error("Failed to process %d model files.", len(failD))
@@ -501,7 +572,7 @@ class ModelReorganizer(object):
             logger.exception("Failing with %s", str(e))
         return ok
 
-    def __reorganizeModels(self, inputModelList, modelSource, destBaseDir, numProc=2, chunkSize=20):
+    def __reorganizeModels(self, inputModelList, modelSource, destBaseDir, numProc=2, chunkSize=20, **kwargs):
         """Prepare multiprocessor queue and workers for generating input:output map for model files, to use in reorganizing
         them into a structured directory tree and naming them with internal identifiers.
 
@@ -528,6 +599,8 @@ class ModelReorganizer(object):
         """
         mD = {}
         failD = {}
+        sourceReleaseDate = kwargs.get("sourceReleaseDate", None)  # Use for ModelArchive files which are currently missing revision date information
+        sourceModifiedDate = kwargs.get("sourceModifiedDate", None)
         tS = datetime.now().replace(microsecond=0).replace(tzinfo=pytz.UTC).isoformat()  # Desired format:  2022-04-15T12:00:00+00:00
         #
         logger.info("Starting with %d models, numProc %d at %r", len(inputModelList), numProc, tS)
@@ -551,6 +624,8 @@ class ModelReorganizer(object):
             "keepSource": self.__keepSource,
             "reorganizeDate": tS
         }
+        if sourceReleaseDate:
+            optD.update({"sourceReleaseDate": sourceReleaseDate, "sourceModifiedDate": sourceModifiedDate})
         mpu.setOptions(optD)
         mpu.set(workerObj=rWorker, workerMethod="reorganize")
         mpu.setWorkingDir(workingDir=self.__workPath)

@@ -22,6 +22,7 @@ import os.path
 import time
 from pathlib import Path
 import glob
+import requests
 
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
@@ -50,6 +51,7 @@ class ModelArchiveModelProvider:
         self.__baseWorkPath = baseWorkPath if baseWorkPath else self.__cachePath
         self.__workPath = os.path.join(self.__baseWorkPath, "work-dir", "ModelArchive")  # Directory where model files will be downloaded (also contains MA-specific cache file)
         self.__dataSetCacheFile = os.path.join(self.__workPath, "model-download-cache.json")
+        self.__modelArchiveSummaryPageBaseApiUrl = "https://www.modelarchive.org/api/projects/"
 
         self.__mU = MarshalUtil(workPath=self.__workPath)
         self.__fU = FileUtil(workPath=self.__workPath)
@@ -257,19 +259,53 @@ class ModelArchiveModelProvider:
         """
         try:
             ok = False
+            archiveReleaseDate = kwargs.get("archiveReleaseDate", None)  # Use for ModelArchive files until revision date information is available in mmCIF files
+            archiveLastModifiedDate = kwargs.get("archiveLastModifiedDate", None)
             #
             mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
             #
             if inputModelList:  # Only reorganize given list of model files
-                ok = mR.reorganize(inputModelList=inputModelList, modelSource="ModelArchive", destBaseDir=self.__cachePath, useCache=useCache)
+                ok = mR.reorganize(
+                    inputModelList=inputModelList,
+                    modelSource="ModelArchive",
+                    destBaseDir=self.__cachePath,
+                    useCache=useCache,
+                    sourceReleaseDate=archiveReleaseDate,
+                    sourceModifiedDate=archiveLastModifiedDate,
+                )
                 if not ok:
                     logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputModelList[0])
             #
             else:  # Reorganize ALL model files for ALL available model datasets
                 archiveDirList = self.getArchiveDirList()
                 for archiveDir in archiveDirList:
+                    #
+                    # Get release and last-modified dates of the dataset archive (TEMPORARY workaround until revision history is included in ModelArchive mmCIF files)
+                    archiveName = os.path.basename(archiveDir.strip("/"))
+                    archiveSummaryPageApiUrl = os.path.join(self.__modelArchiveSummaryPageBaseApiUrl, archiveName)
+                    response = requests.get(archiveSummaryPageApiUrl)
+                    try:
+                        archiveReleaseDate = response.json()["release_date"]  # e.g., '2022-09-28'
+                        archiveLastModifiedDate = response.json()["modified_at"]  # e.g., '2022-09-28T17:22:53.310750Z'
+                        logger.info("Dataset archive %s: release date %s, modified date %s", archiveName, archiveReleaseDate, archiveLastModifiedDate)
+                    except Exception as e:
+                        logger.exception(
+                            "Failing to get release and modified date for archive dataset %s from ModelArchive site (returned status code %r), with exception %s",
+                            archiveName,
+                            response.status_code,
+                            str(e)
+                        )
+                        raise ValueError("Failed to get release and modified date for archive dataset.")
+                    #
                     inputModelList = self.getModelFileList(inputPathList=[archiveDir])
-                    ok = mR.reorganize(inputModelList=inputModelList, modelSource="ModelArchive", destBaseDir=self.__cachePath, useCache=useCache)
+                    ok = mR.reorganize(
+                        inputModelList=inputModelList,
+                        modelSource="ModelArchive",
+                        destBaseDir=self.__cachePath,
+                        useCache=useCache,
+                        sourceReleaseDate=archiveReleaseDate,
+                        sourceModifiedDate=archiveLastModifiedDate,
+                    )
                     if not ok:
                         logger.error("Reorganization of model files failed for dataset archive %s", archiveDir)
                         break
