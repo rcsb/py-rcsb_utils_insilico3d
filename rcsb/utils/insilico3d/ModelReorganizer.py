@@ -104,8 +104,6 @@ class ModelWorker(object):
                     dataContainer = self.__rebuildDateDetails(
                         dataContainer=dataContainer,
                         sourceModelEntryId=sourceModelEntryId,
-                        sourceModelDb=modelSourceDb,
-                        internalModelId=internalModelId,
                         sourceReleaseDate=sourceReleaseDate,
                         sourceModifiedDate=sourceModifiedDate,
                     )
@@ -299,7 +297,7 @@ class ModelWorker(object):
 
         return dataContainer
 
-    def __rebuildDateDetails(self, dataContainer, sourceModelEntryId, sourceModelDb, internalModelId, sourceReleaseDate, sourceModifiedDate):
+    def __rebuildDateDetails(self, dataContainer, sourceModelEntryId, sourceReleaseDate, sourceModifiedDate):
         """Add or rebuild release and revision date details for the dataContainer.
 
         Mainly for ModelArchive models which currently lack this information in the mmCIF file (as of 19-Oct-2022 dwp).
@@ -307,8 +305,6 @@ class ModelWorker(object):
         Args:
             dataContainer (object): mmcif.api.DataContainer object instance
             sourceModelEntryId (str): source entry ID
-            sourceModelDb (str): source DB of model (must adhere to database_2.database_id enumerations)
-            internalModelId (str): internal entry ID
             sourceReleaseDate (str): release date for dataContainer, obtained from source model website (e.g., '2022-09-28')
             sourceModifiedDate (str): last-modified date for dataContainer, obtained from source model website (e.g., '2022-09-28T17:22:53.310750Z')
 
