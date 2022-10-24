@@ -83,12 +83,6 @@ jobs:
       #
       #
       - task: DownloadSecureFile@1
-        name: oelicense
-        displayName: "Download OE license file"
-        inputs:
-          secureFile: "oe_license.txt"
-
-      - task: DownloadSecureFile@1
         name: googlecloudkey
         displayName: "Download Google Cloud key"
         inputs:
@@ -96,35 +90,30 @@ jobs:
 
       - ${{ if startsWith(parameters.tox, 'py') }}:
           - script: |
-              export OE_LICENSE=$(oelicense.secureFilePath)
               export GOOGLE_APPLICATION_CREDENTIALS=$(googlecloudkey.secureFilePath)
               export CONFIG_SUPPORT_TOKEN_ENV=$(VAR_CONFIG_SUPPORT_TOKEN_ENV)
               ${{ format('python -m tox -e {0}', parameters.tox) }}
             displayName: "Running tox task"
       - ? ${{ if and(not(startsWith(parameters.tox, 'py')), startsWith(parameters.python, '3.9')) }}
         : - script: |
-              export OE_LICENSE=$(oelicense.secureFilePath)
               export GOOGLE_APPLICATION_CREDENTIALS=$(googlecloudkey.secureFilePath)
               export CONFIG_SUPPORT_TOKEN_ENV=$(VAR_CONFIG_SUPPORT_TOKEN_ENV)
               ${{ format('python -m tox -e {0}-py39', parameters.tox) }}
             displayName: "Running tox task"
       - ? ${{ if and(not(startsWith(parameters.tox, 'py')), startsWith(parameters.python, '3.8')) }}
         : - script: |
-              export OE_LICENSE=$(oelicense.secureFilePath)
               export GOOGLE_APPLICATION_CREDENTIALS=$(googlecloudkey.secureFilePath)
               export CONFIG_SUPPORT_TOKEN_ENV=$(VAR_CONFIG_SUPPORT_TOKEN_ENV)
               ${{ format('python -m tox -e {0}-py38', parameters.tox) }}
             displayName: "Running tox task"
       - ? ${{ if and(not(startsWith(parameters.tox, 'py')), startsWith(parameters.python, '3.7')) }}
         : - script: |
-              export OE_LICENSE=$(oelicense.secureFilePath)
               export GOOGLE_APPLICATION_CREDENTIALS=$(googlecloudkey.secureFilePath)
               export CONFIG_SUPPORT_TOKEN_ENV=$(VAR_CONFIG_SUPPORT_TOKEN_ENV)
               ${{ format('python -m tox -e {0}-py37', parameters.tox) }}
             displayName: "Running tox task"
       - ? ${{ if and(not(startsWith(parameters.tox, 'py')), startsWith(parameters.python, '2.7')) }}
         : - script: |
-              export OE_LICENSE=$(oelicense.secureFilePath)
               export GOOGLE_APPLICATION_CREDENTIALS=$(googlecloudkey.secureFilePath)
               export CONFIG_SUPPORT_TOKEN_ENV=$(VAR_CONFIG_SUPPORT_TOKEN_ENV)
               ${{ format('python -m tox -e {0}-py27', parameters.tox) }}
