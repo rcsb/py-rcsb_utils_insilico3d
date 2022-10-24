@@ -22,12 +22,11 @@ import time
 from pathlib import Path
 import copy
 import glob
-import re
+# import re
 from google.cloud import storage
 
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
-from rcsb.utils.io.FtpUtil import FtpUtil
 from rcsb.utils.insilico3d.ModelReorganizer import ModelReorganizer
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")

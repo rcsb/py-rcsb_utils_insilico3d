@@ -324,7 +324,7 @@ class ModelWorker(object):
                     rowList=[[sourceModelEntryId, sourceReleaseDate, "REL"]]
                 )
             )
-        
+
         minorRevision = "0"
         revisionHistoryOrdinal = None
 
