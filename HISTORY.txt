@@ -37,5 +37,5 @@
   29-Jun-2022  - V0.30 Add both source and internal IDs to database_2 category in internal mmCIF file to maintain a reference and mapping to the source DB
   21-Jul-2022  - V0.31 Update ModelCacheProvider to allow for smaller number of test cases
   27-Jul-2022  - V0.32 Allow for user-specification of separate path to which to download source model files
-  19-Oct-2022  - V0.33 Add AlphaFold model provider from public Google Cloud dataset;
+  24-Oct-2022  - V0.33 Add AlphaFold model provider from public Google Cloud dataset;
                        Add methods to insert release and modified dates to models lacking these details
