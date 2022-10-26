@@ -325,34 +325,28 @@ class ModelWorker(object):
             dataContainer.append(
                 DataCategory(
                     "pdbx_database_status",
-                    attributeNameList=["entry_id", "recvd_initial_deposition_date", "status_code"],
-                    rowList=[[sourceModelEntryId, sourceArchiveReleaseDate, "REL"]]
+                    attributeNameList=["entry_id", "status_code"],
+                    rowList=[[sourceModelEntryId, "REL"]]
                 )
             )
 
-        minorRevision = "0"
-        revisionHistoryOrdinal = None
-
         # If _pdbx_audit_revision_history.* doesn't exist, create it and add modified date
         if not dataContainer.exists("pdbx_audit_revision_history"):
-            if sourceArchiveModifiedDate[0:10] != sourceArchiveReleaseDate[0:10]:
-                minorRevision = "1"
-            revisionHistoryOrdinal = "1"
             dataContainer.append(
                 DataCategory(
                     "pdbx_audit_revision_history",
                     attributeNameList=["data_content_type", "major_revision", "minor_revision", "ordinal", "revision_date"],
-                    rowList=[["Structure model", "0", minorRevision, revisionHistoryOrdinal, sourceArchiveModifiedDate[0:10]]]
+                    rowList=[["Structure model", "1", "0", "1", sourceArchiveReleaseDate[0:10]]]
                 )
             )
 
-        # If _pdbx_audit_revision_details.* doesn't exist, create it only if _history was created above
-        if not dataContainer.exists("pdbx_audit_revision_details") and revisionHistoryOrdinal:
+        # If _pdbx_audit_revision_details.* doesn't exist, create it
+        if not dataContainer.exists("pdbx_audit_revision_details"):
             dataContainer.append(
                 DataCategory(
                     "pdbx_audit_revision_details",
-                    attributeNameList=["data_content_type", "ordinal", "revision_ordinal"],
-                    rowList=[["Structure model", revisionHistoryOrdinal, revisionHistoryOrdinal]]
+                    attributeNameList=["data_content_type", "ordinal", "revision_ordinal", "type", "provider"],
+                    rowList=[["Structure model", "1", "1", "Initial release", "repository"]]
                 )
             )
 

@@ -282,7 +282,7 @@ class ModelArchiveModelProvider:
                 for archiveDir in archiveDirList:
                     #
                     # Get release and last-modified dates of the dataset archive (TEMPORARY workaround until revision history is included in ModelArchive mmCIF files)
-                    archiveName = os.path.basename(archiveDir.strip("/"))
+                    archiveName = os.path.basename(os.path.abspath(archiveDir))
                     archiveSummaryPageApiUrl = os.path.join(self.__modelArchiveSummaryPageBaseApiUrl, archiveName)
                     response = requests.get(archiveSummaryPageApiUrl, timeout=600)
                     try:
