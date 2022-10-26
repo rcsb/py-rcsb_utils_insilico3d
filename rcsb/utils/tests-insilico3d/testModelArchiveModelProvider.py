@@ -87,7 +87,6 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
             chunkSize=20,
             keepSource=True,
             sourceArchiveReleaseDate="2021-11-11",
-            sourceArchiveModifiedDate="2021-11-11",
         )
         self.assertTrue(ok)
         # Now test using the reorganizer object directly
@@ -99,7 +98,6 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
             destBaseDir=destBaseDir,
             useCache=False,
             sourceArchiveReleaseDate="2021-11-11",
-            sourceArchiveModifiedDate="2021-11-11",
         )
         self.assertTrue(ok)
         ok = mAMR.testCache()
@@ -110,7 +108,6 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
             destBaseDir=destBaseDir,
             useCache=True,
             sourceArchiveReleaseDate="2021-11-11",
-            sourceArchiveModifiedDate="2021-11-11",
         )
         self.assertTrue(ok)
         ok = mAMR.testCache()

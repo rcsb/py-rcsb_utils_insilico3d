@@ -7,7 +7,7 @@
 #   28-Jun-2022  dwp Add __rebuildEntryIds() method to replace (or remove) source entry identifiers with internal IDs, to enable operability with RCSB.org tools.
 #                    Note that these modified data files will NOT be publicly served or available, and proper attribution using the source entry IDs will be given.
 #   29-Jun-2022  dwp Add both source and internal IDs to database_2 category in internal mmCIF file to maintain a reference and mapping to the source DB
-#   24-Oct-2022  dwp Add __rebuildDateDetails() method to add missing revision/modification date and version information to internal model mmCIF files if absent
+#   24-Oct-2022  dwp Add __rebuildDateDetails() method to add missing release date and version information to internal model mmCIF files if absent
 #                    (currently the case for ModelArchive model files);
 #                    Add the PAE access url to the holdings cache file for models with associated PAE data files (currently only AF models)
 #
@@ -80,7 +80,6 @@ class ModelWorker(object):
             keepSource = optionsD.get("keepSource", False)  # whether to copy files over (instead of moving them)
             reorganizeDate = optionsD.get("reorganizeDate", None)  # reorganization date
             sourceArchiveReleaseDate = optionsD.get("sourceArchiveReleaseDate", None)  # externally-obtained release date (i.e., not from CIF); as is case for ModelArchive models
-            sourceArchiveModifiedDate = optionsD.get("sourceArchiveModifiedDate", None)  # externally-obtained modified date (i.e., not from CIF); as is case for ModelArchive models
             #
             for modelFileIn in dataList:
                 modelD = {}
@@ -108,7 +107,6 @@ class ModelWorker(object):
                         dataContainer=dataContainer,
                         sourceModelEntryId=sourceModelEntryId,
                         sourceArchiveReleaseDate=sourceArchiveReleaseDate,
-                        sourceArchiveModifiedDate=sourceArchiveModifiedDate,
                     )
                 #
                 dataContainer = self.__rebuildEntryIds(
@@ -306,7 +304,7 @@ class ModelWorker(object):
 
         return dataContainer
 
-    def __rebuildDateDetails(self, dataContainer, sourceModelEntryId, sourceArchiveReleaseDate, sourceArchiveModifiedDate):
+    def __rebuildDateDetails(self, dataContainer, sourceModelEntryId, sourceArchiveReleaseDate):
         """Add or rebuild release and revision date details for the dataContainer.
 
         Mainly for ModelArchive models which currently lack this information in the mmCIF file (as of 19-Oct-2022 dwp).
@@ -315,7 +313,6 @@ class ModelWorker(object):
             dataContainer (object): mmcif.api.DataContainer object instance
             sourceModelEntryId (str): source entry ID
             sourceArchiveReleaseDate (str): release date for dataContainer, obtained from source model website (e.g., '2022-09-28')
-            sourceArchiveModifiedDate (str): last-modified date for dataContainer, obtained from source model website (e.g., '2022-09-28T17:22:53.310750Z')
 
         Returns:
             dataContainer: updated dataContainer object
@@ -538,7 +535,6 @@ class ModelReorganizer(object):
         """
         ok = False
         sourceArchiveReleaseDate = kwargs.get("sourceArchiveReleaseDate", None)  # Use for ModelArchive files which are currently missing revision date information
-        sourceArchiveModifiedDate = kwargs.get("sourceArchiveModifiedDate", None)
         #
         try:
             mD, failD = self.__reorganizeModels(
@@ -548,7 +544,6 @@ class ModelReorganizer(object):
                 numProc=self.__numProc,
                 chunkSize=self.__chunkSize,
                 sourceArchiveReleaseDate=sourceArchiveReleaseDate,
-                sourceArchiveModifiedDate=sourceArchiveModifiedDate,
             )
             if len(failD) > 0:
                 logger.error("Failed to process %d model files.", len(failD))
@@ -599,7 +594,6 @@ class ModelReorganizer(object):
         mD = {}
         failD = {}
         sourceArchiveReleaseDate = kwargs.get("sourceArchiveReleaseDate", None)  # Use for ModelArchive files which are currently missing revision date information
-        sourceArchiveModifiedDate = kwargs.get("sourceArchiveModifiedDate", None)
         tS = datetime.now().replace(microsecond=0).replace(tzinfo=pytz.UTC).isoformat()  # Desired format:  2022-04-15T12:00:00+00:00
         #
         logger.info("Starting with %d models, numProc %d at %r", len(inputModelList), numProc, tS)
@@ -624,7 +618,7 @@ class ModelReorganizer(object):
             "reorganizeDate": tS
         }
         if sourceArchiveReleaseDate:
-            optD.update({"sourceArchiveReleaseDate": sourceArchiveReleaseDate, "sourceArchiveModifiedDate": sourceArchiveModifiedDate})
+            optD.update({"sourceArchiveReleaseDate": sourceArchiveReleaseDate})
         mpu.setOptions(optD)
         mpu.set(workerObj=rWorker, workerMethod="reorganize")
         mpu.setWorkingDir(workingDir=self.__workPath)

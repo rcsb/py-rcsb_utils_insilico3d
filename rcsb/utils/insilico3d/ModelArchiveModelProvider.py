@@ -4,7 +4,7 @@
 # Date:    18-Mar-2022
 #
 # Updates:
-#   24-Oct-2022  dwp Add functionality to fetch the revision/modification date associated for a given ModelArchive data set
+#   24-Oct-2022  dwp Add functionality to fetch the release date associated for a given ModelArchive data set
 #                    (to use for data loading in case model mmCIF file doesn't contain this information already)
 ##
 """
@@ -94,6 +94,10 @@ class ModelArchiveModelProvider:
                     "ma-bak-cepc": {
                         "urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name",
                         "fileName": "ma-bak-cepc.zip"
+                    },
+                    "ma-ornl-sphdiv": {
+                        "urlEnd": "ma-ornl-sphdiv?type=materials_procedures__accompanying_data_file_name",
+                        "fileName": "ma-ornl-sphdiv.zip"
                     },
                 }
             #
@@ -261,7 +265,6 @@ class ModelArchiveModelProvider:
         try:
             ok = False
             sourceArchiveReleaseDate = kwargs.get("sourceArchiveReleaseDate", None)  # Use for ModelArchive files until revision date information is available in mmCIF files
-            sourceArchiveModifiedDate = kwargs.get("sourceArchiveModifiedDate", None)
             #
             mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
             #
@@ -272,7 +275,6 @@ class ModelArchiveModelProvider:
                     destBaseDir=self.__cachePath,
                     useCache=useCache,
                     sourceArchiveReleaseDate=sourceArchiveReleaseDate,
-                    sourceArchiveModifiedDate=sourceArchiveModifiedDate,
                 )
                 if not ok:
                     logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputModelList[0])
@@ -287,8 +289,7 @@ class ModelArchiveModelProvider:
                     response = requests.get(archiveSummaryPageApiUrl, timeout=600)
                     try:
                         sourceArchiveReleaseDate = response.json()["release_date"]  # e.g., '2022-09-28'
-                        sourceArchiveModifiedDate = response.json()["modified_at"]  # e.g., '2022-09-28T17:22:53.310750Z'
-                        logger.info("Dataset archive %s: release date %s, modified date %s", archiveName, sourceArchiveReleaseDate, sourceArchiveModifiedDate)
+                        logger.info("Dataset archive %s: release date %s", archiveName, sourceArchiveReleaseDate)
                     except Exception as e:
                         logger.exception(
                             "Failing to get release and modified date for archive dataset %s from ModelArchive site (returned status code %r), with exception %s",
@@ -305,7 +306,6 @@ class ModelArchiveModelProvider:
                         destBaseDir=self.__cachePath,
                         useCache=useCache,
                         sourceArchiveReleaseDate=sourceArchiveReleaseDate,
-                        sourceArchiveModifiedDate=sourceArchiveModifiedDate,
                     )
                     if not ok:
                         logger.error("Reorganization of model files failed for dataset archive %s", archiveDir)
