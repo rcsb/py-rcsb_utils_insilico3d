@@ -283,7 +283,7 @@ class ModelArchiveModelProvider:
                 archiveDirList = self.getArchiveDirList()
                 for archiveDir in archiveDirList:
                     #
-                    # Get release and last-modified dates of the dataset archive (TEMPORARY workaround until revision history is included in ModelArchive mmCIF files)
+                    # Get release date of the dataset archive (TEMPORARY workaround until revision history is included in ModelArchive mmCIF files)
                     archiveName = os.path.basename(os.path.abspath(archiveDir))
                     archiveSummaryPageApiUrl = os.path.join(self.__modelArchiveSummaryPageBaseApiUrl, archiveName)
                     response = requests.get(archiveSummaryPageApiUrl, timeout=600)
@@ -292,12 +292,12 @@ class ModelArchiveModelProvider:
                         logger.info("Dataset archive %s: release date %s", archiveName, sourceArchiveReleaseDate)
                     except Exception as e:
                         logger.exception(
-                            "Failing to get release and modified date for archive dataset %s from ModelArchive site (returned status code %r), with exception %s",
+                            "Failing to get release date for archive dataset %s from ModelArchive site (returned status code %r), with exception %s",
                             archiveName,
                             response.status_code,
                             str(e)
                         )
-                        raise ValueError("Failed to get release and modified date for archive dataset.")
+                        raise ValueError("Failed to get release date for archive dataset.")
                     #
                     inputModelList = self.getModelFileList(inputPathList=[archiveDir])
                     ok = mR.reorganize(
