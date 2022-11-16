@@ -148,7 +148,7 @@ class ModelArchiveModelProvider:
                         numModelsToDownload = pathD.get("numModels", dataSetNumModels)  # Used for testing purposes, defaults to total number of models
                         bulkFileName = pathD.get("bulkFileName", None)
                         if bulkFileName:
-                            # Download bulk model archive file (contains associated local pairwise quality data and a3m files) 
+                            # Download bulk model archive file (contains associated local pairwise quality data and a3m files)
                             sD.update({"downloadMethod": "bulk"})
                             sD.update({"bulkArchiveFileName": bulkFileName})
                             dataSetFilePath = os.path.join(baseUrl, dataSet + self.__modelArchiveBulkDownloadUrlEnd)
@@ -229,7 +229,7 @@ class ModelArchiveModelProvider:
         zeroPaddingWidth = len(str(numModelsTotal))
 
         modelUrlList = []
-        for number in range(1, numModels+1):
+        for number in range(1, numModels + 1):
             modelUrlList.append(f"https://modelarchive.org/api/projects/{modelSetName}-{number:0{zeroPaddingWidth}}?type=basic__model_file_name")
         logger.info("First few items in modelUrlList %r", modelUrlList[0:5])
 
@@ -237,7 +237,7 @@ class ModelArchiveModelProvider:
 
         async def fetchFile(url):
             try:
-                fname = url.split("/")[-1].split("?")[0]+".cif"
+                fname = url.split("/")[-1].split("?")[0] + ".cif"
                 async with sema, aiohttp.ClientSession() as session:
                     async with session.get(url) as resp:
                         assert resp.status == 200
