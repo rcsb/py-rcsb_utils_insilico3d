@@ -57,7 +57,7 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
                 useCache=False,
                 numProc=4,
                 chunkSize=20,
-                modelArchiveRequestedDatasetD={"ma-bak-cepc": {"urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name", "fileName": "ma-bak-cepc.zip"}}
+                modelArchiveRequestedDatasetD={"ma-bak-cepc": {"numModelsTotal": 1106, "numModels": 40}}
             )
             ok = mAMP.testCache()
             self.assertTrue(ok)
@@ -68,7 +68,7 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
             useCache=True,
             numProc=4,
             chunkSize=20,
-            modelArchiveRequestedDatasetD={"ma-bak-cepc": {"urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name", "fileName": "ma-bak-cepc.zip"}}
+            modelArchiveRequestedDatasetD={"ma-bak-cepc": {"numModelsTotal": 1106, "numModels": 40}}
         )
         archiveDirList = mAMP.getArchiveDirList()
         ok = True if len(archiveDirList) > 0 else False

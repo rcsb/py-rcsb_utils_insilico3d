@@ -6,6 +6,7 @@
 # Updates:
 #   24-Oct-2022  dwp Add functionality to fetch the release date associated for a given ModelArchive data set
 #                    (to use for data loading in case model mmCIF file doesn't contain this information already)
+#   16-Nov-2022  dwp Add new default functionality to fetch model files individually instead of the full bulk download
 ##
 """
 Accessors for ModelArchive 3D In Silico Models (mmCIF).
@@ -24,6 +25,9 @@ import time
 from pathlib import Path
 import glob
 import requests
+import asyncio
+import aiohttp
+import aiofiles
 
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
@@ -53,6 +57,7 @@ class ModelArchiveModelProvider:
         self.__workPath = os.path.join(self.__baseWorkPath, "work-dir", "ModelArchive")  # Directory where model files will be downloaded (also contains MA-specific cache file)
         self.__dataSetCacheFile = os.path.join(self.__workPath, "model-download-cache.json")
         self.__modelArchiveSummaryPageBaseApiUrl = "https://www.modelarchive.org/api/projects/"
+        self.__modelArchiveBulkDownloadUrlEnd = "?type=materials_procedures__accompanying_data_file_name"  # E.g., "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name"
 
         self.__mU = MarshalUtil(workPath=self.__workPath)
         self.__fU = FileUtil(workPath=self.__workPath)
@@ -92,12 +97,12 @@ class ModelArchiveModelProvider:
             if not modelArchiveRequestedDatasetD:  # Fill in default
                 modelArchiveRequestedDatasetD = {
                     "ma-bak-cepc": {
-                        "urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name",
-                        "fileName": "ma-bak-cepc.zip"
+                        # "bulkFileName": "ma-bak-cepc.zip",
+                        "numModelsTotal": 1106,  # Necessary for forming filenames
                     },
                     "ma-ornl-sphdiv": {
-                        "urlEnd": "ma-ornl-sphdiv?type=materials_procedures__accompanying_data_file_name",
-                        "fileName": "ma-ornl-sphdiv.zip"
+                        # "bulkFileName": "ma-ornl-sphdiv.zip",
+                        "numModelsTotal": 25134,
                     },
                 }
             #
@@ -114,31 +119,16 @@ class ModelArchiveModelProvider:
                 for dataSet, pathD in modelArchiveRequestedDatasetD.items():
                     try:
                         cacheArchiveDir = oD[dataSet]["dataDirectory"]
-                        cacheArchiveFileSize = oD[dataSet]["archiveFileSizeBytes"]
                         cacheArchiveFileDownloadDate = oD[dataSet]["lastDownloaded"]
                         cacheArchiveFileDownloadAge = (datetime.datetime.now() - datetime.datetime.fromisoformat(cacheArchiveFileDownloadDate)).days
                         if not os.path.exists(cacheArchiveDir):
                             logger.warning("Missing archive data for dataSet %s from server: %s", dataSet, pathD)
-                        # If 120 days old, check consistency of local cache with data on ModelArchive
-                        # (requires redownloading the entire archive file, since can't get requests.header info from the ModelArchive download URL)
+                        # If 120 days old, log WARNING about age of archive and possibly being out-of-date
                         if cacheArchiveFileDownloadAge > 120:
-                            logger.info(
-                                "Cached archive data for dataset %s last downloaded on %s (%d days ago): %s. Redownloading to check consistency with cached data.",
+                            logger.warning(
+                                "Cached archive data for dataset %s last downloaded on %s (%d days ago): %s. Recommend redownloading data.",
                                 dataSet, cacheArchiveFileDownloadDate, cacheArchiveFileDownloadAge, pathD
                             )
-                            dataSetFileName = pathD["fileName"]
-                            dataSetFilePath = os.path.join(baseUrl, pathD["urlEnd"])
-                            dataSetDataDumpDir = os.path.join(self.__workPath, dataSet.replace(" ", "_"))
-                            self.__fU.mkdir(dataSetDataDumpDir)
-                            dataSetFileDumpPath = os.path.join(dataSetDataDumpDir, dataSetFileName)
-                            logger.info("Fetching file %s from server to local path %s", dataSetFilePath, dataSetFileDumpPath)
-                            ok = self.__fU.get(dataSetFilePath, dataSetFileDumpPath)
-                            logger.info("Completed fetch (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
-                            dataSetFileSize = int(self.__fU.size(dataSetFileDumpPath))
-                            if cacheArchiveFileSize != dataSetFileSize:
-                                logger.warning("Cached archive data for dataset %s not up-to-date with data archive on server: %s. You should Rebuild the cache!", dataSet, pathD)
-                            logger.info("Deleting compressed dataset download, %s", dataSetFileDumpPath)
-                            self.__fU.remove(dataSetFileDumpPath)
                         else:
                             logger.info(
                                 "Cached archive data for dataset %s last downloaded on %s (%d days ago): %s. Skipping redownload of data.",
@@ -153,39 +143,57 @@ class ModelArchiveModelProvider:
                 cacheD.update({"created": startDateTime, "data": {}})
                 for dataSet, pathD in modelArchiveRequestedDatasetD.items():
                     try:
-                        dataSetFileName = pathD["fileName"]
-                        dataSetFilePath = os.path.join(baseUrl, pathD["urlEnd"])
-                        dataSetDataDumpDir = os.path.join(self.__workPath, dataSet.replace(" ", "_"))
-                        self.__fU.mkdir(dataSetDataDumpDir)
-                        dataSetFileDumpPath = os.path.join(dataSetDataDumpDir, dataSetFileName)
+                        sD = {}
+                        dataSetNumModels = pathD.get("numModelsTotal")
+                        numModelsToDownload = pathD.get("numModels", dataSetNumModels)  # Used for testing purposes, defaults to total number of models
+                        bulkFileName = pathD.get("bulkFileName", None)
+                        if bulkFileName:
+                            # Download bulk model archive file (contains associated local pairwise quality data and a3m files) 
+                            sD.update({"downloadMethod": "bulk"})
+                            sD.update({"bulkArchiveFileName": bulkFileName})
+                            dataSetFilePath = os.path.join(baseUrl, dataSet + self.__modelArchiveBulkDownloadUrlEnd)
+                            dataSetDataDumpDir = os.path.join(self.__workPath, dataSet.replace(" ", "_"))
+                            self.__fU.mkdir(dataSetDataDumpDir)
+                            dataSetFileDumpPath = os.path.join(dataSetDataDumpDir, bulkFileName)
+                            #
+                            logger.info("Fetching file %s from server to local path %s", dataSetFilePath, dataSetFileDumpPath)
+                            ok = self.__fU.get(dataSetFilePath, dataSetFileDumpPath)
+                            logger.info("Completed fetch (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
+                            ok = self.__fU.unbundleZipfile(dataSetFileDumpPath, dirPath=dataSetDataDumpDir)
+                            logger.info("Completed unbundle (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
+                            #
+                            logger.info("Clearing non-model files from extracted zip bundle...")
+                            for nonModelFile in Path(dataSetDataDumpDir).glob("*.a3m"):
+                                nonModelFile.unlink()
+                            for nonModelFile in Path(dataSetDataDumpDir).glob("*_local_pairwise_qa.cif"):
+                                nonModelFile.unlink()
+                        else:
+                            # Download model files individually
+                            sD.update({"downloadMethod": "individual"})
+                            dataSetDataDumpDir = os.path.join(self.__workPath, dataSet.replace(" ", "_"))
+                            self.__fU.mkdir(dataSetDataDumpDir)
+                            logger.info("Fetching %d files for %s from server to local path %s", numModelsToDownload, dataSet, dataSetDataDumpDir)
+                            ok = asyncio.run(self.downloadIndividualModelFiles(
+                                modelSetName=dataSet,
+                                destDir=dataSetDataDumpDir,
+                                numModelsTotal=dataSetNumModels,
+                                numModels=numModelsToDownload
+                            ))
+                            logger.info("Completed fetch (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
                         #
-                        logger.info("Fetching file %s from server to local path %s", dataSetFilePath, dataSetFileDumpPath)
-                        ok = self.__fU.get(dataSetFilePath, dataSetFileDumpPath)
-                        logger.info("Completed fetch (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
-                        dataSetFileSize = int(self.__fU.size(dataSetFileDumpPath))
-                        ok = self.__fU.unbundleZipfile(dataSetFileDumpPath, dirPath=dataSetDataDumpDir)
-                        logger.info("Completed unbundle (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
-                        #
-                        sD = {
+                        sD.update({
                             "dataSetName": dataSet,
-                            "archiveFileName": dataSetFileName,
-                            "archiveFileSizeBytes": dataSetFileSize,
+                            "numModels": numModelsToDownload,
                             "lastDownloaded": startDateTime,
                             "dataDirectory": dataSetDataDumpDir,
-                        }
-                        #
-                        logger.info("Clearing non-model files from extracted zip bundle...")
-                        for nonModelFile in Path(dataSetDataDumpDir).glob("*.a3m"):
-                            nonModelFile.unlink()
-                        for nonModelFile in Path(dataSetDataDumpDir).glob("*_local_pairwise_qa.cif"):
-                            nonModelFile.unlink()
-                        #
+                        })
                         if ok:
                             cacheD["data"].update({dataSet: sD})
-                            self.__fU.remove(dataSetFileDumpPath)
+                            if bulkFileName:
+                                self.__fU.remove(dataSetFileDumpPath)
                     #
                     except Exception as e:
-                        logger.info("Failing on fetching and expansion of file for dataSet %s: %s", dataSet, pathD)
+                        logger.info("Failing on fetching of dataSet %s: %s", dataSet, pathD)
                         logger.exception("Failing with %s", str(e))
 
                 createdDate = cacheD["created"]
@@ -198,9 +206,69 @@ class ModelArchiveModelProvider:
 
         return oD, createdDate
 
+    async def downloadIndividualModelFiles(self, modelSetName=None, destDir=None, numModelsTotal=0, limit=100, breakTime=5, numModels=None):
+        """Download model files individually, in case bulk download not available or want to avoid downloading (currently) unnecessary associated metdata.
+
+        Args:
+            modelSetName (str): model set name (e.g., "ma-ornl-sphdiv").
+            destDir (str): destination directory to which to download model files.
+            numModelsTotal (int): total number of models in model set (e.g., 25135). Defaults to 0.
+            limit (int, optional): max number of models to download asynchronously at once. Splits the total set into batches of size(limit),
+                                   and forces sleep(breakTime) between batches to spare traffic load on ModelArchive server). Defaults to 100.
+            breakTime (int, optional): seconds to wait between subsequent batches of asynchronous requests. Defaults to 5.
+
+        Returns:
+            (bool): True if successful; False otherwise.
+        """
+
+        if not (modelSetName and destDir and numModels):
+            return False
+
+        resultList = []
+        numModels = numModels if numModels else numModelsTotal
+        zeroPaddingWidth = len(str(numModelsTotal))
+
+        modelUrlList = []
+        for number in range(1, numModels+1):
+            modelUrlList.append(f"https://modelarchive.org/api/projects/{modelSetName}-{number:0{zeroPaddingWidth}}?type=basic__model_file_name")
+        logger.info("First few items in modelUrlList %r", modelUrlList[0:5])
+
+        sema = asyncio.BoundedSemaphore(10)
+
+        async def fetchFile(url):
+            try:
+                fname = url.split("/")[-1].split("?")[0]+".cif"
+                async with sema, aiohttp.ClientSession() as session:
+                    async with session.get(url) as resp:
+                        assert resp.status == 200
+                        data = await resp.read()
+                async with aiofiles.open(os.path.join(destDir, fname), "wb") as outfile:
+                    await outfile.write(data)
+                return True
+            #
+            except Exception as e:
+                logger.exception("Failing to fetch url %s with %s", url, str(e))
+                return False
+        #
+        tasks = []
+        batch = 1
+        for modelUrl in modelUrlList:
+            tasks.append(fetchFile(modelUrl))
+            if len(tasks) == limit:
+                logger.info("Downloading batch %d", batch)
+                resL = await asyncio.gather(*tasks)
+                resultList.append(resL)
+                time.sleep(breakTime)
+                tasks = []
+                batch += 1
+        if len(tasks) > 0:  # run any remaining tasks
+            resL = await asyncio.gather(*tasks)
+            resultList.append(resL)
+        #
+        return all(resultList) and len(resultList) > 0
+
     def getArchiveDirList(self):
         archiveDirList = [self.__oD[k]["dataDirectory"] for k in self.__oD]
-
         return archiveDirList
 
     def getModelFileList(self, inputPathList=None):
