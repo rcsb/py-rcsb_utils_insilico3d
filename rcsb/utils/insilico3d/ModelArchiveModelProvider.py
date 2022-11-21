@@ -224,7 +224,6 @@ class ModelArchiveModelProvider:
         if not (modelSetName and destDir and numModels):
             return False
 
-        resultList = []
         numModels = numModels if numModels else numModelsTotal
         zeroPaddingWidth = len(str(numModelsTotal))
 
@@ -248,24 +247,43 @@ class ModelArchiveModelProvider:
             #
             except Exception as e:
                 logger.exception("Failing to fetch url %s with %s", url, str(e))
-                return False
+                return url
         #
         tasks = []
+        resultList = []
         batch = 1
         for modelUrl in modelUrlList:
             tasks.append(fetchFile(modelUrl))
             if len(tasks) == limit:
                 logger.info("Downloading batch %d", batch)
                 resL = await asyncio.gather(*tasks)
-                resultList.append(resL)
+                resultList += resL
                 time.sleep(breakTime)
                 tasks = []
                 batch += 1
         if len(tasks) > 0:  # run any remaining tasks
             resL = await asyncio.gather(*tasks)
-            resultList.append(resL)
+            resultList += resL
         #
-        return all(resultList) and len(resultList) > 0
+        # Re-run any failed model file downloads
+        failList = [i for i in resultList if i is not True]
+        maxRetries = 30
+        retries = 0
+        while len(failList) > 0 and retries < maxRetries:
+            retries += 1
+            logger.info("Re-attempting fetch (retry %d) for %d model files: %r", retries, len(failList), failList)
+            time.sleep(60)  # Give server a minute before refeteching
+            for modelUrl in failList:
+                tasks.append(fetchFile(modelUrl))
+            resL = await asyncio.gather(*tasks)
+            failList = [i for i in resL if i is not True]
+            if len(failList) > 0:
+                logger.info("Re-fetch attempt %d failed for %d model files: %r", retries, len(failList), failList)
+            else:
+                logger.info("Re-fetch succeeded for all model files")
+        #
+        ok = len(failList) == 0 and len(resultList) > 0
+        return ok
 
     def getArchiveDirList(self):
         archiveDirList = [self.__oD[k]["dataDirectory"] for k in self.__oD]
