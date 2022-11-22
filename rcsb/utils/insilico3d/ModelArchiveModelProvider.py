@@ -232,15 +232,14 @@ class ModelArchiveModelProvider:
             modelUrlList.append(f"https://modelarchive.org/api/projects/{modelSetName}-{number:0{zeroPaddingWidth}}?type=basic__model_file_name")
         logger.info("First few items in modelUrlList %r", modelUrlList[0:5])
 
-        sema = asyncio.BoundedSemaphore(10)
+        sema = asyncio.BoundedSemaphore(100)
 
-        async def fetchFile(url):
+        async def fetchFile(url, session):
             try:
                 fname = url.split("/")[-1].split("?")[0] + ".cif"
-                async with sema, aiohttp.ClientSession() as session:
-                    async with session.get(url) as resp:
-                        assert resp.status == 200
-                        data = await resp.read()
+                async with sema, session.get(url) as resp:
+                    assert resp.status == 200
+                    data = await resp.read()
                 async with aiofiles.open(os.path.join(destDir, fname), "wb") as outfile:
                     await outfile.write(data)
                 return True
@@ -248,39 +247,42 @@ class ModelArchiveModelProvider:
             except Exception as e:
                 logger.exception("Failing to fetch url %s with %s", url, str(e))
                 return url
+
+        def modelUrlBatches(fullUrlList, batchSize):
+            for i in range(0, len(fullUrlList), batchSize):
+                yield fullUrlList[i:i + batchSize]
         #
         tasks = []
-        resultList = []
-        batch = 1
-        for modelUrl in modelUrlList:
-            tasks.append(fetchFile(modelUrl))
-            if len(tasks) == limit:
-                logger.info("Downloading batch %d", batch)
+        resultList, failList = [], []
+        maxRetries = 10
+        for batchNum, batchUrls in enumerate(modelUrlBatches(modelUrlList, limit)):
+            logger.info("Downloading batch %d", batchNum)
+            async with aiohttp.ClientSession() as session:
+                for modelUrl in batchUrls:
+                    tasks.append(fetchFile(modelUrl, session))
                 resL = await asyncio.gather(*tasks)
+                failL = [i for i in resL if i is not True]
                 resultList += resL
-                time.sleep(breakTime)
                 tasks = []
-                batch += 1
-        if len(tasks) > 0:  # run any remaining tasks
-            resL = await asyncio.gather(*tasks)
-            resultList += resL
-        #
-        # Re-run any failed model file downloads
-        failList = [i for i in resultList if i is not True]
-        maxRetries = 30
-        retries = 0
-        while len(failList) > 0 and retries < maxRetries:
-            retries += 1
-            logger.info("Re-attempting fetch (retry %d) for %d model files: %r", retries, len(failList), failList)
-            time.sleep(60)  # Give server a minute before refeteching
-            for modelUrl in failList:
-                tasks.append(fetchFile(modelUrl))
-            resL = await asyncio.gather(*tasks)
-            failList = [i for i in resL if i is not True]
-            if len(failList) > 0:
-                logger.info("Re-fetch attempt %d failed for %d model files: %r", retries, len(failList), failList)
-            else:
-                logger.info("Re-fetch succeeded for all model files")
+                time.sleep(breakTime)
+            # Re-run any failed model file downloads
+            if len(failL) > 0:
+                retries = 0
+                while len(failL) > 0 and retries < maxRetries:
+                    retries += 1
+                    tasks = []
+                    logger.info("Re-attempting fetch (retry %d) for %d model files: %r", retries, len(failL), failL)
+                    time.sleep(60)  # Give server a minute before refeteching
+                    async with aiohttp.ClientSession() as session:
+                        for modelUrl in failL:
+                            tasks.append(fetchFile(modelUrl, session))
+                        resL = await asyncio.gather(*tasks)
+                        failL = [i for i in resL if i is not True]
+                    if len(failL) > 0:
+                        logger.info("Re-fetch attempt %d failed for %d model files: %r", retries, len(failL), failL)
+                    else:
+                        logger.info("Re-fetch succeeded for all model files")
+                failList += [i for i in failL]
         #
         ok = len(failList) == 0 and len(resultList) > 0
         return ok
