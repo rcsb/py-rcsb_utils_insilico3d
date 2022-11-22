@@ -252,28 +252,27 @@ class ModelArchiveModelProvider:
             for i in range(0, len(fullUrlList), batchSize):
                 yield fullUrlList[i:i + batchSize]
         #
-        tasks = []
         resultList, failList = [], []
         maxRetries = 10
         for batchNum, batchUrls in enumerate(modelUrlBatches(modelUrlList, limit)):
-            logger.info("Downloading batch %d", batchNum)
+            logger.info("Downloading batch %d", batchNum + 1)
             async with aiohttp.ClientSession() as session:
+                tasks = []
                 for modelUrl in batchUrls:
                     tasks.append(fetchFile(modelUrl, session))
                 resL = await asyncio.gather(*tasks)
                 failL = [i for i in resL if i is not True]
                 resultList += resL
-                tasks = []
                 time.sleep(breakTime)
             # Re-run any failed model file downloads
             if len(failL) > 0:
                 retries = 0
                 while len(failL) > 0 and retries < maxRetries:
                     retries += 1
-                    tasks = []
                     logger.info("Re-attempting fetch (retry %d) for %d model files: %r", retries, len(failL), failL)
                     time.sleep(60)  # Give server a minute before refeteching
                     async with aiohttp.ClientSession() as session:
+                        tasks = []
                         for modelUrl in failL:
                             tasks.append(fetchFile(modelUrl, session))
                         resL = await asyncio.gather(*tasks)
