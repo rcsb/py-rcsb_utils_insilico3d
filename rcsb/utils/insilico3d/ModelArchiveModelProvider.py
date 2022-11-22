@@ -232,7 +232,7 @@ class ModelArchiveModelProvider:
             modelUrlList.append(f"https://modelarchive.org/api/projects/{modelSetName}-{number:0{zeroPaddingWidth}}?type=basic__model_file_name")
         logger.info("First few items in modelUrlList %r", modelUrlList[0:5])
 
-        sema = asyncio.BoundedSemaphore(100)
+        sema = asyncio.BoundedSemaphore(20)
 
         async def fetchFile(url, session):
             try:
