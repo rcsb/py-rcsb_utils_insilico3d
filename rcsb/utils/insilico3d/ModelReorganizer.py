@@ -7,6 +7,9 @@
 #   28-Jun-2022  dwp Add __rebuildEntryIds() method to replace (or remove) source entry identifiers with internal IDs, to enable operability with RCSB.org tools.
 #                    Note that these modified data files will NOT be publicly served or available, and proper attribution using the source entry IDs will be given.
 #   29-Jun-2022  dwp Add both source and internal IDs to database_2 category in internal mmCIF file to maintain a reference and mapping to the source DB
+#   24-Oct-2022  dwp Add __rebuildDateDetails() method to add missing release date and version information to internal model mmCIF files if absent
+#                    (currently the case for ModelArchive model files);
+#                    Add the PAE access url to the holdings cache file for models with associated PAE data files (currently only AF models)
 #
 # To Do:
 # - pylint: disable=fixme
@@ -75,7 +78,8 @@ class ModelWorker(object):
             modelSourceDbMap = optionsD.get("modelSourceDbMap")
             destBaseDir = optionsD.get("destBaseDir")  # base path for all computed models (i.e., "computed-models"); Or will be root path at HTTP endpoint
             keepSource = optionsD.get("keepSource", False)  # whether to copy files over (instead of moving them)
-            reorganizeDate = optionsD.get("reorganizeDate", False)  # whether to copy files over (instead of moving them)
+            reorganizeDate = optionsD.get("reorganizeDate", None)  # reorganization date
+            sourceArchiveReleaseDate = optionsD.get("sourceArchiveReleaseDate", None)  # externally-obtained release date (i.e., not from CIF); as is case for ModelArchive models
             #
             for modelFileIn in dataList:
                 modelD = {}
@@ -97,6 +101,13 @@ class ModelWorker(object):
                 sourceModelEntryId = tObj.getValue("id", 0)
                 modelEntryId = "".join(char for char in sourceModelEntryId if char.isalnum()).upper()
                 internalModelId = modelSourcePrefix + "_" + modelEntryId
+                #
+                if sourceArchiveReleaseDate:
+                    dataContainer = self.__rebuildDateDetails(
+                        dataContainer=dataContainer,
+                        sourceModelEntryId=sourceModelEntryId,
+                        sourceArchiveReleaseDate=sourceArchiveReleaseDate,
+                    )
                 #
                 dataContainer = self.__rebuildEntryIds(
                     dataContainer=dataContainer,
@@ -136,7 +147,7 @@ class ModelWorker(object):
                 modelFileOut = os.path.join(destModelDir, internalModelName)
                 modelFileOutUnzip = modelFileOut.split(".gz")[0]
                 #
-                sourceModelUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, sourceModelEntryId)
+                sourceModelUrl, sourceModelPaeUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, sourceModelEntryId)
                 #
                 modelD["modelId"] = internalModelId
                 modelD["modelPath"] = modelPathFromPrefixDir  # Starts at prefix (e.g., "AF/XJ/E6/AF_AFA0A385XJE6F1.cif.gz"); needed like this by RepositoryProvider
@@ -145,6 +156,8 @@ class ModelWorker(object):
                 modelD["sourceModelFileName"] = modelFileNameIn
                 if sourceModelUrl:
                     modelD["sourceModelUrl"] = sourceModelUrl
+                if sourceModelPaeUrl:
+                    modelD["sourceModelPaeUrl"] = sourceModelPaeUrl
                 modelD["lastModifiedDate"] = lastModifiedDate
                 #
                 try:
@@ -181,17 +194,21 @@ class ModelWorker(object):
             sourceModelEntryId (str): model entry.id value as in the provided mmCIF file
 
         Returns:
-            (str): Accession URL for the specified model file and source.
-                    Note that file-specific downloads aren't gzipped, unlike model files in species tarball.
-                    E.g., "https://alphafold.ebi.ac.uk/files/AF-Q9RQP8-F1-model_v2.cif"
+            sourceModelUrl (str): Accession URL for the specified model file and source.
+                                  Note that file-specific downloads aren't gzipped, unlike model files in species tarball.
+                                  E.g., "https://alphafold.ebi.ac.uk/files/AF-Q9RQP8-F1-model_v2.cif"
+            sourceModelPaeUrl (str): Accession URL for the PAE file of the specified model if available, else None.
         """
         sourceModelUrl = None
+        sourceModelPaeUrl = None
         try:
             if modelSourcePrefix == "AF":
                 if not sourceModelEntryId.upper().endswith("F1"):
-                    return None
+                    return None, None
                 modelFileNameInUrl = sourceModelFileName.split(".gz")[0]
                 sourceModelUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelFileNameInUrl)
+                modelPaeFileNameInUrl = modelFileNameInUrl.split("-model_")[0] + "-predicted_aligned_error_" + modelFileNameInUrl.split("-model_")[1].split(".cif")[0] + ".json"
+                sourceModelPaeUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelPaeFileNameInUrl)
             elif modelSourcePrefix == "MB":
                 modbaseInternalId = sourceModelEntryId.split("model_")[-1]
                 # sourceModelUrl = "https://salilab.org/modbase/searchbyid?modelID=" + modbaseInternalId + "&displaymode=moddetail"  # Directs to entry page
@@ -205,7 +222,7 @@ class ModelWorker(object):
         except Exception as e:
             logger.exception("Failing with %s", str(e))
 
-        return sourceModelUrl
+        return sourceModelUrl, sourceModelPaeUrl
 
     def __rebuildEntryIds(self, dataContainer, sourceModelEntryId, sourceModelDb, internalModelId):
         """Replace or remove occurrences of source entry ID with internal ID
@@ -284,6 +301,51 @@ class ModelWorker(object):
         dataContainer.append(
             DataCategory("database_2", attributeNameList=["database_code", "database_id"], rowList=[[sourceModelEntryId, sourceModelDb], [internalModelId, "RCSB"]])
         )
+
+        return dataContainer
+
+    def __rebuildDateDetails(self, dataContainer, sourceModelEntryId, sourceArchiveReleaseDate):
+        """Add or rebuild release and revision date details for the dataContainer.
+
+        Mainly for ModelArchive models which currently lack this information in the mmCIF file (as of 19-Oct-2022 dwp).
+
+        Args:
+            dataContainer (object): mmcif.api.DataContainer object instance
+            sourceModelEntryId (str): source entry ID
+            sourceArchiveReleaseDate (str): release date for dataContainer, obtained from source model website (e.g., '2022-09-28')
+
+        Returns:
+            dataContainer: updated dataContainer object
+        """
+        # If pdbx_database_status.* doesn't exist, create it and add release date
+        if not dataContainer.exists("pdbx_database_status"):
+            dataContainer.append(
+                DataCategory(
+                    "pdbx_database_status",
+                    attributeNameList=["entry_id", "status_code"],
+                    rowList=[[sourceModelEntryId, "REL"]]
+                )
+            )
+
+        # If _pdbx_audit_revision_history.* doesn't exist, create it and add modified date
+        if not dataContainer.exists("pdbx_audit_revision_history"):
+            dataContainer.append(
+                DataCategory(
+                    "pdbx_audit_revision_history",
+                    attributeNameList=["data_content_type", "major_revision", "minor_revision", "ordinal", "revision_date"],
+                    rowList=[["Structure model", "1", "0", "1", sourceArchiveReleaseDate[0:10]]]
+                )
+            )
+
+        # If _pdbx_audit_revision_details.* doesn't exist, create it
+        if not dataContainer.exists("pdbx_audit_revision_details"):
+            dataContainer.append(
+                DataCategory(
+                    "pdbx_audit_revision_details",
+                    attributeNameList=["data_content_type", "ordinal", "revision_ordinal", "type", "provider"],
+                    rowList=[["Structure model", "1", "1", "Initial release", "repository"]]
+                )
+            )
 
         return dataContainer
 
@@ -459,7 +521,7 @@ class ModelReorganizer(object):
     def getCacheFilePath(self):
         return self.__cacheFilePath
 
-    def reorganize(self, inputModelList, modelSource, destBaseDir, useCache=True):
+    def reorganize(self, inputModelList, modelSource, destBaseDir, useCache=True, **kwargs):
         """Move model files from organism-wide model listing to hashed directory structure and rename files
         to follow internal identifier naming convention.
 
@@ -472,13 +534,16 @@ class ModelReorganizer(object):
             bool: True for success or False otherwise
         """
         ok = False
+        sourceArchiveReleaseDate = kwargs.get("sourceArchiveReleaseDate", None)  # Use for ModelArchive files which are currently missing revision date information
+        #
         try:
             mD, failD = self.__reorganizeModels(
                 inputModelList=inputModelList,
                 modelSource=modelSource,
                 destBaseDir=destBaseDir,
                 numProc=self.__numProc,
-                chunkSize=self.__chunkSize
+                chunkSize=self.__chunkSize,
+                sourceArchiveReleaseDate=sourceArchiveReleaseDate,
             )
             if len(failD) > 0:
                 logger.error("Failed to process %d model files.", len(failD))
@@ -501,7 +566,7 @@ class ModelReorganizer(object):
             logger.exception("Failing with %s", str(e))
         return ok
 
-    def __reorganizeModels(self, inputModelList, modelSource, destBaseDir, numProc=2, chunkSize=20):
+    def __reorganizeModels(self, inputModelList, modelSource, destBaseDir, numProc=2, chunkSize=20, **kwargs):
         """Prepare multiprocessor queue and workers for generating input:output map for model files, to use in reorganizing
         them into a structured directory tree and naming them with internal identifiers.
 
@@ -528,6 +593,7 @@ class ModelReorganizer(object):
         """
         mD = {}
         failD = {}
+        sourceArchiveReleaseDate = kwargs.get("sourceArchiveReleaseDate", None)  # Use for ModelArchive files which are currently missing revision date information
         tS = datetime.now().replace(microsecond=0).replace(tzinfo=pytz.UTC).isoformat()  # Desired format:  2022-04-15T12:00:00+00:00
         #
         logger.info("Starting with %d models, numProc %d at %r", len(inputModelList), numProc, tS)
@@ -551,6 +617,8 @@ class ModelReorganizer(object):
             "keepSource": self.__keepSource,
             "reorganizeDate": tS
         }
+        if sourceArchiveReleaseDate:
+            optD.update({"sourceArchiveReleaseDate": sourceArchiveReleaseDate})
         mpu.setOptions(optD)
         mpu.set(workerObj=rWorker, workerMethod="reorganize")
         mpu.setWorkingDir(workingDir=self.__workPath)

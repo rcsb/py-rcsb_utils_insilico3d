@@ -57,7 +57,7 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
                 useCache=False,
                 numProc=4,
                 chunkSize=20,
-                modelArchiveRequestedDatasetD={"ma-bak-cepc": {"urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name", "fileName": "ma-bak-cepc.zip"}}
+                modelArchiveRequestedDatasetD={"ma-bak-cepc": {"numModelsTotal": 1106, "numModels": 40}}
             )
             ok = mAMP.testCache()
             self.assertTrue(ok)
@@ -68,7 +68,7 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
             useCache=True,
             numProc=4,
             chunkSize=20,
-            modelArchiveRequestedDatasetD={"ma-bak-cepc": {"urlEnd": "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name", "fileName": "ma-bak-cepc.zip"}}
+            modelArchiveRequestedDatasetD={"ma-bak-cepc": {"numModelsTotal": 1106, "numModels": 40}}
         )
         archiveDirList = mAMP.getArchiveDirList()
         ok = True if len(archiveDirList) > 0 else False
@@ -81,16 +81,34 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
         self.assertTrue(ok)
         #
         # Next test reorganizing model file directory structure
-        ok = mAMP.reorganizeModelFiles(useCache=False, inputModelList=archiveModelFileList[0:10], numProc=4, chunkSize=20, keepSource=True)
+        ok = mAMP.reorganizeModelFiles(
+            useCache=False, inputModelList=archiveModelFileList[0:10],
+            numProc=4,
+            chunkSize=20,
+            keepSource=True,
+            sourceArchiveReleaseDate="2021-11-11",
+        )
         self.assertTrue(ok)
         # Now test using the reorganizer object directly
         mAMR = mAMP.getModelReorganizer(useCache=False, numProc=4, chunkSize=20, keepSource=True)
         destBaseDir = mAMP.getComputedModelsDataPath()
-        ok = mAMR.reorganize(inputModelList=archiveModelFileList[10:20], modelSource="ModelArchive", destBaseDir=destBaseDir, useCache=False)
+        ok = mAMR.reorganize(
+            inputModelList=archiveModelFileList[10:20],
+            modelSource="ModelArchive",
+            destBaseDir=destBaseDir,
+            useCache=False,
+            sourceArchiveReleaseDate="2021-11-11",
+        )
         self.assertTrue(ok)
         ok = mAMR.testCache()
         self.assertFalse(ok)  # Confirm that testCache FAILED (< 20 in cache)
-        ok = mAMR.reorganize(inputModelList=archiveModelFileList[20:30], modelSource="ModelArchive", destBaseDir=destBaseDir, useCache=True)
+        ok = mAMR.reorganize(
+            inputModelList=archiveModelFileList[20:30],
+            modelSource="ModelArchive",
+            destBaseDir=destBaseDir,
+            useCache=True,
+            sourceArchiveReleaseDate="2021-11-11",
+        )
         self.assertTrue(ok)
         ok = mAMR.testCache()
         self.assertTrue(ok)  # Confirm that testCache SUCCEEDED (>= 20 in cache)
