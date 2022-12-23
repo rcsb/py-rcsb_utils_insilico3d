@@ -40,3 +40,4 @@
   16-Nov-2022  - V0.33 Add AlphaFold model provider from public Google Cloud dataset;
                        Add methods to insert release dates to models lacking these details
                        Adjust ModelArchiveProvider to fetch model files individually (instead of the full bulk download)
+  23-Dec-2022  - V0.34 Configuration changes to support tox 4
