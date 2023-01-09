@@ -96,7 +96,7 @@ class ModelArchiveModelProvider:
             useCache = kwargs.get("useCache", True)
             baseUrl = kwargs.get("baseUrl", self.__modelArchiveSummaryPageBaseApiUrl)
             modelArchiveRequestedDatasetD = kwargs.get("modelArchiveRequestedDatasetD", {})
-            if not modelArchiveRequestedDatasetD:  # Fill in default
+            if not modelArchiveRequestedDatasetD:  # use default
                 modelArchiveRequestedDatasetD = {
                     "ma-bak-cepc": {
                         # "bulkFileName": "ma-bak-cepc.zip",
@@ -108,16 +108,14 @@ class ModelArchiveModelProvider:
                     },
                     "ma-coffe-slac": {
                         # "bulkFileName": "",
-                        # "numModelsTotal": 41932,
-                        # "filePattern": "ma-coffe-slac-c100000_g1_i1",
-                        # "filePattern": "ma-coffe-slac-c100000_g1_i2",
+                        # "numModelsTotal": ,
                     },
                     "ma-asfv-asfvg": {
-                        # "bulkFileName": "",
+                        # "bulkFileName": "ma-asfv-asfvg.zip",
                         # "numModelsTotal": ,
                     },
                     "ma-t3vr3": {
-                        # "bulkFileName": "",
+                        # "bulkFileName": "ma-t3vr3.zip",
                         # "numModelsTotal": ,
                     },
                 }
@@ -160,7 +158,6 @@ class ModelArchiveModelProvider:
                 for dataSet, pathD in modelArchiveRequestedDatasetD.items():
                     try:
                         sD = {}
-                        # dataSetNumModels = pathD.get("numModelsTotal")
                         numModelsToDownload = pathD.get("numModels", None)  # Used for testing purposes, defaults to total number of models
                         bulkFileName = pathD.get("bulkFileName", None)
                         if bulkFileName:
@@ -192,7 +189,6 @@ class ModelArchiveModelProvider:
                             ok = asyncio.run(self.downloadIndividualModelFiles(
                                 modelSetName=dataSet,
                                 destDir=dataSetDataDumpDir,
-                                # numModelsTotal=dataSetNumModels,
                                 numModels=numModelsToDownload
                             ))
                             logger.info("Completed fetch (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
@@ -231,7 +227,7 @@ class ModelArchiveModelProvider:
         Returns:
             list: list of individual model IDs
         """
-        modelSetResp = requests.get(os.path.join(self.__modelArchiveSummaryPageBaseApiUrl, modelSetName))
+        modelSetResp = requests.get(os.path.join(self.__modelArchiveSummaryPageBaseApiUrl, modelSetName), timeout=600)
         modelSetRespMaterials = modelSetResp.json()["materials_procedures"]["materials"]
         startIdx = modelSetRespMaterials.index("linkData=") + len("linkData=")
         endIdx = modelSetRespMaterials.index("];", startIdx) + 1
@@ -262,17 +258,13 @@ class ModelArchiveModelProvider:
 
         # First, fetch list of model set IDs
         modelSetIdFullList = self.fetchModelIdList(modelSetName)
-
         numModels = numModels if numModels else len(modelSetIdFullList)
-        # zeroPaddingWidth = len(str(numModelsTotal))
         modelSetIdL = modelSetIdFullList[0:numModels]
 
         modelUrlList = []
         for mId in modelSetIdL:
             mUrl = os.path.join(self.__modelArchiveSummaryPageBaseApiUrl, f"{mId}?type=basic__model_file_name")
             modelUrlList.append(mUrl)
-        # for number in range(1, numModels + 1):
-        #     modelUrlList.append(f"https://modelarchive.org/api/projects/{modelSetName}-{number:0{zeroPaddingWidth}}?type=basic__model_file_name")
         logger.info("First few items in modelUrlList %r", modelUrlList[0:5])
 
         sema = asyncio.BoundedSemaphore(20)
