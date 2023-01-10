@@ -185,7 +185,7 @@ class ModelArchiveModelProvider:
                             sD.update({"downloadMethod": "individual"})
                             dataSetDataDumpDir = os.path.join(self.__workPath, dataSet.replace(" ", "_"))
                             self.__fU.mkdir(dataSetDataDumpDir)
-                            logger.info("Fetching %d files for %s from server to local path %s", numModelsToDownload, dataSet, dataSetDataDumpDir)
+                            logger.info("Fetching files for %s from server to local path %s", dataSet, dataSetDataDumpDir)
                             ok = asyncio.run(self.downloadIndividualModelFiles(
                                 modelSetName=dataSet,
                                 destDir=dataSetDataDumpDir,
