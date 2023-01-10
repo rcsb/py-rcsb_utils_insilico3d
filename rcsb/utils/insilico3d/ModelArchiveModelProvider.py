@@ -100,23 +100,18 @@ class ModelArchiveModelProvider:
                 modelArchiveRequestedDatasetD = {
                     "ma-bak-cepc": {
                         # "bulkFileName": "ma-bak-cepc.zip",
-                        # "numModelsTotal": 1106,
                     },
                     "ma-ornl-sphdiv": {
                         # "bulkFileName": "ma-ornl-sphdiv.zip",
-                        # "numModelsTotal": 25134,
                     },
                     "ma-coffe-slac": {
                         # "bulkFileName": "",
-                        # "numModelsTotal": ,
                     },
                     "ma-asfv-asfvg": {
                         # "bulkFileName": "ma-asfv-asfvg.zip",
-                        # "numModelsTotal": ,
                     },
                     "ma-t3vr3": {
                         # "bulkFileName": "ma-t3vr3.zip",
-                        # "numModelsTotal": ,
                     },
                 }
             #
@@ -186,7 +181,7 @@ class ModelArchiveModelProvider:
                             dataSetDataDumpDir = os.path.join(self.__workPath, dataSet.replace(" ", "_"))
                             self.__fU.mkdir(dataSetDataDumpDir)
                             logger.info("Fetching files for %s from server to local path %s", dataSet, dataSetDataDumpDir)
-                            ok = asyncio.run(self.downloadIndividualModelFiles(
+                            ok, numModelsDownloaded = asyncio.run(self.downloadIndividualModelFiles(
                                 modelSetName=dataSet,
                                 destDir=dataSetDataDumpDir,
                                 numModels=numModelsToDownload
@@ -195,7 +190,7 @@ class ModelArchiveModelProvider:
                         #
                         sD.update({
                             "dataSetName": dataSet,
-                            "numModels": numModelsToDownload,
+                            "numModels": numModelsDownloaded,
                             "lastDownloaded": startDateTime,
                             "dataDirectory": dataSetDataDumpDir,
                         })
@@ -253,7 +248,7 @@ class ModelArchiveModelProvider:
             (bool): True if successful; False otherwise.
         """
 
-        if not (modelSetName and destDir and numModels):
+        if not (modelSetName and destDir):
             return False
 
         # First, fetch list of model set IDs
@@ -319,7 +314,8 @@ class ModelArchiveModelProvider:
                 failList += [i for i in failL]
         #
         ok = len(failList) == 0 and len(resultList) > 0
-        return ok
+        numModelsDownloaded = len([i for i in resultList if i is True])
+        return ok, numModelsDownloaded
 
     def getArchiveDirList(self):
         archiveDirList = [self.__oD[k]["dataDirectory"] for k in self.__oD]
