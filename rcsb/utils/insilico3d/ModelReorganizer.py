@@ -236,9 +236,10 @@ class ModelWorker(object):
         - _pdbx_database_status.entry_id
 
         Remove the following categories (or attributes) from the mmCIF completely:
+        - _exptl.* (entire category loop)
         - _entry.ma_collection_id
-        - _database_2.*  (entire category loop)  - will repopulate afterwards
-        - _ma_entry_associated_files.*  (entire category loop)
+        - _ma_entry_associated_files.* (entire category loop)
+        - _database_2.* (entire category loop) -> repopulated afterwards
 
         And ADD the following:
         - _database_2.*  - add references to both sourceDB ID and internal RCSB ID
@@ -288,13 +289,17 @@ class ModelWorker(object):
                 if tObj.getValue("entry_id", 0) == sourceModelEntryId:
                     tObj.setValue(internalModelId, "entry_id", 0)
 
-        # Remove database_2.*  (entire category loop)
-        if dataContainer.exists("database_2"):
-            dataContainer.remove("database_2")
+        # Remove exptl.*  (entire category loop)
+        if dataContainer.exists("exptl"):
+            dataContainer.remove("exptl")
 
         # Remove ma_entry_associated_files.*  (entire category loop)
         if dataContainer.exists("ma_entry_associated_files"):
             dataContainer.remove("ma_entry_associated_files")
+
+        # Remove database_2.*  (entire category loop)
+        if dataContainer.exists("database_2"):
+            dataContainer.remove("database_2")
 
         # RE-ADD database_2.* with corrected references to both sourceDB ID and internal RCSB ID
         # (Note that the category will still be masked and NOT be loaded into ExDB, just saved to internal file - as of 29-Jun-2022 dwp)

@@ -7,6 +7,7 @@
 #   24-Oct-2022  dwp Add functionality to fetch the release date associated for a given ModelArchive data set
 #                    (to use for data loading in case model mmCIF file doesn't contain this information already)
 #   16-Nov-2022  dwp Add new default functionality to fetch model files individually instead of the full bulk download
+#    9-Jan-2023  dwp Fetch data set model IDs directly (don't try to construct them here), and add more ModelArchive data sets
 ##
 """
 Accessors for ModelArchive 3D In Silico Models (mmCIF).
@@ -22,6 +23,7 @@ import datetime
 import logging
 import os.path
 import time
+import json
 from pathlib import Path
 import glob
 import requests
@@ -92,17 +94,24 @@ class ModelArchiveModelProvider:
             startTime = time.time()
             startDateTime = datetime.datetime.now().isoformat()
             useCache = kwargs.get("useCache", True)
-            baseUrl = kwargs.get("baseUrl", "https://www.modelarchive.org/api/projects")
+            baseUrl = kwargs.get("baseUrl", self.__modelArchiveSummaryPageBaseApiUrl)
             modelArchiveRequestedDatasetD = kwargs.get("modelArchiveRequestedDatasetD", {})
-            if not modelArchiveRequestedDatasetD:  # Fill in default
+            if not modelArchiveRequestedDatasetD:  # use default
                 modelArchiveRequestedDatasetD = {
                     "ma-bak-cepc": {
                         # "bulkFileName": "ma-bak-cepc.zip",
-                        "numModelsTotal": 1106,  # Necessary for forming filenames
                     },
                     "ma-ornl-sphdiv": {
                         # "bulkFileName": "ma-ornl-sphdiv.zip",
-                        "numModelsTotal": 25134,
+                    },
+                    "ma-coffe-slac": {
+                        # "bulkFileName": "",
+                    },
+                    "ma-asfv-asfvg": {
+                        # "bulkFileName": "ma-asfv-asfvg.zip",
+                    },
+                    "ma-t3vr3": {
+                        # "bulkFileName": "ma-t3vr3.zip",
                     },
                 }
             #
@@ -144,8 +153,7 @@ class ModelArchiveModelProvider:
                 for dataSet, pathD in modelArchiveRequestedDatasetD.items():
                     try:
                         sD = {}
-                        dataSetNumModels = pathD.get("numModelsTotal")
-                        numModelsToDownload = pathD.get("numModels", dataSetNumModels)  # Used for testing purposes, defaults to total number of models
+                        numModelsToDownload = pathD.get("numModels", None)  # Used for testing purposes, defaults to total number of models
                         bulkFileName = pathD.get("bulkFileName", None)
                         if bulkFileName:
                             # Download bulk model archive file (contains associated local pairwise quality data and a3m files)
@@ -172,18 +180,17 @@ class ModelArchiveModelProvider:
                             sD.update({"downloadMethod": "individual"})
                             dataSetDataDumpDir = os.path.join(self.__workPath, dataSet.replace(" ", "_"))
                             self.__fU.mkdir(dataSetDataDumpDir)
-                            logger.info("Fetching %d files for %s from server to local path %s", numModelsToDownload, dataSet, dataSetDataDumpDir)
-                            ok = asyncio.run(self.downloadIndividualModelFiles(
+                            logger.info("Fetching files for %s from server to local path %s", dataSet, dataSetDataDumpDir)
+                            ok, numModelsDownloaded = asyncio.run(self.downloadIndividualModelFiles(
                                 modelSetName=dataSet,
                                 destDir=dataSetDataDumpDir,
-                                numModelsTotal=dataSetNumModels,
                                 numModels=numModelsToDownload
                             ))
                             logger.info("Completed fetch (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
                         #
                         sD.update({
                             "dataSetName": dataSet,
-                            "numModels": numModelsToDownload,
+                            "numModels": numModelsDownloaded,
                             "lastDownloaded": startDateTime,
                             "dataDirectory": dataSetDataDumpDir,
                         })
@@ -206,13 +213,33 @@ class ModelArchiveModelProvider:
 
         return oD, createdDate
 
-    async def downloadIndividualModelFiles(self, modelSetName=None, destDir=None, numModelsTotal=0, limit=100, breakTime=5, numModels=None):
+    def fetchModelIdList(self, modelSetName):
+        """Fetech the list of individual models files for a ModelArchive data set.
+
+        Args:
+            modelSetName (str): model set name (e.g., "ma-ornl-sphdiv").
+
+        Returns:
+            list: list of individual model IDs
+        """
+        modelSetResp = requests.get(os.path.join(self.__modelArchiveSummaryPageBaseApiUrl, modelSetName), timeout=600)
+        modelSetRespMaterials = modelSetResp.json()["materials_procedures"]["materials"]
+        startIdx = modelSetRespMaterials.index("linkData=") + len("linkData=")
+        endIdx = modelSetRespMaterials.index("];", startIdx) + 1
+        modelSetString = modelSetRespMaterials[startIdx:endIdx]
+        modelSetL = json.loads(modelSetString)
+        modelIdList = []
+        for data in modelSetL:
+            modelIdList.append(data["id"])
+        return modelIdList
+
+    async def downloadIndividualModelFiles(self, modelSetName=None, destDir=None, limit=100, breakTime=5, numModels=None):
         """Download model files individually, in case bulk download not available or want to avoid downloading (currently) unnecessary associated metdata.
 
         Args:
             modelSetName (str): model set name (e.g., "ma-ornl-sphdiv").
             destDir (str): destination directory to which to download model files.
-            numModelsTotal (int): total number of models in model set (e.g., 25135). Defaults to 0.
+            numModels (int): number of models to download from model set.
             limit (int, optional): max number of models to download asynchronously at once. Splits the total set into batches of size(limit),
                                    and forces sleep(breakTime) between batches to spare traffic load on ModelArchive server). Defaults to 100.
             breakTime (int, optional): seconds to wait between subsequent batches of asynchronous requests. Defaults to 5.
@@ -221,15 +248,18 @@ class ModelArchiveModelProvider:
             (bool): True if successful; False otherwise.
         """
 
-        if not (modelSetName and destDir and numModels):
+        if not (modelSetName and destDir):
             return False
 
-        numModels = numModels if numModels else numModelsTotal
-        zeroPaddingWidth = len(str(numModelsTotal))
+        # First, fetch list of model set IDs
+        modelSetIdFullList = self.fetchModelIdList(modelSetName)
+        numModels = numModels if numModels else len(modelSetIdFullList)
+        modelSetIdL = modelSetIdFullList[0:numModels]
 
         modelUrlList = []
-        for number in range(1, numModels + 1):
-            modelUrlList.append(f"https://modelarchive.org/api/projects/{modelSetName}-{number:0{zeroPaddingWidth}}?type=basic__model_file_name")
+        for mId in modelSetIdL:
+            mUrl = os.path.join(self.__modelArchiveSummaryPageBaseApiUrl, f"{mId}?type=basic__model_file_name")
+            modelUrlList.append(mUrl)
         logger.info("First few items in modelUrlList %r", modelUrlList[0:5])
 
         sema = asyncio.BoundedSemaphore(20)
@@ -284,7 +314,8 @@ class ModelArchiveModelProvider:
                 failList += [i for i in failL]
         #
         ok = len(failList) == 0 and len(resultList) > 0
-        return ok
+        numModelsDownloaded = len([i for i in resultList if i is True])
+        return ok, numModelsDownloaded
 
     def getArchiveDirList(self):
         archiveDirList = [self.__oD[k]["dataDirectory"] for k in self.__oD]
