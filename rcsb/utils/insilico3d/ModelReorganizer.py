@@ -465,7 +465,7 @@ class ModelWorker(object):
         logger.debug("Adding NCBI ID for %s", dataContainer.getName())
         tObj = dataContainer.getObj("ma_target_ref_db_details")
         if not tObj.hasAttribute("ncbi_taxonomy_id"):
-            tObj.appendAttribute("ncbi_taxonomy_ids")
+            tObj.appendAttribute("ncbi_taxonomy_id")
         tObj.setValue(ncbiId, "ncbi_taxonomy_id", 0)
 
         return dataContainer
