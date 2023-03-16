@@ -10,10 +10,10 @@
 #   24-Oct-2022  dwp Add __rebuildDateDetails() method to add missing release date and version information to internal model mmCIF files if absent
 #                    (currently the case for ModelArchive model files);
 #                    Add the PAE access url to the holdings cache file for models with associated PAE data files (currently only AF models)
+#   20-Mar-2023  dwp Assign NCBI ID to ma-ornl-sphdiv files to enable organism metadata population
 #
 # To Do:
 # - pylint: disable=fixme
-# - Add mkdssp calculation
 ##
 
 """
@@ -125,6 +125,10 @@ class ModelWorker(object):
                 #
                 # Insert default deposited pdbx_assembly information into CIF
                 dataContainer = self.__addDepositedAssembly(dataContainer=dataContainer)
+                #
+                # Add NCBI ID to models missing this data (currently only ma-ornl-sphdiv)
+                if internalModelId.startswith("MA_MAORNLSPHDIV"):
+                    dataContainer = self.__addNcbiId(dataContainer=dataContainer, ncbiId="2779801")
                 #
                 # Gzip the original file if not already (as the case for ModelArchive model files)
                 if modelFileIn.endswith(".gz"):
@@ -440,6 +444,29 @@ class ModelWorker(object):
                 tObj.setValue("?", atName, rowIdx)
         #
         tObj.setValue(str(len(asymIdL)), "oligomeric_count", rowIdx)
+
+        return dataContainer
+
+    def __addNcbiId(self, dataContainer, ncbiId):
+        """Add the NCBI ID to _ma_target_ref_db_details.ncbi_taxonomy_id
+
+        Args:
+            dataContainer (object): mmcif.api.DataContainer object instance
+            ncbiId (str): NCBI ID (e.g., "2779801")
+
+        Returns:
+            dataContainer: updated dataContainer object
+
+        """
+        if not dataContainer.exists("ma_target_ref_db_details"):
+            logger.warning("Category ma_target_ref_db_details does not exist for entry %r", dataContainer.getName())
+            return dataContainer
+
+        logger.debug("Adding NCBI ID for %s", dataContainer.getName())
+        tObj = dataContainer.getObj("ma_target_ref_db_details")
+        if not tObj.hasAttribute("ncbi_taxonomy_id"):
+            tObj.appendAttribute("ncbi_taxonomy_ids")
+        tObj.setValue(ncbiId, "ncbi_taxonomy_id", 0)
 
         return dataContainer
 
