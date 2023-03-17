@@ -448,7 +448,9 @@ class ModelWorker(object):
         return dataContainer
 
     def __addNcbiId(self, dataContainer, ncbiId):
-        """Add the NCBI ID to _ma_target_ref_db_details.ncbi_taxonomy_id
+        """Add the NCBI ID to _ma_target_ref_db_details.ncbi_taxonomy_id.
+        Note this only adds the ID to the first row of the ma_target_ref_db_details table.
+        If you need to add the ID to more than one row/entity, method will need to be modified.
 
         Args:
             dataContainer (object): mmcif.api.DataContainer object instance
