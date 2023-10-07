@@ -8,6 +8,7 @@
 #                    (to use for data loading in case model mmCIF file doesn't contain this information already)
 #   16-Nov-2022  dwp Add new default functionality to fetch model files individually instead of the full bulk download
 #    9-Jan-2023  dwp Fetch data set model IDs directly (don't try to construct them here), and add more ModelArchive data sets
+#    6-Oct-2023  dwp Individual model files now being downloaded as .cif.gz when using aiohttp
 ##
 """
 Accessors for ModelArchive 3D In Silico Models (mmCIF).
@@ -266,8 +267,8 @@ class ModelArchiveModelProvider:
 
         async def fetchFile(url, session):
             try:
-                fname = url.split("/")[-1].split("?")[0] + ".cif"
-                async with sema, session.get(url) as resp:
+                fname = url.split("/")[-1].split("?")[0] + ".cif.gz"
+                async with sema, session.get(url, timeout=10) as resp:
                     assert resp.status == 200
                     data = await resp.read()
                 async with aiofiles.open(os.path.join(destDir, fname), "wb") as outfile:
@@ -340,7 +341,7 @@ class ModelArchiveModelProvider:
 
         for modelDir in inputPathList:
             try:
-                modelFiles = glob.glob(os.path.join(modelDir, "*.cif"))
+                modelFiles = glob.glob(os.path.join(modelDir, "*.cif.gz"))  # may need to be ".cif" for bulk downloads, but need to check
                 modelFileList = [os.path.abspath(f) for f in modelFiles]
             except Exception as e:
                 logger.exception("Failing with %s", str(e))

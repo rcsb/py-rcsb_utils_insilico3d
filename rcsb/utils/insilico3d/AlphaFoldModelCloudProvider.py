@@ -8,6 +8,12 @@
 """
 Accessors for AlphaFold 3D Models (mmCIF) from public Google Cloud datasets.
 
+Details about downloading these data are described here: https://github.com/google-deepmind/alphafold/blob/main/afdb/README.md
+
+View metadata here: https://console.cloud.google.com/marketplace/product/bigquery-public-data/deepmind-alphafold?pli=1&organizationId=835909686548
+
+View datasets here: https://console.cloud.google.com/storage/browser/public-datasets-deepmind-alphafold-v4
+Example by Taxonomy ID: https://console.cloud.google.com/storage/browser/public-datasets-deepmind-alphafold-v4/proteomes;tab=objects?prefix=proteome-tax_id-38727
 """
 
 __docformat__ = "google en"
@@ -23,6 +29,7 @@ from pathlib import Path
 import copy
 import glob
 # import re
+import tarfile
 from google.cloud import storage
 
 from rcsb.utils.io.FileUtil import FileUtil
@@ -51,9 +58,9 @@ class AlphaFoldModelCloudProvider:
         self.__cachePath = cachePath  # Directory where model files will be reorganized and stored permanently (also contains computed-model-cache.json file) (i.e., 'computed-models')
         self.__baseWorkPath = baseWorkPath if baseWorkPath else self.__cachePath
         self.__workPath = os.path.join(self.__baseWorkPath, "work-dir", "AlphaFoldCloud")  # Directory where model files will be downloaded (also contains AF-specific cache file)
-        self.__speciesDataCacheFile = os.path.join(self.__workPath, "model-download-cache.json")
+        self.__AFCloudTaxIdDataCacheFile = os.path.join(self.__workPath, "model-download-cache.json")
 
-        self.__bucketName = "public-datasets-deepmind-alphafold"
+        self.__bucketName = "public-datasets-deepmind-alphafold-v4"
 
         self.__mU = MarshalUtil(workPath=self.__workPath)
         self.__fU = FileUtil(workPath=self.__workPath)
@@ -88,74 +95,117 @@ class AlphaFoldModelCloudProvider:
             startDateTime = datetime.datetime.now().isoformat()
             useCache = kwargs.get("useCache", True)
 
-            alphaFoldRequestedSpeciesList = kwargs.get("alphaFoldRequestedSpeciesList", [])
-            if not alphaFoldRequestedSpeciesList:
-                alphaFoldRequestedSpeciesList = [
-                    {"species": "Panicum virgatum", "common_name": "Switchgrass", "taxIds": ["38727", "206033"]}
+            # alphaFoldRequestedSpeciesList = kwargs.get("alphaFoldRequestedSpeciesList", [])
+            # if not alphaFoldRequestedSpeciesList:
+            #     alphaFoldRequestedSpeciesList = [
+            #         {"species": "Panicum virgatum", "common_name": "Switchgrass", "taxIds": ["38727", "206033"]},
+            #     ]
+
+            alphaFoldRequestedTaxIdPrefixList = kwargs.get("alphaFoldRequestedTaxIdPrefixList", [])
+            if not alphaFoldRequestedTaxIdPrefixList:
+                alphaFoldRequestedTaxIdPrefixList = [
+                    "206033",
+                    "100000",
+                    # "408170",
                 ]
 
             self.__fU.mkdir(self.__workPath)
 
-            logger.info("useCache %r self.__speciesDataCacheFile %r", useCache, self.__speciesDataCacheFile)
-            if useCache and self.__mU.exists(self.__speciesDataCacheFile):
-                logger.info("Loading data cache, %s.", self.__speciesDataCacheFile)
-                cacheD = self.__mU.doImport(self.__speciesDataCacheFile, fmt="json")
+            logger.info("useCache %r self.__AFCloudTaxIdDataCacheFile %r", useCache, self.__AFCloudTaxIdDataCacheFile)
+            if useCache and self.__mU.exists(self.__AFCloudTaxIdDataCacheFile):
+                logger.info("Loading data cache, %s.", self.__AFCloudTaxIdDataCacheFile)
+                cacheD = self.__mU.doImport(self.__AFCloudTaxIdDataCacheFile, fmt="json")
                 createdDate = cacheD["created"]
                 oD = cacheD["data"]
-                cacheArchiveFileList = [sF for sF in oD]
-                logger.info("Checking consistency of cached data with data available on FTP")
-                for archiveD in alphaFoldRequestedSpeciesList:
-                    try:
-                        speciesName = archiveD.get("species", archiveD.get("label", None))
-                        archiveFile = archiveD["archive_name"]
-                        archiveFileSize = int(archiveD["size_bytes"])
-                        speciesNumModels = int(archiveD["num_predicted_structures"])
-                        if speciesName not in cacheArchiveFileList:
-                            logger.info("Species archive data for %s not found in local cache. Will re-fetch.", speciesName)
-                            cacheD = self.fetchSpeciesArchive(archiveD, cacheD)
-                            oD = cacheD["data"]
-                            ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=4)
-                            continue
-                        #
-                        # Check if cache was already reorganized
-                        reorganized = archiveD.get("reorganized", False)
-                        reorganizedBaseDir = archiveD.get("reorganizedBaseDir", None)
-                        if reorganized and reorganizedBaseDir is not None:
-                            if self.__mU.exists(reorganizedBaseDir):
-                                logger.info("Species archive data for %s already reorganized to: %s", speciesName, reorganizedBaseDir)
-                        #
-                        cacheArchiveDir = oD[speciesName]["data_directory"]
-                        cacheArchiveFileSize = oD[speciesName]["size_bytes"]
-                        cacheSpeciesNumModels = oD[speciesName]["num_predicted_structures"]
-                        if not os.path.exists(cacheArchiveDir) and not reorganized:
-                            logger.warning("Species archive data directory for %s not found at cached path %s", archiveFile, cacheArchiveDir)
-                        if cacheArchiveFileSize != archiveFileSize:
-                            logger.warning("Species archive data file %s not up-to-date with file available on FTP server.", archiveFile)
-                        if cacheSpeciesNumModels != speciesNumModels:
-                            logger.warning(
-                                "Missing some or all of the bundled model files for species archive %s as available on FTP server (found %d / %d model files)",
-                                archiveFile,
-                                cacheSpeciesNumModels,
-                                speciesNumModels,
-                            )
-                    except Exception as e:
-                        logger.exception("Failing on checking of cache data for %s from FTP server, with message:\n%s", archiveD["archive_name"], str(e))
-
             else:
                 logger.info("Refetching all files from server.")
                 cacheD = {}
                 cacheD.update({"created": startDateTime, "data": {}})
-                for archiveD in alphaFoldRequestedSpeciesList:
-                    cacheD = self.fetchSpeciesArchive(archiveD, cacheD)
+                for taxIdPrefix in alphaFoldRequestedTaxIdPrefixList:
+                    cacheD = self.fetchTaxIdArchive(taxIdPrefix, cacheD)
                 createdDate = cacheD["created"]
                 oD = cacheD["data"]
-                ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=4)
+                ok = self.__mU.doExport(self.__AFCloudTaxIdDataCacheFile, cacheD, fmt="json", indent=4)
                 logger.info("Export AlphaFold species model data (%d) status %r", len(oD), ok)
 
         except Exception as e:
             logger.exception("Failing with %s", str(e))
 
         return oD, createdDate
+
+    def fetchTaxIdArchive(self, taxIdPrefix, cacheD):
+        try:
+            startTime = time.time()
+            client = storage.Client()
+            bucket = client.bucket(self.__bucketName)
+            #
+            taxIdPrefixDataDumpDir = os.path.join(self.__workPath, taxIdPrefix)
+            self.__fU.mkdir(taxIdPrefixDataDumpDir)
+            blobs = bucket.list_blobs(prefix="proteomes/proteome-tax_id-" + taxIdPrefix)
+            for blob in blobs:
+                archiveFile = blob.name.split("/")[-1]
+                taxId = archiveFile.split("tax_id-")[-1].split("-")[0]
+                taxIdAndIdx = archiveFile.split("tax_id-")[-1].split("_v")[0]
+                logger.info("archiveFile: %r, taxId: %r, taxIdAndIdx: %r", archiveFile, taxId, taxIdAndIdx)
+                # tD = {"taxId": taxId}
+                if not archiveFile.endswith(".tar"):
+                    logger.info("archiveFile %r not a tar file - skipping...", archiveFile)
+                    continue
+                archiveFileDumpPath = os.path.join(taxIdPrefixDataDumpDir, archiveFile)
+                # tD.update({"data_directory": taxIdPrefixDataDumpDir})
+                logger.info("Fetching file %s from Google Cloud bucket %s to local path %s", archiveFile, self.__bucketName, archiveFileDumpPath)
+                blob.download_to_filename(archiveFileDumpPath)
+                logger.info("Completed fetch at %s (%.4f seconds)", time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
+                if taxIdPrefixDataDumpDir not in cacheD["data"]:
+                    cacheD["data"].update({taxIdPrefixDataDumpDir: {"archive_files": []}})
+                cacheD["data"][taxIdPrefixDataDumpDir]["archive_files"].append(archiveFile)
+
+                # logger.info("unbundling archiveFileDumpPath %r", archiveFileDumpPath)
+                # ok = self.__fU.unbundleTarfile(archiveFileDumpPath, dirPath=taxIdPrefixDataDumpDir)
+                # logger.info("Clearing confidence and PAE files from extracted tar bundle...")
+                # for pdbDumpFile in Path(taxIdPrefixDataDumpDir).glob("*.json.gz"):
+                #     pdbDumpFile.unlink()
+
+                # numModels = None
+                # ok = False
+                # with tarfile.open(archiveFileDumpPath, "r") as tF:
+                #     # Get a list of items (files and directories) in the tar file
+                #     fL = tF.getnames()
+                #     logger.info("tarFile items: %r", fL)
+                #     fL = [f for f in fL if f.endswith(".cif.gz")]  # only extract model files (not PAE and pLDDT files)
+                #     numModels = len(fL)
+                #     # DON'T EXTRACT THEM YET--ONLY DO THIS WHEN RE-ORGANIZING
+                #     # for fName in fL:
+                #     #     fOutputPath = os.path.join(taxIdPrefixDataDumpDir, fName)
+                #     #     ok = self.extractTarMember(archiveFileDumpPath, fName, fOutputPath)
+                #     #     if not ok:
+                #     #         logger.error("Failed to extract member %r from archiveFileDumpPath %r", fName, archiveFileDumpPath)
+                #     #         ok = False
+                #     #         break
+                # if numModels:
+                #     ok = True
+                # if ok:
+                #     # self.__fU.remove(archiveFileDumpPath)
+                #     # tD.update({"num_predicted_structures": numModels})
+                #     cacheD["data"].setdefault(taxIdPrefixDataDumpDir, []).append(archiveFile)
+                #     # cacheD["data"].update({archiveFile: tD})
+
+        except Exception as e:
+            logger.exception("Failing on fetching of taxIdPrefix %s from FTP server, with message:\n%s", taxIdPrefix, str(e))
+
+        return cacheD
+
+    def extractTarMember(self, tarFilePath, memberName, memberPath):
+        ret = True
+        try:
+            with tarfile.open(tarFilePath) as tar:
+                fIn = tar.extractfile(memberName)
+                with open(memberPath, "wb") as ofh:
+                    ofh.write(fIn.read())
+        except Exception as e:
+            logger.exception("Failing with %s", str(e))
+            ret = False
+        return ret
 
     def fetchSpeciesArchive(self, archiveD, cacheD):
         try:
@@ -199,7 +249,7 @@ class AlphaFoldModelCloudProvider:
         return cacheD
 
     def getArchiveDirList(self):
-        archiveDirList = [self.__oD[k]["data_directory"] for k in self.__oD]
+        archiveDirList = [k for k in self.__oD]
 
         return archiveDirList
 
@@ -207,8 +257,8 @@ class AlphaFoldModelCloudProvider:
         archivDataDict = copy.deepcopy(self.__oD)
         return archivDataDict
 
-    def getModelFileList(self, inputPathList=None):
-        """Return a list of filepaths for all mmCIF models under the provided set of directories.
+    def getArchiveFileList(self, inputPathList=None):
+        """Return a list of filepaths for all tar files under the provided set of directories.
 
         Args:
             inputPathList (list): Optional (but recommended) list of paths to directories containing model mmCIF files to return.
@@ -222,16 +272,16 @@ class AlphaFoldModelCloudProvider:
         if not inputPathList:
             inputPathList = self.getArchiveDirList()
 
-        modelFileList = []
+        archiveFileList = []
 
-        for modelDir in inputPathList:
+        for archiveDir in inputPathList:
             try:
-                modelFiles = glob.glob(os.path.join(modelDir, "*.cif.gz"))
-                modelFileList = [os.path.abspath(f) for f in modelFiles]
+                archiveFiles = glob.glob(os.path.join(archiveDir, "*.tar"))
+                archiveFileList = [os.path.abspath(f) for f in archiveFiles]
             except Exception as e:
                 logger.exception("Failing with %s", str(e))
 
-        return modelFileList
+        return archiveFileList
 
     def getSpeciesDataDownloadDate(self):
         return self.__createdDate
@@ -239,8 +289,8 @@ class AlphaFoldModelCloudProvider:
     def getBaseDataPath(self):
         return self.__workPath
 
-    def getSpeciesDataCacheFilePath(self):
-        return self.__speciesDataCacheFile
+    def getAFCloudTaxIdDataCacheFilePath(self):
+        return self.__AFCloudTaxIdDataCacheFile
 
     def getModelReorganizer(self, cachePath=None, useCache=True, workPath=None, **kwargs):
         cachePath = cachePath if cachePath else self.__cachePath
@@ -250,8 +300,66 @@ class AlphaFoldModelCloudProvider:
     def getComputedModelsDataPath(self):
         return self.__cachePath
 
-    def reorganizeModelFiles(self, cachePath=None, useCache=True, inputModelList=None, **kwargs):
-        """Reorganize model files from organism-wide model listing to hashed directory structure and rename files
+    # def reorganizeModelFiles(self, cachePath=None, useCache=True, inputModelList=None, **kwargs):
+    #     """Reorganize model files from organism-wide model listing to hashed directory structure and rename files
+    #     to follow internal identifier naming convention.
+
+    #     Args:
+    #         cachePath (str): Path to cache directory.
+    #         inputModelList (list, optional): List of input model filepaths to reorganize; defaults to all models for all species model sets.
+    #         **kwargs (optional):
+    #             numProc (int): number of processes to use; default 2.
+    #             chunkSize (int): incremental chunk size used for distribute work processes; default 20.
+    #             keepSource (bool): whether to copy files to new directory (instead of moving them); default False.
+    #             cacheFilePath (str): full filepath and name for cache file containing a dictionary of all reorganized models.
+
+    #     Returns:
+    #         (bool): True if successful; False otherwise.
+    #     """
+    #     try:
+    #         ok = False
+    #         #
+    #         mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
+    #         #
+    #         if inputModelList:  # Only reorganize given list of model files
+    #             ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
+    #             if not ok:
+    #                 logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputModelList[0])
+    #         #
+    #         else:  # Reorganize ALL model files for ALL available species model sets
+    #             cacheD = self.__mU.doImport(self.__speciesDataCacheFile, fmt="json")
+    #             archiveDataD = self.getArchiveDataDict()
+    #             for species, archiveD in archiveDataD.items():
+    #                 archiveDir = archiveD["data_directory"]
+    #                 # First check if cache was already reorganized
+    #                 if cacheD["data"][species]["data_directory"] == archiveDir:
+    #                     reorganized = archiveD.get("reorganized", False)
+    #                     reorganizedBaseDir = archiveD.get("reorganizedBaseDir", None)
+    #                     if reorganized and reorganizedBaseDir is not None:
+    #                         if self.__mU.exists(reorganizedBaseDir) and reorganizedBaseDir == self.__cachePath:
+    #                             logger.info("Species archive data for %s already reorganized to: %s", species, reorganizedBaseDir)
+    #                             ok = True
+    #                             continue
+    #                 # Proceed with reorganization
+    #                 inputModelList = self.getModelFileList(inputPathList=[archiveDir])
+    #                 ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
+    #                 if not ok:
+    #                     logger.error("Reorganization of model files failed for species archive %s", archiveDir)
+    #                     break
+    #                 # Update the cache file to indicate that the given species archive has been reorganized
+    #                 if cacheD["data"][species]["data_directory"] == archiveDir:
+    #                     cacheD["data"][species].update({"reorganized": True, "reorganizedBaseDir": self.__cachePath})
+    #                     logger.info("Reorganization of model files complete for species, %s, from archive %s", species, archiveDir)
+    #                 ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=4)
+    #     #
+    #     except Exception as e:
+    #         logger.exception("Failing with %s", str(e))
+    #         ok = False
+    #     #
+    #     return ok
+
+    def extractAndReorganizeModelFiles(self, cachePath=None, useCache=True, inputArchiveList=None, **kwargs):
+        """Extract and reorganize model files from organism-wide model listing to hashed directory structure and rename files
         to follow internal identifier naming convention.
 
         Args:
@@ -271,39 +379,89 @@ class AlphaFoldModelCloudProvider:
             #
             mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
             #
-            if inputModelList:  # Only reorganize given list of model files
-                ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
-                if not ok:
-                    logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputModelList[0])
+            # if inputArchiveList:  # Only reorganize given list of model files
+            #     ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFoldCloud", destBaseDir=self.__cachePath, useCache=useCache)
+            #     if not ok:
+            #         logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputArchiveList[0])
             #
-            else:  # Reorganize ALL model files for ALL available species model sets
-                cacheD = self.__mU.doImport(self.__speciesDataCacheFile, fmt="json")
-                archiveDataD = self.getArchiveDataDict()
-                for species, archiveD in archiveDataD.items():
-                    archiveDir = archiveD["data_directory"]
-                    # First check if cache was already reorganized
-                    if cacheD["data"][species]["data_directory"] == archiveDir:
-                        reorganized = archiveD.get("reorganized", False)
-                        reorganizedBaseDir = archiveD.get("reorganizedBaseDir", None)
-                        if reorganized and reorganizedBaseDir is not None:
-                            if self.__mU.exists(reorganizedBaseDir) and reorganizedBaseDir == self.__cachePath:
-                                logger.info("Species archive data for %s already reorganized to: %s", species, reorganizedBaseDir)
-                                ok = True
-                                continue
-                    # Proceed with reorganization
-                    inputModelList = self.getModelFileList(inputPathList=[archiveDir])
-                    ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
-                    if not ok:
-                        logger.error("Reorganization of model files failed for species archive %s", archiveDir)
-                        break
-                    # Update the cache file to indicate that the given species archive has been reorganized
-                    if cacheD["data"][species]["data_directory"] == archiveDir:
-                        cacheD["data"][species].update({"reorganized": True, "reorganizedBaseDir": self.__cachePath})
-                        logger.info("Reorganization of model files complete for species, %s, from archive %s", species, archiveDir)
-                    ok = self.__mU.doExport(self.__speciesDataCacheFile, cacheD, fmt="json", indent=4)
+            # else:  # Reorganize ALL model files for ALL available species model sets
+            #
+            cacheD = self.__mU.doImport(self.__AFCloudTaxIdDataCacheFile, fmt="json")
+
+            cacheDataD = cacheD["data"]
+            logger.info("cacheD keys: %r", cacheDataD.keys())
+            # for archiveDir, archiveFileL in cacheDataD.items():
+            for archiveDir, archiveD in cacheDataD.items():
+                inputPathList = []
+                logger.info("ARCHIVE DIR: %r", archiveDir)
+                archiveFileL = archiveD["archive_files"]
+                #
+                # First check if cache was already reorganized
+                reorganized = archiveD.get("reorganized", False)
+                # reorganizedBaseDir = archiveD.get("reorganizedBaseDir", None)
+                if reorganized:
+                    logger.info("Species archive data for %s already reorganized", archiveDir)
+                    ok = True
+                    continue
+                #
+                # Proceed with reorganization
+                for archiveFile in archiveFileL:
+                    logger.info("ARCHIVE FILE: %r", archiveFile)
+                    with tarfile.open(os.path.join(archiveDir, archiveFile), "r") as tar:
+                        cifFiles = [file for file in tar.getnames() if file.endswith(".cif.gz")]
+                        for cifFile in cifFiles:
+                            tar.extract(cifFile, path=archiveDir)  # Extract all cif files into a given taxIdPrefix directory (e.g., "100/")
+                            inputPathList.append(os.path.join(archiveDir, cifFile))
+                logger.info("inputPathList[0:3]: %r", inputPathList[0:3])
+                ok = mR.reorganize(inputModelList=inputPathList, modelSource="AlphaFoldCloud", destBaseDir=self.__cachePath, useCache=useCache)
+                if not ok:
+                    logger.error("Reorganization of model files failed for species archive %s", archiveDir)
+                    break
+                # Now delete the source model files
+                for inFile in inputPathList:
+                    os.remove(inFile)
+
+                # Update the cache file to indicate that the given species archive has been reorganized
+                if ok and not cacheD["data"][archiveDir].get("reorganized", False):
+                    cacheD["data"][archiveDir].update({"reorganized": True})
+                    logger.info("Reorganization of model files complete for archive %s", archiveDir)
+                ok = self.__mU.doExport(self.__AFCloudTaxIdDataCacheFile, cacheD, fmt="json", indent=4)
         #
         except Exception as e:
             logger.exception("Failing with %s", str(e))
             ok = False
         #
         return ok
+
+# import os
+# from rcsb.utils.io.MarshalUtil import MarshalUtil
+
+# workDir = "/mnt/csm/source-models/work-dir"
+
+# def createArchiveDirFileDict(baseDir):
+#     # Get a dictionary of all subdirectories and files in the given directory
+#     archiveDirFileD = {}
+#     absBaseDir = os.path.abspath(baseDir)
+#     with os.scandir(absBaseDir) as fObjs:
+#         for fObj in fObjs:
+#             if fObj.is_dir():
+#                 archiveDir = os.path.join(absBaseDir, fObj.name)
+#                 archiveFileL = []
+#                 with os.scandir(archiveDir) as archiveObjs:
+#                     for archiveObj in archiveObjs:
+#                         if archiveObj.is_file() and archiveObj.name.endswith(".tar"):
+#                             archiveFileL.append(archiveObj.name)
+#                 archiveDirFileD[archiveDir] = archiveFileL
+#     return archiveDirFileD
+
+# cacheD = createArchiveDirFileDict(workDir)
+# mU = MarshalUtil()
+# outFile = os.path.join(workDir, "model-download-cache.json")
+# mU.doExport(outFile, cacheD, fmt="json")
+
+
+
+
+
+
+

@@ -637,7 +637,7 @@ class ModelReorganizer(object):
             logger.info("Creating base destination directory for model file reorganization, %s", destBaseDir)
             self.__fU.mkdir(destBaseDir)
         #
-        modelSourcePrefixD = {"AlphaFold": "AF", "ModBase": "MB", "ModelArchive": "MA", "SwissModelRepository": "SMR"}
+        modelSourcePrefixD = {"AlphaFold": "AF", "AlphaFoldCloud": "AF", "ModBase": "MB", "ModelArchive": "MA", "SwissModelRepository": "SMR"}
         modelSourceDbMap = {"AF": "AlphaFoldDB", "MB": "MODBASE", "MA": "ModelArchive", "SMR": "SWISS-MODEL_REPOSITORY"}
         # Database name values correspond to _database_2.database_id enumerations (https://mmcif.wwpdb.org/dictionaries/mmcif_pdbx_v50.dic/Items/_database_2.database_id.html)
         modelSourcePrefix = modelSourcePrefixD[modelSource]

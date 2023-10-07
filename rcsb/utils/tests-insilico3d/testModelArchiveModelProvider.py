@@ -82,7 +82,8 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
         #
         # Next test reorganizing model file directory structure
         ok = mAMP.reorganizeModelFiles(
-            useCache=False, inputModelList=archiveModelFileList[0:10],
+            useCache=False,
+            inputModelList=archiveModelFileList[0:10],
             numProc=4,
             chunkSize=20,
             keepSource=True,

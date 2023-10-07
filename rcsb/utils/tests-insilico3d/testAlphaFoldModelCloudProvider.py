@@ -52,37 +52,39 @@ class AlphaFoldModelCloudProviderTests(unittest.TestCase):
         #
         # First test fetching model archive
         if redownloadBulkData:
-            aFMP = AlphaFoldModelCloudProvider(
+            aFMCP = AlphaFoldModelCloudProvider(
                 cachePath=self.__cachePath,
                 useCache=False,
                 numProc=4,
                 chunkSize=20,
-                alphaFoldRequestedSpeciesList=[{"species": "Panicum virgatum", "common_name": "Switchgrass", "taxIds": ["206033"]}]
+                # alphaFoldRequestedTaxIdPrefixList = ["100000"]
+                # alphaFoldRequestedSpeciesList=[{"species": "Panicum virgatum", "common_name": "Switchgrass", "taxIds": ["206033"]}]
             )
-            ok = aFMP.testCache()
+            ok = aFMCP.testCache()
             self.assertTrue(ok)
         #
-        # # Next test reloading the cache
-        # aFMP = AlphaFoldModelCloudProvider(
-        #     cachePath=self.__cachePath,
-        #     useCache=True,
-        #     numProc=4,
-        #     chunkSize=20,
-        #     # alphaFoldRequestedSpeciesList=[{"species": "Panicum virgatum", "common_name": "Switchgrass", "taxIds": ["206033"]}]
-        # )
-        # speciesDirList = aFMP.getArchiveDirList()
-        # ok = True if len(speciesDirList) > 0 else False
-        # self.assertTrue(ok)
+        # Next test reloading the cache
+        aFMCP = AlphaFoldModelCloudProvider(
+            cachePath=self.__cachePath,
+            useCache=True,
+            numProc=4,
+            chunkSize=20,
+            # alphaFoldRequestedSpeciesList=[{"species": "Panicum virgatum", "common_name": "Switchgrass", "taxIds": ["206033"]}]
+        )
+        taxIdPrefixDirList = aFMCP.getArchiveDirList()
+        ok = True if len(taxIdPrefixDirList) > 0 else False
+        self.assertTrue(ok)
         # #
-        # speciesModelFileList = aFMP.getModelFileList(inputPathList=speciesDirList)
-        # ok = True if len(speciesModelFileList) > 0 else False
-        # self.assertTrue(ok)
-        # ok = aFMP.testCache()
-        # self.assertTrue(ok)
-        # #
-        # # Next test reorganizing model file directory structure
-        # ok = aFMP.reorganizeModelFiles(useCache=False, inputModelList=speciesModelFileList[0:10], numProc=4, chunkSize=20, keepSource=True)
-        # self.assertTrue(ok)
+        archiveFileList = aFMCP.getArchiveFileList(inputPathList=taxIdPrefixDirList)
+        ok = True if len(archiveFileList) > 0 else False
+        self.assertTrue(ok)
+        ok = aFMCP.testCache()
+        self.assertTrue(ok)
+        #
+        # Next test reorganizing model file directory structure
+        ok = aFMCP.extractAndReorganizeModelFiles(useCache=True, inputModelList=None, numProc=4, chunkSize=20, keepSource=True)
+        self.assertTrue(ok)
+
         # # Now test using the reorganizer object directly
         # aFMR = aFMP.getModelReorganizer(useCache=False, numProc=4, chunkSize=20, keepSource=True)
         # destBaseDir = aFMP.getComputedModelsDataPath()
