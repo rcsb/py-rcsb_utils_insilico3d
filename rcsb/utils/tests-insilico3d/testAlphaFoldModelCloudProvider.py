@@ -82,7 +82,7 @@ class AlphaFoldModelCloudProviderTests(unittest.TestCase):
         self.assertTrue(ok)
         #
         # Next test reorganizing model file directory structure
-        ok = aFMCP.extractAndReorganizeModelFiles(useCache=True, inputModelList=None, numProc=4, chunkSize=20, keepSource=True)
+        ok = aFMCP.reorganizeModelFiles(useCache=True, inputTaxIdPrefixList=["206033", "100000"], numProc=4, chunkSize=20, keepSource=True)
         self.assertTrue(ok)
 
         # # Now test using the reorganizer object directly

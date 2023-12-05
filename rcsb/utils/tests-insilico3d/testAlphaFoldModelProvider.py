@@ -48,7 +48,7 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
     def testAlphaFoldModelProvider(self):
-        redownloadBulkData = False
+        redownloadBulkData = True
         #
         # First test fetching model archive
         if redownloadBulkData:
