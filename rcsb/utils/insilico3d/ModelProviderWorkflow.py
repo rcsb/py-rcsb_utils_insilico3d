@@ -123,6 +123,7 @@ class ModelProviderWorkflow:
         numProc = kwargs.get("numProc", self.__numProc)
         chunkSize = kwargs.get("chunkSize", self.__chunkSize)
         inputDirList = kwargs.get("inputDirList", [])
+        dictFilePath = kwargs.get("dictFilePath", None)
 
         ok = False
         try:
@@ -136,7 +137,8 @@ class ModelProviderWorkflow:
                         inputTaxIdPrefixList=inputDirList,
                         numProc=numProc,
                         chunkSize=chunkSize,
-                        keepSource=True
+                        keepSource=True,
+                        dictFilePath=dictFilePath,
                     )
                 if provider == "ModelArchive":
                     ok = self.__mAMP.reorganizeModelFiles(useCache=self.__useCache, numProc=numProc, chunkSize=chunkSize, keepSource=keepSource)
