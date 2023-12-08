@@ -8,7 +8,7 @@
 #                    (to use for data loading in case model mmCIF file doesn't contain this information already)
 #   16-Nov-2022  dwp Add new default functionality to fetch model files individually instead of the full bulk download
 #    9-Jan-2023  dwp Fetch data set model IDs directly (don't try to construct them here), and add more ModelArchive data sets
-#    6-Oct-2023  dwp Individual model files now being downloaded as .cif.gz when using aiohttp
+#    7-Dec-2023  dwp Update base URL for individual model file downloads, which are now served as .cif.gz when using aiohttp
 ##
 """
 Accessors for ModelArchive 3D In Silico Models (mmCIF).
@@ -27,8 +27,8 @@ import time
 import json
 from pathlib import Path
 import glob
-import requests
 import asyncio
+import requests
 import aiohttp
 import aiofiles
 
@@ -60,6 +60,10 @@ class ModelArchiveModelProvider:
         self.__workPath = os.path.join(self.__baseWorkPath, "work-dir", "ModelArchive")  # Directory where model files will be downloaded (also contains MA-specific cache file)
         self.__dataSetCacheFile = os.path.join(self.__workPath, "model-download-cache.json")
         self.__modelArchiveSummaryPageBaseApiUrl = "https://www.modelarchive.org/api/projects/"
+        #
+        # For direct gzipped file downloads (e.g., https://www.modelarchive.org/doi/10.5452/ma-bak-cepc-0001.cif.gz)
+        self.__modelArchiveBaseDownloadUrl = "https://www.modelarchive.org/doi/10.5452/"
+        #
         self.__modelArchiveBulkDownloadUrlEnd = "?type=materials_procedures__accompanying_data_file_name"  # E.g., "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name"
 
         self.__mU = MarshalUtil(workPath=self.__workPath)
@@ -259,7 +263,7 @@ class ModelArchiveModelProvider:
 
         modelUrlList = []
         for mId in modelSetIdL:
-            mUrl = os.path.join(self.__modelArchiveSummaryPageBaseApiUrl, f"{mId}?type=basic__model_file_name")
+            mUrl = os.path.join(self.__modelArchiveBaseDownloadUrl, f"{mId}.cif.gz")
             modelUrlList.append(mUrl)
         logger.info("First few items in modelUrlList %r", modelUrlList[0:5])
 
@@ -267,7 +271,8 @@ class ModelArchiveModelProvider:
 
         async def fetchFile(url, session):
             try:
-                fname = url.split("/")[-1].split("?")[0] + ".cif.gz"
+                fname = url.split("/")[-1]
+                # fname = url.split("/")[-1].split("?")[0] + ".cif.gz"
                 async with sema, session.get(url, timeout=10) as resp:
                     assert resp.status == 200
                     data = await resp.read()

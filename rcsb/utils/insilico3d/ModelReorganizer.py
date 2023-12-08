@@ -34,7 +34,9 @@ from datetime import datetime
 import tarfile
 import pytz
 
+from mmcif.api.DictionaryApi import DictionaryApi
 from mmcif.api.DataCategory import DataCategory
+from mmcif.io.IoAdapterPy import IoAdapterPy as IoAdapter
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.multiproc.MultiProcUtil import MultiProcUtil
@@ -219,6 +221,7 @@ class ModelWorker(object):
             keepSource = optionsD.get("keepSource", False)  # whether to copy files over (instead of moving them)
             reorganizeDate = optionsD.get("reorganizeDate", None)  # reorganization date
             sourceArchiveReleaseDate = optionsD.get("sourceArchiveReleaseDate", None)  # externally-obtained release date (i.e., not from CIF); as is case for ModelArchive models
+            dictionaryApi = optionsD.get("dictionaryApi", None)
             #
             for archiveFile in dataList:
                 successModelList = []
@@ -318,7 +321,8 @@ class ModelWorker(object):
                     modelD["lastModifiedDate"] = lastModifiedDate
                     #
                     try:
-                        self.__mU.doExport(modelFileOutUnzip, containerList, fmt="bcif")
+                        ok = self.__mU.doExport(modelFileOutUnzip, containerList, fmt="bcif", dictionaryApi=dictionaryApi)
+                        logger.debug("export status %r for %s", ok, modelFileOutUnzip)
                         self.__fU.compress(modelFileOutUnzip, modelFileOut)
                         self.__mU.remove(modelFileOutUnzip)
                         self.__mU.remove(modelFileInGzip)  # Remove original file
@@ -658,6 +662,7 @@ class ModelReorganizer(object):
             chunkSize (int, optional): incremental chunk size used for distribute work processes; default 20.
             workPath (str, optional): directory path for workers to operate in; default is cachePath.
             keepSource (bool, optional): whether to copy model files to new directory instead of moving them; default False.
+            dictFilePath (str, optional): Dictionary file to use for BCIF encoding.
         """
 
         try:
@@ -677,14 +682,7 @@ class ModelReorganizer(object):
             cacheFile = kwargs.get("cacheFile", "computed-models-holdings." + cacheExt + ".gz")
             cacheFilePath = kwargs.get("cacheFilePath", os.path.join(self.__cachePath, "holdings", cacheFile))
 
-            # logger.info("self.__numProc: %r", self.__numProc)
-            # logger.info("self.__chunkSize: %r", self.__chunkSize)
-            # logger.info("self.__cachePath: %r", self.__cachePath)
-            # logger.info("self.__workPath: %r", self.__workPath)
-            # logger.info("self.__keepSource: %r", self.__keepSource)
-            # logger.info("self.__cacheFormat: %r", self.__cacheFormat)
-            # logger.info("cacheFile: %r", cacheFile) 
-            # logger.info("cacheFilePath: %r", cacheFilePath)
+            self.__dictFilePath = kwargs.get("dictFilePath", "https://raw.githubusercontent.com/wwpdb-dictionaries/mmcif_pdbx/master/dist/mmcif_pdbx_v5_next.dic")
 
             if not cacheFilePath.lower().endswith(".gz"):
                 logger.error("Holdings cache file must be gzipped, %s", cacheFilePath)
@@ -823,16 +821,31 @@ class ModelReorganizer(object):
         modelSourcePrefix = modelSourcePrefixD[modelSource]
         #
         rWorker = ModelWorker(workPath=self.__workPath)
+        #
         mpu = MultiProcUtil(verbose=True)
         optD = {
             "modelSourcePrefix": modelSourcePrefix,
             "modelSourceDbMap": modelSourceDbMap,
             "destBaseDir": destBaseDir,
             "keepSource": self.__keepSource,
-            "reorganizeDate": tS
+            "reorganizeDate": tS,
         }
         if sourceArchiveReleaseDate:
             optD.update({"sourceArchiveReleaseDate": sourceArchiveReleaseDate})
+        #
+        # Create DictionaryApi instance to use in exporting of BCIF files by mpu workers
+        logger.info("Will try to instantiate DictionaryApi object with dictionary file at 'dictFilePath': %r", self.__dictFilePath)
+        try:
+            myIo = IoAdapter(raiseExceptions=True)
+            dApiContainerList = myIo.readFile(inputFilePath=self.__dictFilePath)
+            dictionaryApi = DictionaryApi(containerList=dApiContainerList, consolidate=True)
+        except Exception as e:
+            dictionaryApi = None
+            logger.error("Failed to create DictionaryApi instance with exception %s", str(e))
+        #
+        if dictionaryApi:
+            optD.update({"dictionaryApi": dictionaryApi})
+        #
         mpu.setOptions(optD)
         if modelSource in ["AlphaFold", "ModelArchive"]:
             mpu.set(workerObj=rWorker, workerMethod="reorganize")

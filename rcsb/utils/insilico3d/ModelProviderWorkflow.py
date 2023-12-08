@@ -21,6 +21,7 @@ __license__ = "Apache 2.0"
 import logging
 
 from rcsb.utils.insilico3d.AlphaFoldModelProvider import AlphaFoldModelProvider
+from rcsb.utils.insilico3d.AlphaFoldModelCloudProvider import AlphaFoldModelCloudProvider
 from rcsb.utils.insilico3d.ModelArchiveModelProvider import ModelArchiveModelProvider
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
@@ -49,6 +50,7 @@ class ModelProviderWorkflow:
         self.__modelProviders = modelProviders if modelProviders else ["AlphaFold", "ModelArchive"]
         #
         self.__alphaFoldRequestedSpeciesList = kwargs.get("alphaFoldRequestedSpeciesList", [])
+        self.__alphaFoldRequestedTaxIdPrefixList = kwargs.get("alphaFoldRequestedTaxIdPrefixList", [])
         self.__modelArchiveRequestedDatasetD = kwargs.get("modelArchiveRequestedDatasetD", {})
 
         if "AlphaFold" in self.__modelProviders:
@@ -58,6 +60,15 @@ class ModelProviderWorkflow:
                 useCache=self.__useCache,
                 reload=False,
                 alphaFoldRequestedSpeciesList=self.__alphaFoldRequestedSpeciesList,
+            )
+
+        if "AlphaFoldCloud" in self.__modelProviders:
+            self.__aFMCP = AlphaFoldModelCloudProvider(
+                cachePath=self.__destDir,
+                baseWorkPath=self.__srcDir,
+                useCache=self.__useCache,
+                reload=False,
+                alphaFoldRequestedTaxIdPrefixList=self.__alphaFoldRequestedTaxIdPrefixList,
             )
 
         if "ModelArchive" in self.__modelProviders:
@@ -111,12 +122,22 @@ class ModelProviderWorkflow:
         modelProviders = modelProviders if modelProviders else self.__modelProviders
         numProc = kwargs.get("numProc", self.__numProc)
         chunkSize = kwargs.get("chunkSize", self.__chunkSize)
+        inputDirList = kwargs.get("inputDirList", [])
 
         ok = False
         try:
             for provider in modelProviders:
                 if provider == "AlphaFold":
                     ok = self.__aFMP.reorganizeModelFiles(useCache=self.__useCache, numProc=numProc, chunkSize=chunkSize, keepSource=keepSource)
+                if provider == "AlphaFoldCloud":
+                    ok = self.__aFMCP.reorganizeModelFiles(
+                        cachePath=self.__destDir,
+                        useCache=self.__useCache,
+                        inputTaxIdPrefixList=inputDirList,
+                        numProc=numProc,
+                        chunkSize=chunkSize,
+                        keepSource=True
+                    )
                 if provider == "ModelArchive":
                     ok = self.__mAMP.reorganizeModelFiles(useCache=self.__useCache, numProc=numProc, chunkSize=chunkSize, keepSource=keepSource)
                 if not ok:

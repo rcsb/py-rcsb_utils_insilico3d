@@ -37,6 +37,8 @@ class AlphaFoldModelCloudProviderTests(unittest.TestCase):
 
     def setUp(self):
         self.__cachePath = os.path.join(HERE, "test-output", "CACHE", "computed-models")
+        self.__dataPath = os.path.join(HERE, "test-data")
+        self.__dictFilePath = os.path.join(self.__dataPath, "rcsb_mmcif_all.dic")
         self.__startTime = time.time()
         logger.info("Starting %s at %s", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()))
 
@@ -49,6 +51,7 @@ class AlphaFoldModelCloudProviderTests(unittest.TestCase):
 
     def testAlphaFoldModelCloudProvider(self):
         redownloadBulkData = True
+        alphaFoldRequestedTaxIdPrefixList = ["206033", "100000"]  # "408170" - large dataset
         #
         # First test fetching model archive
         if redownloadBulkData:
@@ -57,8 +60,8 @@ class AlphaFoldModelCloudProviderTests(unittest.TestCase):
                 useCache=False,
                 numProc=4,
                 chunkSize=20,
-                # alphaFoldRequestedTaxIdPrefixList = ["100000"]
-                # alphaFoldRequestedSpeciesList=[{"species": "Panicum virgatum", "common_name": "Switchgrass", "taxIds": ["206033"]}]
+                redownloadBulkData=redownloadBulkData,
+                alphaFoldRequestedTaxIdPrefixList=alphaFoldRequestedTaxIdPrefixList
             )
             ok = aFMCP.testCache()
             self.assertTrue(ok)
@@ -69,33 +72,34 @@ class AlphaFoldModelCloudProviderTests(unittest.TestCase):
             useCache=True,
             numProc=4,
             chunkSize=20,
-            # alphaFoldRequestedSpeciesList=[{"species": "Panicum virgatum", "common_name": "Switchgrass", "taxIds": ["206033"]}]
         )
         taxIdPrefixDirList = aFMCP.getArchiveDirList()
+        logger.info("taxIdPrefixDirList: %r", taxIdPrefixDirList)
         ok = True if len(taxIdPrefixDirList) > 0 else False
         self.assertTrue(ok)
         # #
         archiveFileList = aFMCP.getArchiveFileList(inputPathList=taxIdPrefixDirList)
+        logger.info("archiveFileList: %r", archiveFileList)
         ok = True if len(archiveFileList) > 0 else False
         self.assertTrue(ok)
         ok = aFMCP.testCache()
         self.assertTrue(ok)
         #
+        logger.info("getArchiveDataDict: %r", aFMCP.getArchiveDataDict())
+        logger.info("getAFCloudTaxIdDataCacheFilePath: %r", aFMCP.getAFCloudTaxIdDataCacheFilePath())
+        logger.info("getBaseDataPath (workPath): %r", aFMCP.getBaseDataPath())
+        logger.info("getComputedModelsDataPath (cachePath): %r", aFMCP.getComputedModelsDataPath())
+        #
         # Next test reorganizing model file directory structure
-        ok = aFMCP.reorganizeModelFiles(useCache=True, inputTaxIdPrefixList=["206033", "100000"], numProc=4, chunkSize=20, keepSource=True)
+        ok = aFMCP.reorganizeModelFiles(
+            useCache=True,
+            inputTaxIdPrefixList=alphaFoldRequestedTaxIdPrefixList,
+            numProc=4,
+            chunkSize=20,
+            keepSource=True,
+            dictFilePath=self.__dictFilePath
+        )
         self.assertTrue(ok)
-
-        # # Now test using the reorganizer object directly
-        # aFMR = aFMP.getModelReorganizer(useCache=False, numProc=4, chunkSize=20, keepSource=True)
-        # destBaseDir = aFMP.getComputedModelsDataPath()
-        # ok = aFMR.reorganize(inputModelList=speciesModelFileList[10:20], modelSource="AlphaFold", destBaseDir=destBaseDir, useCache=False)
-        # self.assertTrue(ok)
-        # ok = aFMR.testCache()
-        # self.assertFalse(ok)  # Confirm that testCache FAILED (< 20 in cache)
-        # ok = aFMR.reorganize(inputModelList=speciesModelFileList[20:30], modelSource="AlphaFold", destBaseDir=destBaseDir, useCache=True)
-        # self.assertTrue(ok)
-        # ok = aFMR.testCache()
-        # self.assertTrue(ok)  # Confirm that testCache SUCCEEDED (>= 20 in cache)
 
 
 def fetchAlphaFoldModels():
