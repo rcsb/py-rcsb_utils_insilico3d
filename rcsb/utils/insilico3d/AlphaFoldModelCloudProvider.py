@@ -234,7 +234,7 @@ class AlphaFoldModelCloudProvider:
             inputTaxIdPrefixList (list, optional): List of input model filepaths to reorganize; defaults to all models for all species model sets.
             **kwargs (optional):
                 numProc (int): number of processes to use; default 2.
-                chunkSize (int): incremental chunk size used for distribute work processes; default 20.
+                chunkSize (int): incremental chunk size used for distributed work processes; default 20.
                 keepSource (bool): whether to copy files to new directory (instead of moving them); default False.
                 cacheFilePath (str): full filepath and name for cache file containing a dictionary of all reorganized models.
                 dictFilePathL (str, optional): List of dictionary files to use for BCIF encoding.
@@ -254,13 +254,12 @@ class AlphaFoldModelCloudProvider:
             # "data": {
             #   "/mnt/vdb1/source-models/work-dir/100":
             #       "archive_files": {
-            #           "proteome-tax_id-1000965-0_v4.tar": 1012000,
-            #           "proteome-tax_id-1000960-0_v4.tar": 1290412,
-            #           "proteome-tax_id-1000888-0_v4.tar": 1255412,
-            #           "proteome-tax_id-1000974-0_v4.tar": 12777412,
-            #           "proteome-tax_id-1007383-0_v4.tar": 3290412,
-            #           "proteome-tax_id-1000701-0_v4.tar": 123520412,
-            #           "proteome-tax_id-1001117-0_v4.tar": 12913412,
+            #           "proteome-tax_id-1000965-0_v4.tar": 95232,  # (fname: fsize)
+            #           "proteome-tax_id-1000960-0_v4.tar": 88576,
+            #           "proteome-tax_id-1000888-0_v4.tar": 128512,
+            #           "proteome-tax_id-1000974-0_v4.tar": 96256,
+            #           "proteome-tax_id-1007383-0_v4.tar": 40960,
+            #           "proteome-tax_id-1000701-0_v4.tar": 579584,
             # ...}}
             #
             reorgDataD = {}
@@ -278,33 +277,33 @@ class AlphaFoldModelCloudProvider:
                     reorgDataD[archiveDir] = archiveD
 
             for archiveDir, archiveD in reorgDataD.items():
-                smallArchiveFileL = [fn for fn, size in archiveD["archive_files"].items() if size <= 1048576]  # files <= 1mb
-                bigArchiveFileL = [fn for fn, size in archiveD["archive_files"].items() if size > 1048576]  # files > 1mb
+                smallArchiveFileL = [fn for fn, size in archiveD["archive_files"].items() if size <= 16777216]  # files <= 16mb
+                bigArchiveFileL = [fn for fn, size in archiveD["archive_files"].items() if size > 16777216]  # files > 16mb
                 smallArchiveFilePathL = [os.path.join(archiveDir, archiveFile) for archiveFile in smallArchiveFileL]
                 bigArchiveFilePathL = [os.path.join(archiveDir, archiveFile) for archiveFile in bigArchiveFileL]
+                #
                 logger.info(
-                    "archiveDir %s - %d small files (<= 1mb), %d large files (> 1mb), (total number of tar files %d)",
+                    "archiveDir %s - %d small files (<= 16mb), %d large files (> 16mb), (total number of tar files %d)",
                     archiveDir,
                     len(smallArchiveFilePathL),
                     len(bigArchiveFilePathL),
                     len(archiveD["archive_files"]),
                 )
-                # logger.debug("archiveDir %s - archiveFilePathL (length %d) first item: %r", archiveDir, len(archiveFilePathL), archiveFilePathL[0])
 
                 taxIdGroup = archiveDir.split("/")[-1]
                 holdingsFileName = "alphafold-holdings-" + taxIdGroup + ".json.gz"
                 mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, workPath=archiveDir, cacheFile=holdingsFileName, cacheFormat="json", **kwargs)
 
-                # First, reorganize small archive files (<= 1mb) -- more efficient with multiple workers acting on separate tar files
+                # First, reorganize small archive files (<= 16mb) -- more efficient with multiple workers acting on separate tar files
                 if smallArchiveFilePathL:
-                    logger.info("Reorganizing small archive files (<= 1mb)...")
+                    logger.info("Reorganizing small archive files (<= 16mb) - %d files", len(smallArchiveFilePathL))
                     ok = mR.reorganize(inputModelList=smallArchiveFilePathL, modelSource="AlphaFoldCloud", destBaseDir=self.__cachePath, useCache=useCache)
                     if not ok:
                         logger.error("Reorganization of model files failed for species archive %s", archiveDir)
 
-                # Second, reorganize large archive files (> 1mb) -- more efficient with multiple workers acting on the same tar file
+                # Second, reorganize large archive files (> 16mb) -- more efficient with multiple workers acting on the same tar file
                 if bigArchiveFilePathL:
-                    logger.info("Reorganizing large archive files (> 1mb)...")
+                    logger.info("Reorganizing large archive files (> 16mb) - %d files", len(bigArchiveFilePathL))
                     for archiveFile in bigArchiveFilePathL:
                         inputModelList = self.__extractModelCifFiles(archiveFile)
                         if inputModelList and len(inputModelList) > 0:

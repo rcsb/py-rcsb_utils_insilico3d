@@ -49,7 +49,7 @@ setup(
     entry_points={"console_scripts": []},
     #
     install_requires=packagesRequired,
-    packages=find_packages(exclude=["rcsb.mock-data", "rcsb.utils.tests-insilico3d", "rcsb.utils.tests-*", "tests.*"]),
+    packages=find_packages(exclude=["rcsb.mock-data", "rcsb.utils.tests-insilico3d", "rcsb.utils.insilico3d.scripts", "rcsb.utils.tests-*", "tests.*"]),
     package_data={
         # If any package contains *.md or *.rst ...  files, include them:
         "": ["*.md", "*.rst", "*.txt", "*.cfg"]

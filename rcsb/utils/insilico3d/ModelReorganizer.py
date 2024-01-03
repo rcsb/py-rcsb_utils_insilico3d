@@ -57,7 +57,7 @@ class ModelWorker(object):
         self.__mU = MarshalUtil(workPath=self.__workPath)
 
     def reorganize(self, dataList, procName, optionsD, workingDir):
-        """Enumerate and reorganize and rename model files.
+        """Enumerate and reorganize and rename model files, provided a list of individual CIF model file paths as input.
 
         Args:
             dataList (list): list of model files to work on
@@ -195,7 +195,8 @@ class ModelWorker(object):
         return successList, retList, diagList
 
     def reorganizeCloud(self, dataList, procName, optionsD, workingDir):
-        """Enumerate and reorganize and rename model files.
+        """Enumerate and reorganize and rename model files, provided a list of tarred archive files as input (from AlphaFold GoogleCloud).
+        Useful over the above 'reorganize' method when dealing with a lot of very small tar files with only a few models per tar file.
 
         Args:
             dataList (list): list of model files to work on
@@ -655,7 +656,7 @@ class ModelReorganizer(object):
             cacheFile (str, optional): filename for cache file; default "computed-models-holdings.json.gz".
             cacheFilePath (str, optional): full filepath and name for cache file (will override "cachePath" and "cacheFile" if provided).
             numProc (int, optional): number of processes to use; default 2.
-            chunkSize (int, optional): incremental chunk size used for distribute work processes; default 20.
+            chunkSize (int, optional): incremental chunk size used for distributed work processes; default 20.
             workPath (str, optional): directory path for workers to operate in; default is cachePath.
             keepSource (bool, optional): whether to copy model files to new directory instead of moving them; default False.
             dictFilePathL (str, optional): List of dictionary files to use for BCIF encoding.
@@ -800,7 +801,7 @@ class ModelReorganizer(object):
             modelSource (str): Source of model files ("AlphaFold", "ModBase", "ModelArchive", or "SwissModel")
             destBaseDir (str): Base destination directory into which to reorganize model files (e.g., "computed-models")
             numProc (int, optional): number of processes to use; default 2.
-            chunkSize (int, optional): incremental chunk size used for distribute work processes; default 20.
+            chunkSize (int, optional): incremental chunk size used for distributed work processes; default 20.
 
         Returns:
             mD (dict): dictionary of successfully processed models, in the following structure:
