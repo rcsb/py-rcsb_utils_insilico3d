@@ -137,7 +137,7 @@ class ModelProviderWorkflow:
                         inputTaxIdPrefixList=inputDirList,
                         numProc=numProc,
                         chunkSize=chunkSize,
-                        keepSource=True,
+                        keepSource=keepSource,
                         dictFilePathL=dictFilePathL,
                     )
                 if provider == "ModelArchive":

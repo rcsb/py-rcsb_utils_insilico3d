@@ -51,7 +51,7 @@ class AlphaFoldModelCloudProviderTests(unittest.TestCase):
 
     def testAlphaFoldModelCloudProvider(self):
         redownloadBulkData = True
-        alphaFoldRequestedTaxIdPrefixList = ["206033", "100000"]  # "408170" - large dataset
+        alphaFoldRequestedTaxIdPrefixList = ["206033", "10000", "1001912"]  # "408170" - large dataset
         #
         # First test fetching model archive
         if redownloadBulkData:
