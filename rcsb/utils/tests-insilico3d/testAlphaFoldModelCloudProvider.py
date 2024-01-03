@@ -38,7 +38,7 @@ class AlphaFoldModelCloudProviderTests(unittest.TestCase):
     def setUp(self):
         self.__cachePath = os.path.join(HERE, "test-output", "CACHE", "computed-models")
         self.__dataPath = os.path.join(HERE, "test-data")
-        self.__dictFilePath = os.path.join(self.__dataPath, "rcsb_mmcif_all.dic")
+        self.__dictFilePathL = [os.path.join(self.__dataPath, "rcsb_mmcif_all.dic")]
         self.__startTime = time.time()
         logger.info("Starting %s at %s", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()))
 
@@ -90,16 +90,25 @@ class AlphaFoldModelCloudProviderTests(unittest.TestCase):
         logger.info("getBaseDataPath (workPath): %r", aFMCP.getBaseDataPath())
         logger.info("getComputedModelsDataPath (cachePath): %r", aFMCP.getComputedModelsDataPath())
         #
-        # Next test reorganizing model file directory structure
+        # Next test reorganizing model file directory structure, using specified dictionary files for BCIF encoding
         ok = aFMCP.reorganizeModelFiles(
             useCache=True,
-            inputTaxIdPrefixList=alphaFoldRequestedTaxIdPrefixList,
+            inputTaxIdPrefixList=alphaFoldRequestedTaxIdPrefixList[:1],
             numProc=4,
             chunkSize=20,
-            keepSource=True,
-            dictFilePath=self.__dictFilePath
+            keepSource=False,
+            dictFilePathL=self.__dictFilePathL,
         )
         self.assertTrue(ok)
+        #
+        # Next test reorganizing model file directory structure, using default dictionary files for BCIF encoding
+        ok = aFMCP.reorganizeModelFiles(
+            useCache=True,
+            inputTaxIdPrefixList=alphaFoldRequestedTaxIdPrefixList[1:],
+            numProc=4,
+            chunkSize=20,
+            keepSource=False,
+        )
 
 
 def fetchAlphaFoldModels():

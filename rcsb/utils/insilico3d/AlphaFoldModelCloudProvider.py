@@ -27,6 +27,7 @@ import os
 import time
 import copy
 import glob
+import tarfile
 from google.cloud import storage
 
 from rcsb.utils.io.FileUtil import FileUtil
@@ -216,13 +217,13 @@ class AlphaFoldModelCloudProvider:
     def getAFCloudTaxIdDataCacheFilePath(self):
         return self.__aFCTaxIdDataCacheFile
 
+    def getComputedModelsDataPath(self):
+        return self.__cachePath
+
     def getModelReorganizer(self, cachePath=None, useCache=True, workPath=None, **kwargs):
         cachePath = cachePath if cachePath else self.__cachePath
         workPath = workPath if workPath else self.__workPath
         return ModelReorganizer(cachePath=cachePath, useCache=useCache, workPath=workPath, **kwargs)
-
-    def getComputedModelsDataPath(self):
-        return self.__cachePath
 
     def reorganizeModelFiles(self, cachePath=None, useCache=True, inputTaxIdPrefixList=None, **kwargs):
         """Reorganize model files from organism-wide model listing to hashed directory structure and rename files
@@ -236,13 +237,15 @@ class AlphaFoldModelCloudProvider:
                 chunkSize (int): incremental chunk size used for distribute work processes; default 20.
                 keepSource (bool): whether to copy files to new directory (instead of moving them); default False.
                 cacheFilePath (str): full filepath and name for cache file containing a dictionary of all reorganized models.
-                dictFilePath (str, optional): Dictionary file to use for BCIF encoding.
+                dictFilePathL (str, optional): List of dictionary files to use for BCIF encoding.
 
         Returns:
             (bool): True if successful; False otherwise.
         """
         try:
             ok = False
+            #
+            logger.info("Beginning reorganization with cachePath %r, useCache %r, inputTaxIdPrefixList %r, kwargs %r", cachePath, useCache, inputTaxIdPrefixList, kwargs)
             #
             cacheD = self.__mU.doImport(self.__aFCTaxIdDataCacheFile, fmt="json")
             cacheDataD = cacheD["data"]
@@ -275,25 +278,33 @@ class AlphaFoldModelCloudProvider:
                     reorgDataD[archiveDir] = archiveD
 
             for archiveDir, archiveD in reorgDataD.items():
-                logger.debug("archiveDir: %r", archiveDir)
                 archiveFileL = archiveD["archive_files"]
-                inputModelList = [os.path.join(archiveDir, archiveFile) for archiveFile in archiveFileL]
-                logger.debug("inputModelList (length %d) first item: %r", len(inputModelList), inputModelList[0])
-                #
+                archiveFilePathL = [os.path.join(archiveDir, archiveFile) for archiveFile in archiveFileL]
+                logger.info("archiveDir %s (total number of tar files %d)", archiveDir, len(archiveFilePathL))
+                # logger.debug("archiveDir %s - archiveFilePathL (length %d) first item: %r", archiveDir, len(archiveFilePathL), archiveFilePathL[0])
+
                 taxIdGroup = archiveDir.split("/")[-1]
                 holdingsFileName = "alphafold-holdings-" + taxIdGroup + ".json.gz"
                 mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, workPath=archiveDir, cacheFile=holdingsFileName, cacheFormat="json", **kwargs)
 
-                # Proceed with reorganization
-                ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFoldCloud", destBaseDir=self.__cachePath, useCache=useCache)
-                if not ok:
-                    logger.error("Reorganization of model files failed for species archive %s", archiveDir)
-                    break
+                for archiveFile in archiveFilePathL:
+                    inputModelList = self.__extractModelCifFiles(archiveFile)
+                    if inputModelList and len(inputModelList) > 0:
+                        logger.info("Working on reorganizing %s (%d models)", archiveFile, len(inputModelList))
+                        # Proceed with reorganization
+                        ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFoldCloud", destBaseDir=self.__cachePath, useCache=useCache)
+                        if not ok:
+                            logger.error("Reorganization of model files failed for species archive %s", archiveDir)
+                            break
+
+                    # NOTE: This script should NOT be used to delete the source archive files--that task should be left up to the user to do manually,
+                    #       and only when everything is assured to be reorganized correctly and there is absolutely no need to keep the source tar files.
+                    #       Once they are deleted (e.g., all 100-999 taxId directories), the only way to get them back is to redownload them all again from GoogleCloud.
 
                 # Update the cache file to indicate that the given species archive has been reorganized
                 if ok and not cacheD["data"][archiveDir].get("reorganized", False):
                     cacheD["data"][archiveDir].update({"reorganized": True})
-                    logger.info("Reorganization of model files complete for archive %s", archiveDir)
+                    logger.info("Reorganization of model files complete for archiveDir %s", archiveDir)
                 ok = self.__mU.doExport(self.__aFCTaxIdDataCacheFile, cacheD, fmt="json", indent=4)
         #
         except Exception as e:
@@ -301,3 +312,25 @@ class AlphaFoldModelCloudProvider:
             ok = False
         #
         return ok
+
+    def __extractModelCifFiles(self, archiveFile):
+        modelPathL = []
+        try:
+            with tarfile.open(archiveFile, "r") as tF:
+                tfL = tF.getnames()  # Get a list of items (files and directories) in the tar file
+                logger.debug("Tar members in archiveFile %s: %r", archiveFile, tfL)
+                #
+                cifFiles = [file for file in tfL if file.endswith(".cif.gz")]  # only extract model files (not PAE and pLDDT files)
+                # numModels = len(cifFiles)
+                archiveFileDirPath = os.path.dirname(os.path.abspath(archiveFile))
+                for cifFile in cifFiles:
+                    fOutputPath = os.path.join(archiveFileDirPath, cifFile)
+                    fIn = tF.extractfile(cifFile)
+                    with open(fOutputPath, "wb") as ofh:
+                        ofh.write(fIn.read())
+                    modelPathL.append(fOutputPath)
+        #
+        except Exception as e:
+            logger.exception("Failing with %s", str(e))
+        #
+        return modelPathL
