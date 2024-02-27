@@ -49,6 +49,7 @@ class ModelProviderWorkflow:
         self.__chunkSize = chunkSize
         self.__modelProviders = modelProviders if modelProviders else ["AlphaFold", "ModelArchive"]
         #
+        self.__smallFileSizeCutoff = kwargs.get("smallFileSizeCutoff", 33554432)
         self.__alphaFoldRequestedSpeciesList = kwargs.get("alphaFoldRequestedSpeciesList", [])
         self.__alphaFoldRequestedTaxIdPrefixList = kwargs.get("alphaFoldRequestedTaxIdPrefixList", [])
         self.__modelArchiveRequestedDatasetD = kwargs.get("modelArchiveRequestedDatasetD", {})
@@ -122,6 +123,7 @@ class ModelProviderWorkflow:
         modelProviders = modelProviders if modelProviders else self.__modelProviders
         numProc = kwargs.get("numProc", self.__numProc)
         chunkSize = kwargs.get("chunkSize", self.__chunkSize)
+        smallFileSizeCutoff = kwargs.get("smallFileSizeCutoff", self.__smallFileSizeCutoff)
         inputDirList = kwargs.get("inputDirList", [])
         dictFilePathL = kwargs.get("dictFilePathL", None)
 
@@ -137,6 +139,7 @@ class ModelProviderWorkflow:
                         inputTaxIdPrefixList=inputDirList,
                         numProc=numProc,
                         chunkSize=chunkSize,
+                        smallFileSizeCutoff=smallFileSizeCutoff,
                         keepSource=keepSource,
                         dictFilePathL=dictFilePathL,
                     )

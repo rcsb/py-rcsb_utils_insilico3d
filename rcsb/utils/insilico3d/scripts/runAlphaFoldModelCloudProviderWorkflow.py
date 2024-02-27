@@ -70,8 +70,9 @@ class ModelProviderWorkflowTests(unittest.TestCase):
                 destDir=self.__cachePath,
                 modelProviders=["AlphaFoldCloud"],
                 useCache=True,
-                numProc=8,
+                numProc=16,
                 chunkSize=50,
+                smallFileSizeCutoff=67108864,  # 64mb
             )
             for subDir in alphaFoldSubDirL:
                 ok = mPWf.reorganize(

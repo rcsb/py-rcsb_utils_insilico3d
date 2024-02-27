@@ -78,7 +78,7 @@ class ModelCacheProvider(StashableBase):
                 ok = fU.get(self.__holdingsRemotePath, self.__holdingsLocalPath)
                 logger.info("Computed-model cache fetch status is %r", ok)
                 if not ok:
-                    logger.info("Refetching computed-models holdings cache fallback file from %r to %r", self.__holdingsRemotePath, self.__holdingsLocalPath)
+                    logger.info("Refetching computed-models holdings cache fallback file from %r to %r", self.__fallbackUrl, self.__holdingsLocalPath)
                     ok = fU.get(self.__fallbackUrl, self.__holdingsLocalPath)
                     logger.info("Computed-model cache fallback fetch status is %r", ok)
                 mD = self.__mU.doImport(self.__holdingsLocalPath, fmt="json")

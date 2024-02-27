@@ -231,6 +231,7 @@ class AlphaFoldModelCloudProvider:
 
         Args:
             cachePath (str): Path to cache directory.
+            useCache (bool): Whether to use the existing data cache or re-run entire model reorganization process.
             inputTaxIdPrefixList (list, optional): List of input model filepaths to reorganize; defaults to all models for all species model sets.
             **kwargs (optional):
                 numProc (int): number of processes to use; default 2.
@@ -238,6 +239,7 @@ class AlphaFoldModelCloudProvider:
                 keepSource (bool): whether to copy files to new directory (instead of moving them); default False.
                 cacheFilePath (str): full filepath and name for cache file containing a dictionary of all reorganized models.
                 dictFilePathL (str, optional): List of dictionary files to use for BCIF encoding.
+                smallFileSizeCutoff (int): size in bytes to use a file size cutoff for separating out "small" vs. "big" tar files
 
         Returns:
             (bool): True if successful; False otherwise.
@@ -246,6 +248,8 @@ class AlphaFoldModelCloudProvider:
             ok = False
             #
             logger.info("Beginning reorganization with cachePath %r, useCache %r, inputTaxIdPrefixList %r, kwargs %r", cachePath, useCache, inputTaxIdPrefixList, kwargs)
+            #
+            smallFileSizeCutoff = kwargs.get("smallFileSizeCutoff", 33554432)  # 32mb
             #
             cacheD = self.__mU.doImport(self.__aFCTaxIdDataCacheFile, fmt="json")
             cacheDataD = cacheD["data"]
@@ -277,8 +281,8 @@ class AlphaFoldModelCloudProvider:
                     reorgDataD[archiveDir] = archiveD
 
             for archiveDir, archiveD in reorgDataD.items():
-                smallArchiveFileL = [fn for fn, size in archiveD["archive_files"].items() if size <= 16777216]  # files <= 16mb
-                bigArchiveFileL = [fn for fn, size in archiveD["archive_files"].items() if size > 16777216]  # files > 16mb
+                smallArchiveFileL = [fn for fn, size in archiveD["archive_files"].items() if size <= smallFileSizeCutoff]
+                bigArchiveFileL = [fn for fn, size in archiveD["archive_files"].items() if size > smallFileSizeCutoff]
                 smallArchiveFilePathL = [os.path.join(archiveDir, archiveFile) for archiveFile in smallArchiveFileL]
                 bigArchiveFilePathL = [os.path.join(archiveDir, archiveFile) for archiveFile in bigArchiveFileL]
                 #

@@ -51,7 +51,8 @@ class AlphaFoldModelCloudProviderTests(unittest.TestCase):
 
     def testAlphaFoldModelCloudProvider(self):
         redownloadBulkData = True
-        alphaFoldRequestedTaxIdPrefixList = ["206033", "10000", "1001912"]  # "408170" - large dataset
+        alphaFoldRequestedTaxIdPrefixList = ["232300"] #, "206033", "10000", "1001912"]  # "408170" - large dataset
+        # proteome-tax_id-232300-0_v4.tar - corresponds to AF-A0A023GPI8-F1
         #
         # First test fetching model archive
         if redownloadBulkData:
