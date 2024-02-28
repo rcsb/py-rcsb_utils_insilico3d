@@ -127,18 +127,29 @@ class AlphaFoldModelCloudProvider:
 
     def rebuildArchiveDirCacheFile(self):
         # Get a dictionary of all subdirectories and files in the given directory
-        archiveDirFileD = {}
         absBaseDir = os.path.abspath(self.__workPath)
+        archiveDirFileD = {}
+        sizeLimit = 68719476736  # 64 GB - max size of any single archive prefix subset
         with os.scandir(absBaseDir) as fObjs:
             for fObj in fObjs:
-                if fObj.is_dir():
+                if fObj.is_dir() and str(fObj.name).isdigit():
                     archiveDir = os.path.join(absBaseDir, fObj.name)
+                    archiveDirFileD[archiveDir] = {}
                     archiveFileD = {}
+                    tmpSize = 0
+                    archiveDirSubsetIdx = 0
                     with os.scandir(archiveDir) as archiveObjs:
                         for archiveObj in archiveObjs:
                             if archiveObj.is_file() and archiveObj.name.endswith(".tar"):
-                                archiveFileD[archiveObj.name] = archiveObj.stat().st_size
-                    archiveDirFileD[archiveDir] = {"archive_files": archiveFileD}
+                                fSize = archiveObj.stat().st_size
+                                archiveFileD[archiveObj.name] = fSize
+                                tmpSize += fSize
+                                if tmpSize > sizeLimit:
+                                    archiveDirFileD[archiveDir][archiveDirSubsetIdx] = {"archive_files": archiveFileD}
+                                    archiveDirSubsetIdx += 1
+                                    archiveFileD = {}
+                                    tmpSize = 0
+                    archiveDirFileD[archiveDir][archiveDirSubsetIdx] = {"archive_files": archiveFileD}
         return archiveDirFileD
 
     def fetchTaxIdArchive(self, taxIdPrefix, cacheD):
@@ -150,6 +161,7 @@ class AlphaFoldModelCloudProvider:
             taxIdPrefixDataDumpDir = os.path.join(self.__workPath, taxIdPrefix)
             self.__fU.mkdir(taxIdPrefixDataDumpDir)
             blobs = bucket.list_blobs(prefix="proteomes/proteome-tax_id-" + taxIdPrefix)
+            #
             for blob in blobs:
                 archiveFile = blob.name.split("/")[-1]
                 taxId = archiveFile.split("tax_id-")[-1].split("-")[0]
@@ -165,8 +177,8 @@ class AlphaFoldModelCloudProvider:
                 blob.download_to_filename(archiveFileDumpPath)
                 logger.info("Completed fetch at %s (%.4f seconds)", time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
                 if taxIdPrefixDataDumpDir not in cacheD["data"]:
-                    cacheD["data"].update({taxIdPrefixDataDumpDir: {"archive_files": {}}})
-                cacheD["data"][taxIdPrefixDataDumpDir]["archive_files"][archiveFile] = os.path.getsize(archiveFileDumpPath)
+                    cacheD["data"].update({taxIdPrefixDataDumpDir: {"0": {"archive_files": {}}}})
+                cacheD["data"][taxIdPrefixDataDumpDir]["0"]["archive_files"][archiveFile] = os.path.getsize(archiveFileDumpPath)
 
         except Exception as e:
             logger.exception("Failing on fetching of taxIdPrefix %s from FTP server, with message:\n%s", taxIdPrefix, str(e))
@@ -250,7 +262,7 @@ class AlphaFoldModelCloudProvider:
             logger.info("Beginning reorganization with cachePath %r, useCache %r, inputTaxIdPrefixList %r, kwargs %r", cachePath, useCache, inputTaxIdPrefixList, kwargs)
             #
             smallFileSizeCutoff = kwargs.get("smallFileSizeCutoff", 33554432)  # 32mb
-            smallFileSizeCutoffMb = smallFileSizeCutoff / (1024 * 1024)
+            smallFileSizeCutoffMb = int(smallFileSizeCutoff / (1024 * 1024))
             #
             cacheD = self.__mU.doImport(self.__aFCTaxIdDataCacheFile, fmt="json")
             cacheDataD = cacheD["data"]
@@ -295,10 +307,10 @@ class AlphaFoldModelCloudProvider:
                         "archiveDir %s subset %r - %d small files (<= %rmb), %d large files (> %rmb), (total number of tar files %d)",
                         archiveDir,
                         archiveSubsetIdx,
-                        smallFileSizeCutoffMb,
                         len(smallArchiveFilePathL),
                         smallFileSizeCutoffMb,
                         len(bigArchiveFilePathL),
+                        smallFileSizeCutoffMb,
                         len(archiveSubsetD["archive_files"]),
                     )
 
