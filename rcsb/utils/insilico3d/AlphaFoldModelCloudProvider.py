@@ -261,7 +261,7 @@ class AlphaFoldModelCloudProvider:
             #
             logger.info("Beginning reorganization with cachePath %r, useCache %r, inputTaxIdPrefixList %r, kwargs %r", cachePath, useCache, inputTaxIdPrefixList, kwargs)
             #
-            smallFileSizeCutoff = kwargs.get("smallFileSizeCutoff", 33554432)  # 32mb
+            smallFileSizeCutoff = kwargs.get("smallFileSizeCutoff", 8388608)  # 8mb
             smallFileSizeCutoffMb = int(smallFileSizeCutoff / (1024 * 1024))
             #
             cacheD = self.__mU.doImport(self.__aFCTaxIdDataCacheFile, fmt="json")
@@ -298,6 +298,7 @@ class AlphaFoldModelCloudProvider:
 
             for archiveDir, archiveD in reorgDataD.items():
                 for archiveSubsetIdx, archiveSubsetD in archiveD.items():
+                    outputModelD = {}
                     smallArchiveFileL = [fn for fn, size in archiveSubsetD["archive_files"].items() if size <= smallFileSizeCutoff]
                     bigArchiveFileL = [fn for fn, size in archiveSubsetD["archive_files"].items() if size > smallFileSizeCutoff]
                     smallArchiveFilePathL = [os.path.join(archiveDir, archiveFile) for archiveFile in smallArchiveFileL]
@@ -321,7 +322,14 @@ class AlphaFoldModelCloudProvider:
                     # First, reorganize small archive files (<= 16mb) -- more efficient with multiple workers acting on separate tar files
                     if smallArchiveFilePathL:
                         logger.info("Reorganizing small archive files (<= %rmb) - %d files", smallFileSizeCutoffMb, len(smallArchiveFilePathL))
-                        ok = mR.reorganize(inputModelList=smallArchiveFilePathL, modelSource="AlphaFoldCloud", destBaseDir=self.__cachePath, useCache=useCache)
+                        outputModelD, ok = mR.reorganize(
+                            inputModelList=smallArchiveFilePathL,
+                            modelSource="AlphaFoldCloud",
+                            destBaseDir=self.__cachePath,
+                            useCache=useCache,
+                            inputModelD=outputModelD,
+                            writeCache=False
+                        )
                         if not ok:
                             logger.error("Reorganization of model files failed for archive %s subset %r", archiveDir, archiveSubsetIdx)
 
@@ -333,10 +341,23 @@ class AlphaFoldModelCloudProvider:
                             if inputModelList and len(inputModelList) > 0:
                                 logger.info("Working on reorganizing %s (%d models)", archiveFile, len(inputModelList))
                                 # Proceed with reorganization
-                                ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
+                                outputModelD, ok = mR.reorganize(
+                                    inputModelList=inputModelList,
+                                    modelSource="AlphaFold",
+                                    destBaseDir=self.__cachePath,
+                                    useCache=useCache,
+                                    inputModelD=outputModelD,
+                                    writeCache=False
+                                )
                                 if not ok:
                                     logger.error("Reorganization of model files failed for archive %s subset %r", archiveDir, archiveSubsetIdx)
                                     break
+
+                    # Last, write out the holdings/cache files
+                    ok = mR.writeCacheFiles(outputModelD)
+                    if not ok:
+                        logger.error("Exporting of holdings cache files failed for archive %s subset %r", archiveDir, archiveSubsetIdx)
+                        break
 
                     # NOTE: This script should NOT be used to delete the source archive files--that task should be left up to the user to do manually,
                     #       and only when everything is assured to be reorganized correctly and there is absolutely no need to keep the source tar files.

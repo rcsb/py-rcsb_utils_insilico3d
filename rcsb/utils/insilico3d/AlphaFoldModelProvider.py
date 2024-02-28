@@ -60,6 +60,7 @@ class AlphaFoldModelProvider:
         self.__baseWorkPath = baseWorkPath if baseWorkPath else self.__cachePath
         self.__workPath = os.path.join(self.__baseWorkPath, "work-dir", "AlphaFold")  # Directory where model files will be downloaded (also contains AF-specific cache file)
         self.__speciesDataCacheFile = os.path.join(self.__workPath, "model-download-cache.json")
+        self.__dataSetHoldingsFileName = "alphafold-ftp-holdings.json.gz"
 
         self.__ftpHost = kwargs.get("ftpHost", "ftp.ebi.ac.uk")
         self.__ftpDataPath = kwargs.get("ftpDataPath", "/pub/databases/alphafold/")
@@ -258,7 +259,9 @@ class AlphaFoldModelProvider:
     def getModelReorganizer(self, cachePath=None, useCache=True, workPath=None, **kwargs):
         cachePath = cachePath if cachePath else self.__cachePath
         workPath = workPath if workPath else self.__workPath
-        return ModelReorganizer(cachePath=cachePath, useCache=useCache, workPath=workPath, **kwargs)
+        cacheFile = kwargs.get("cacheFile", self.__dataSetHoldingsFileName)
+        cacheFormat = kwargs.get("cacheFormat", "json")
+        return ModelReorganizer(cachePath=cachePath, useCache=useCache, workPath=workPath, cacheFile=cacheFile, cacheFormat=cacheFormat, **kwargs)
 
     def getComputedModelsDataPath(self):
         return self.__cachePath
@@ -285,7 +288,7 @@ class AlphaFoldModelProvider:
             mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
             #
             if inputModelList:  # Only reorganize given list of model files
-                ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
+                _, ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
                 if not ok:
                     logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputModelList[0])
             #
@@ -305,7 +308,7 @@ class AlphaFoldModelProvider:
                                 continue
                     # Proceed with reorganization
                     inputModelList = self.getModelFileList(inputPathList=[archiveDir])
-                    ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
+                    _, ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
                     if not ok:
                         logger.error("Reorganization of model files failed for species archive %s", archiveDir)
                         break

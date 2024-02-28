@@ -49,7 +49,7 @@ class ModelProviderWorkflow:
         self.__chunkSize = chunkSize
         self.__modelProviders = modelProviders if modelProviders else ["AlphaFold", "ModelArchive"]
         #
-        self.__smallFileSizeCutoff = kwargs.get("smallFileSizeCutoff", 33554432)
+        self.__smallFileSizeCutoff = kwargs.get("smallFileSizeCutoff", 8388608)
         self.__alphaFoldRequestedSpeciesList = kwargs.get("alphaFoldRequestedSpeciesList", [])
         self.__alphaFoldRequestedTaxIdPrefixList = kwargs.get("alphaFoldRequestedTaxIdPrefixList", [])
         self.__modelArchiveRequestedDatasetD = kwargs.get("modelArchiveRequestedDatasetD", {})

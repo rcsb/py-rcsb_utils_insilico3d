@@ -71,8 +71,8 @@ class ModelProviderWorkflowTests(unittest.TestCase):
                 modelProviders=["AlphaFoldCloud"],
                 useCache=True,
                 numProc=16,
-                chunkSize=50,
-                smallFileSizeCutoff=67108864,  # 64mb
+                chunkSize=4,  # the smaller the faster, generally
+                smallFileSizeCutoff=8388608,  # 8mb (~130 models), seems to be the optimal cutoff
             )
             for subDir in alphaFoldSubDirL:
                 ok = mPWf.reorganize(

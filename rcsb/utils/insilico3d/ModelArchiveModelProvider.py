@@ -59,11 +59,11 @@ class ModelArchiveModelProvider:
         self.__baseWorkPath = baseWorkPath if baseWorkPath else self.__cachePath
         self.__workPath = os.path.join(self.__baseWorkPath, "work-dir", "ModelArchive")  # Directory where model files will be downloaded (also contains MA-specific cache file)
         self.__dataSetCacheFile = os.path.join(self.__workPath, "model-download-cache.json")
+        self.__dataSetHoldingsFileName = "modelarchive-holdings.json.gz"
+
         self.__modelArchiveSummaryPageBaseApiUrl = "https://www.modelarchive.org/api/projects/"
-        #
-        # For direct gzipped file downloads (e.g., https://www.modelarchive.org/doi/10.5452/ma-bak-cepc-0001.cif.gz)
         self.__modelArchiveBaseDownloadUrl = "https://www.modelarchive.org/doi/10.5452/"
-        #
+        # For direct gzipped file downloads (e.g., https://www.modelarchive.org/doi/10.5452/ma-bak-cepc-0001.cif.gz)
         self.__modelArchiveBulkDownloadUrlEnd = "?type=materials_procedures__accompanying_data_file_name"  # E.g., "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name"
 
         self.__mU = MarshalUtil(workPath=self.__workPath)
@@ -365,7 +365,9 @@ class ModelArchiveModelProvider:
     def getModelReorganizer(self, cachePath=None, useCache=True, workPath=None, **kwargs):
         cachePath = cachePath if cachePath else self.__cachePath
         workPath = workPath if workPath else self.__workPath
-        return ModelReorganizer(cachePath=cachePath, useCache=useCache, workPath=workPath, **kwargs)
+        cacheFile = kwargs.get("cacheFile", self.__dataSetHoldingsFileName)
+        cacheFormat = kwargs.get("cacheFormat", "json")
+        return ModelReorganizer(cachePath=cachePath, useCache=useCache, workPath=workPath, cacheFile=cacheFile, cacheFormat=cacheFormat, **kwargs)
 
     def getComputedModelsDataPath(self):
         return self.__cachePath
@@ -393,7 +395,7 @@ class ModelArchiveModelProvider:
             mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
             #
             if inputModelList:  # Only reorganize given list of model files
-                ok = mR.reorganize(
+                _, ok = mR.reorganize(
                     inputModelList=inputModelList,
                     modelSource="ModelArchive",
                     destBaseDir=self.__cachePath,
@@ -424,7 +426,7 @@ class ModelArchiveModelProvider:
                         raise ValueError("Failed to get release date for archive dataset.")
                     #
                     inputModelList = self.getModelFileList(inputPathList=[archiveDir])
-                    ok = mR.reorganize(
+                    _, ok = mR.reorganize(
                         inputModelList=inputModelList,
                         modelSource="ModelArchive",
                         destBaseDir=self.__cachePath,

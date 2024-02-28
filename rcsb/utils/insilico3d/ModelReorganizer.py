@@ -653,8 +653,10 @@ class ModelReorganizer(object):
         Args:
             cachePath (str): directory path for storing cache file containing a dictionary of all reorganized models.
             useCache (bool): whether to use the existing data cache or re-run entire model reorganization process.
-            cacheFile (str, optional): filename for cache file; default "computed-models-holdings.json.gz".
-            cacheFilePath (str, optional): full filepath and name for cache file (will override "cachePath" and "cacheFile" if provided).
+            cacheFile (str, optional): filename for individual holdings file; default "computed-models-holdings.json.gz".
+            cacheFilePath (str, optional): full filepath and name for individual holdings file (will override "cachePath" and "cacheFile" if provided).
+            cacheFileList (str, optional): filename for holdings file list (contains list of all holdings files); default "computed-models-holdings-list.json.gz".
+            cacheFileListPath (str, optional): full filepath and name for holdings file list (will override "cachePath" and "cacheFileList" if provided).
             numProc (int, optional): number of processes to use; default 2.
             chunkSize (int, optional): incremental chunk size used for distributed work processes; default 20.
             workPath (str, optional): directory path for workers to operate in; default is cachePath.
@@ -678,6 +680,8 @@ class ModelReorganizer(object):
             cacheExt = "pic" if self.__cacheFormat == "pickle" else "json"
             cacheFile = kwargs.get("cacheFile", "computed-models-holdings." + cacheExt + ".gz")
             cacheFilePath = kwargs.get("cacheFilePath", os.path.join(self.__cachePath, "holdings", cacheFile))
+            cacheFileList = kwargs.get("cacheFileList", "computed-models-holdings-list.json")
+            self.__cacheFileListPath = kwargs.get("cacheFileListPath", os.path.join(self.__cachePath, "holdings", cacheFileList))
 
             # Create DictionaryApi instance to use in exporting of BCIF files by mpu workers
             dictFilePathL = kwargs.get("dictFilePathL", None)
@@ -747,7 +751,7 @@ class ModelReorganizer(object):
     def getCacheFilePath(self):
         return self.__cacheFilePath
 
-    def reorganize(self, inputModelList, modelSource, destBaseDir, useCache=True, **kwargs):
+    def reorganize(self, inputModelList, modelSource, destBaseDir, useCache=True, inputModelD=None, writeCache=True, **kwargs):
         """Move model files from organism-wide model listing to hashed directory structure and rename files
         to follow internal identifier naming convention.
 
@@ -755,6 +759,8 @@ class ModelReorganizer(object):
             inputModelList (list): List of input model filepaths to reorganize.
             modelSource (str): Source of model files ("AlphaFold", "ModBase", "ModelArchive", or "SwissModel")
             destBaseDir (str): Base destination directory into which to reorganize model files (e.g., "computed-models")
+            inputModelD (dict): Input mD dictionary, onto which to append the given set of newly reorganized models; defaults to re-reading in cache file (if useCache True)
+            writeCache (bool): Whether to write out the cache holdings file or not; default True
 
         Returns:
             bool: True for success or False otherwise
@@ -773,24 +779,23 @@ class ModelReorganizer(object):
             )
             if len(failD) > 0:
                 logger.error("Failed to process %d model files.", len(failD))
-            kwargs = {"indent": 4} if self.__cacheFormat == "json" else {"pickleProtocol": 4}
+            #
             if useCache:
-                self.__mD = self.__reload(cacheFilePath=self.__cacheFilePath, useCache=useCache)
+                self.__mD = inputModelD if inputModelD else self.__reload(cacheFilePath=self.__cacheFilePath, useCache=useCache)
                 for modelId, modelD in mD.items():
                     self.__mD.update({modelId: modelD})
             else:
                 self.__mD = copy.deepcopy(mD)
-            ok = self.__mU.doExport(self.__cacheFilePathUnzip, self.__mD, fmt=self.__cacheFormat, **kwargs)
-            logger.debug("Wrote %r status %r", self.__cacheFilePathUnzip, ok)
-            if ok:
-                ok2 = self.__fU.compress(self.__cacheFilePathUnzip, self.__cacheFilePath)
-                logger.debug("Wrote and compressed %r status %r", self.__cacheFilePath, ok2)
-                if ok2:
-                    ok3 = self.__fU.remove(self.__cacheFilePathUnzip)
-                    logger.debug("Removed uncompressed holdings cache file %s status %r", self.__cacheFilePathUnzip, ok3)
+            #
+            ok = len(self.__mD) > 0
+            #
+            if writeCache:
+                ok = self.writeCacheFiles(self.__mD) and ok
+        #
         except Exception as e:
             logger.exception("Failing with %s", str(e))
-        return ok
+        #
+        return self.__mD, ok
 
     def __reorganizeModels(self, inputModelList, modelSource, destBaseDir, numProc=2, chunkSize=20, **kwargs):
         """Prepare multiprocessor queue and workers for generating input:output map for model files, to use in reorganizing
@@ -869,3 +874,36 @@ class ModelReorganizer(object):
         #
         logger.info("Completed with multi-proc status %r, failures %r, total models with data (%d)", ok, len(failList), len(mD))
         return mD, failD
+
+    def writeCacheFiles(self, mD):
+        ok = False
+        #
+        try:
+            kwargsExport = {"indent": 4} if self.__cacheFormat == "json" else {"pickleProtocol": 4}
+            #
+            ok = self.__mU.doExport(self.__cacheFilePathUnzip, mD, fmt=self.__cacheFormat, **kwargsExport)
+            logger.debug("Wrote %r status %r", self.__cacheFilePathUnzip, ok)
+            if ok:
+                ok2 = self.__fU.compress(self.__cacheFilePathUnzip, self.__cacheFilePath)
+                logger.info("Wrote and compressed holdings file %r (%r models) status %r", self.__cacheFilePath, len(mD), ok2)
+                if ok2:
+                    ok3 = self.__fU.remove(self.__cacheFilePathUnzip)
+                    logger.debug("Removed uncompressed holdings cache file %s status %r", self.__cacheFilePathUnzip, ok3)
+            #
+            # Update the holdings file list (i.e., the file containing the list of all holdings files)
+            if os.path.exists(self.__cacheFileListPath):
+                holdingsFileListD = self.__mU.doImport(self.__cacheFileListPath, fmt="json")
+                holdingsFileListD = holdingsFileListD if holdingsFileListD else {}
+            else:
+                holdingsFileListD = {}
+            holdingsFilePathRelative = "/".join(self.__cacheFilePath.split("/")[-2:])
+            holdingsFileListD.update({holdingsFilePathRelative: len(mD)})
+            ok4 = self.__mU.doExport(self.__cacheFileListPath, holdingsFileListD, fmt="json", indent=4)
+            logger.info("Wrote holdings file list %r status %r", self.__cacheFileListPath, ok4)
+            #
+            ok = ok and ok2 and ok3 and ok4
+        #
+        except Exception as e:
+            logger.exception("Failing with %s", str(e))
+        #
+        return ok
