@@ -31,8 +31,8 @@ import logging
 import os.path
 import copy
 from datetime import datetime
-import pytz
 import tarfile
+import pytz
 
 from mmcif.api.DictionaryApi import DictionaryApi
 from mmcif.api.DataCategory import DataCategory

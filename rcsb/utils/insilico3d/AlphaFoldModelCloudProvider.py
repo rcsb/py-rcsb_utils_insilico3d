@@ -250,20 +250,23 @@ class AlphaFoldModelCloudProvider:
             logger.info("Beginning reorganization with cachePath %r, useCache %r, inputTaxIdPrefixList %r, kwargs %r", cachePath, useCache, inputTaxIdPrefixList, kwargs)
             #
             smallFileSizeCutoff = kwargs.get("smallFileSizeCutoff", 33554432)  # 32mb
+            smallFileSizeCutoffMb = smallFileSizeCutoff / (1024 * 1024)
             #
             cacheD = self.__mU.doImport(self.__aFCTaxIdDataCacheFile, fmt="json")
             cacheDataD = cacheD["data"]
             # Has the following structure:
             # {
-            # "data": {
-            #   "/mnt/vdb1/source-models/work-dir/100":
-            #       "archive_files": {
-            #           "proteome-tax_id-1000965-0_v4.tar": 95232,  # (fname: fsize)
+            #   "data": {
+            #     "/mnt/vdb1/source-models/work-dir/AlphaFoldCloud/100": {      <--- directory of tar files
+            #       "0": {                                                      <--- subset of tar files (such that no single subset is > 64 GB)
+            #         "archive_files": {
+            #           "proteome-tax_id-1000965-0_v4.tar": 95232,              <--- tar file name and size
             #           "proteome-tax_id-1000960-0_v4.tar": 88576,
             #           "proteome-tax_id-1000888-0_v4.tar": 128512,
             #           "proteome-tax_id-1000974-0_v4.tar": 96256,
             #           "proteome-tax_id-1007383-0_v4.tar": 40960,
-            #           "proteome-tax_id-1000701-0_v4.tar": 579584,
+            #           ...
+            #         "reorganized": False                                      <--- whether the subset has been reorganized yet; key is absent if not
             # ...}}
             #
             reorgDataD = {}
@@ -275,58 +278,63 @@ class AlphaFoldModelCloudProvider:
                         reorgDataD[archiveDir] = archiveD
                 else:
                     # Check if cache was already reorganized
-                    if archiveD.get("reorganized", False):
-                        logger.info("TaxID archive data group %s already reorganized", archiveDir)
-                        continue
-                    reorgDataD[archiveDir] = archiveD
+                    for archiveSubsetIdx, archiveSubsetD in archiveD.items():
+                        if archiveSubsetD.get("reorganized", False):
+                            logger.info("TaxID archive data group %s already reorganized", archiveDir)
+                            continue
+                        reorgDataD.setdefault(archiveDir, {}).update({archiveSubsetIdx: archiveSubsetD})
 
             for archiveDir, archiveD in reorgDataD.items():
-                smallArchiveFileL = [fn for fn, size in archiveD["archive_files"].items() if size <= smallFileSizeCutoff]
-                bigArchiveFileL = [fn for fn, size in archiveD["archive_files"].items() if size > smallFileSizeCutoff]
-                smallArchiveFilePathL = [os.path.join(archiveDir, archiveFile) for archiveFile in smallArchiveFileL]
-                bigArchiveFilePathL = [os.path.join(archiveDir, archiveFile) for archiveFile in bigArchiveFileL]
-                #
-                logger.info(
-                    "archiveDir %s - %d small files (<= 16mb), %d large files (> 16mb), (total number of tar files %d)",
-                    archiveDir,
-                    len(smallArchiveFilePathL),
-                    len(bigArchiveFilePathL),
-                    len(archiveD["archive_files"]),
-                )
+                for archiveSubsetIdx, archiveSubsetD in archiveD.items():
+                    smallArchiveFileL = [fn for fn, size in archiveSubsetD["archive_files"].items() if size <= smallFileSizeCutoff]
+                    bigArchiveFileL = [fn for fn, size in archiveSubsetD["archive_files"].items() if size > smallFileSizeCutoff]
+                    smallArchiveFilePathL = [os.path.join(archiveDir, archiveFile) for archiveFile in smallArchiveFileL]
+                    bigArchiveFilePathL = [os.path.join(archiveDir, archiveFile) for archiveFile in bigArchiveFileL]
+                    #
+                    logger.info(
+                        "archiveDir %s subset %r - %d small files (<= %rmb), %d large files (> %rmb), (total number of tar files %d)",
+                        archiveDir,
+                        archiveSubsetIdx,
+                        smallFileSizeCutoffMb,
+                        len(smallArchiveFilePathL),
+                        smallFileSizeCutoffMb,
+                        len(bigArchiveFilePathL),
+                        len(archiveSubsetD["archive_files"]),
+                    )
 
-                taxIdGroup = archiveDir.split("/")[-1]
-                holdingsFileName = "alphafold-holdings-" + taxIdGroup + ".json.gz"
-                mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, workPath=archiveDir, cacheFile=holdingsFileName, cacheFormat="json", **kwargs)
+                    taxIdGroup = archiveDir.split("/")[-1]
+                    holdingsFileName = "alphafold-holdings-" + taxIdGroup + "-" + str(archiveSubsetIdx) + ".json.gz"
+                    mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, workPath=archiveDir, cacheFile=holdingsFileName, cacheFormat="json", **kwargs)
 
-                # First, reorganize small archive files (<= 16mb) -- more efficient with multiple workers acting on separate tar files
-                if smallArchiveFilePathL:
-                    logger.info("Reorganizing small archive files (<= 16mb) - %d files", len(smallArchiveFilePathL))
-                    ok = mR.reorganize(inputModelList=smallArchiveFilePathL, modelSource="AlphaFoldCloud", destBaseDir=self.__cachePath, useCache=useCache)
-                    if not ok:
-                        logger.error("Reorganization of model files failed for species archive %s", archiveDir)
+                    # First, reorganize small archive files (<= 16mb) -- more efficient with multiple workers acting on separate tar files
+                    if smallArchiveFilePathL:
+                        logger.info("Reorganizing small archive files (<= %rmb) - %d files", smallFileSizeCutoffMb, len(smallArchiveFilePathL))
+                        ok = mR.reorganize(inputModelList=smallArchiveFilePathL, modelSource="AlphaFoldCloud", destBaseDir=self.__cachePath, useCache=useCache)
+                        if not ok:
+                            logger.error("Reorganization of model files failed for archive %s subset %r", archiveDir, archiveSubsetIdx)
 
-                # Second, reorganize large archive files (> 16mb) -- more efficient with multiple workers acting on the same tar file
-                if bigArchiveFilePathL:
-                    logger.info("Reorganizing large archive files (> 16mb) - %d files", len(bigArchiveFilePathL))
-                    for archiveFile in bigArchiveFilePathL:
-                        inputModelList = self.__extractModelCifFiles(archiveFile)
-                        if inputModelList and len(inputModelList) > 0:
-                            logger.info("Working on reorganizing %s (%d models)", archiveFile, len(inputModelList))
-                            # Proceed with reorganization
-                            ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
-                            if not ok:
-                                logger.error("Reorganization of model files failed for species archive %s", archiveDir)
-                                break
+                    # Second, reorganize large archive files (> 16mb) -- more efficient with multiple workers acting on the same tar file
+                    if bigArchiveFilePathL:
+                        logger.info("Reorganizing large archive files (> %rmb) - %d files", smallFileSizeCutoffMb, len(bigArchiveFilePathL))
+                        for archiveFile in bigArchiveFilePathL:
+                            inputModelList = self.__extractModelCifFiles(archiveFile)
+                            if inputModelList and len(inputModelList) > 0:
+                                logger.info("Working on reorganizing %s (%d models)", archiveFile, len(inputModelList))
+                                # Proceed with reorganization
+                                ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
+                                if not ok:
+                                    logger.error("Reorganization of model files failed for archive %s subset %r", archiveDir, archiveSubsetIdx)
+                                    break
 
-                # NOTE: This script should NOT be used to delete the source archive files--that task should be left up to the user to do manually,
-                #       and only when everything is assured to be reorganized correctly and there is absolutely no need to keep the source tar files.
-                #       Once they are deleted (e.g., all 100-999 taxId directories), the only way to get them back is to redownload them all again from GoogleCloud.
+                    # NOTE: This script should NOT be used to delete the source archive files--that task should be left up to the user to do manually,
+                    #       and only when everything is assured to be reorganized correctly and there is absolutely no need to keep the source tar files.
+                    #       Once they are deleted (e.g., all 100-999 taxId directories), the only way to get them back is to redownload them all again from GoogleCloud.
 
-                # Update the cache file to indicate that the given species archive has been reorganized
-                if ok and not cacheD["data"][archiveDir].get("reorganized", False):
-                    cacheD["data"][archiveDir].update({"reorganized": True})
-                    logger.info("Reorganization of model files complete for archiveDir %s", archiveDir)
-                ok = self.__mU.doExport(self.__aFCTaxIdDataCacheFile, cacheD, fmt="json", indent=4)
+                    # Update the cache file to indicate that the given species archive has been reorganized
+                    if ok and not cacheD["data"][archiveDir][archiveSubsetIdx].get("reorganized", False):
+                        cacheD["data"][archiveDir][archiveSubsetIdx].update({"reorganized": True})
+                        logger.info("Reorganization of model files complete for archiveDir %s", archiveDir)
+                    ok = self.__mU.doExport(self.__aFCTaxIdDataCacheFile, cacheD, fmt="json", indent=4)
         #
         except Exception as e:
             logger.exception("Failing with %s", str(e))
