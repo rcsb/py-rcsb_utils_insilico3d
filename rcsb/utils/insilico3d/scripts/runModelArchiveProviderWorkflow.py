@@ -1,16 +1,14 @@
 ##
-# File:    runAlphaFoldModelCloudProviderWorkflow.py
+# File:    runModelArchiveProviderWorkflow.py
 # Author:  Dennis Piehl
-# Date:    3-Jan-2024
+# Date:    15-Apr-2022
 #
 # Updates:
 #
 #
 ##
 """
-Script for running through the reorganization workflow for AlphaFold models downloaded from Google Cloud.
-
-Assumes tar files have already been downloaded.
+Script for running through the entire workflow for retrieving and storing all ModelArchive models.
 
 """
 
@@ -35,18 +33,22 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(mo
 logger = logging.getLogger()
 
 
-class ModelProviderWorkflowTests(unittest.TestCase):
-    runEntireWorkflowForAllProviderSources = True
+class ModelProviderWorkflowExec(unittest.TestCase):
 
     def setUp(self):
         # This is where the models will be downloaded to and stored, prior to processing and reorganization
         # should stay the same regardless of where you want to reorganize the processed models
-        self.__workPath = "/mnt/vdb1/source-models/"
+        self.__workPath = "/mnt/vdb1/source-models/"  # "/PATH/TO/GIANT/_SOURCE_/DIRECTORY"
 
         # This is where the models will be reorganized into after processing
-        self.__cachePath = "/mnt/vdb1/computed-models/CSM1"
-        #
-        self.__keepSource = False
+        self.__cachePath = "/mnt/vdb1/computed-models/CSM1"  # "/PATH/TO/GIANT/_ORGANIZED_/DIRECTORY"
+
+        # This controls whether to keep the downloaded source files after processing and reorganizing them.
+        # It's generally a good idea to keep them around in case the reorganization step of the workflow needs
+        # to be run again. (*Note that this flag means something different for GoogleCloud-sourced AlphaFold models!)
+        self.__keepSource = True
+
+        self.__fetchAndReorganizeModelArchive = False  # Set to False until ready to run
 
         self.__startTime = time.time()
         logger.info("Starting %s at %s", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()))
@@ -58,33 +60,26 @@ class ModelProviderWorkflowTests(unittest.TestCase):
         endTime = time.time()
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
-    @unittest.skipUnless(runEntireWorkflowForAllProviderSources, "Skip running the entire workflow")
     def runModelProviderWorkflow(self):
         if self.__workPath and self.__cachePath:
-
-            alphaFoldSubDirL = ["100"]
-            # alphaFoldSubDirL = [str(i) for i in range(100, 1000)]
-
-            mPWf = ModelProviderWorkflow(
-                srcDir=self.__workPath,
-                destDir=self.__cachePath,
-                modelProviders=["AlphaFoldCloud"],
-                useCache=True,
-                numProc=16,
-                chunkSize=4,  # the smaller the faster, generally
-                smallFileSizeCutoff=8388608,  # 8mb (~130 models), seems to be the optimal cutoff
-            )
-            for subDir in alphaFoldSubDirL:
-                ok = mPWf.reorganize(
-                    keepSource=self.__keepSource,
-                    inputDirList=[subDir],
+            if self.__fetchAndReorganizeModelArchive:
+                mPWf = ModelProviderWorkflow(
+                    srcDir=self.__workPath,
+                    destDir=self.__cachePath,
+                    modelProviders=["ModelArchive"],
+                    useCache=True,
+                    numProc=8,
+                    chunkSize=100,
                 )
+                ok = mPWf.download()
+                self.assertTrue(ok)
+                ok = mPWf.reorganize(keepSource=self.__keepSource)
                 self.assertTrue(ok)
 
 
 def modelProviderSuite():
     suiteSelect = unittest.TestSuite()
-    suiteSelect.addTest(ModelProviderWorkflowTests("runModelProviderWorkflow"))
+    suiteSelect.addTest(ModelProviderWorkflowExec("runModelProviderWorkflow"))
     return suiteSelect
 
 

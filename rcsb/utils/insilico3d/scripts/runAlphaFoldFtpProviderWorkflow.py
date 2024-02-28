@@ -1,5 +1,5 @@
 ##
-# File:    runModelProviderWorkflow.py
+# File:    runAlphaFoldFtpProviderWorkflow.py
 # Author:  Dennis Piehl
 # Date:    15-Apr-2022
 #
@@ -8,7 +8,8 @@
 #
 ##
 """
-Script for running through the entire workflow for retrieving and storing all models.
+Script for running through the entire workflow for retrieving and storing AlphaFold models from the FTP site (i.e., the
+original ~1 million subset). To be superseded by the set from Google Cloud (see runAlphaFoldCloudReorganizingWorkflow.py).
 
 """
 
@@ -33,22 +34,24 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(mo
 logger = logging.getLogger()
 
 
-class ModelProviderWorkflowTests(unittest.TestCase):
-    runEntireWorkflowForAllProviderSources = False
+class ModelProviderWorkflowExec(unittest.TestCase):
+    runEntireWorkflow = False
 
     def setUp(self):
         # This is where the models will be downloaded to and stored, prior to processing and reorganization
         # should stay the same regardless of where you want to reorganize the processed models
-        # IMPORTANT: MAKE SURE THIS LOCATION HAS ENOUGH STORAGE TO HOLD ALL THE DOWNLOADED MODELS!
-        self.__workPath = None  # "/PATH/TO/GIANT/_SOURCE_/DIRECTORY"
+        self.__workPath = "/mnt/vdb1/source-models/"  # "/PATH/TO/GIANT/_SOURCE_/DIRECTORY"
 
         # This is where the models will be reorganized into after processing
-        # IMPORTANT: MAKE SURE THIS LOCATION HAS ENOUGH STORAGE TO HOLD ALL THE PROCESSED/ORGANIZED MODELS!
-        self.__cachePath = None  # "/PATH/TO/GIANT/_ORGANIZED_/DIRECTORY"
+        self.__cachePath = "/mnt/vdb1/computed-models/CSM1"  # "/PATH/TO/GIANT/_ORGANIZED_/DIRECTORY"
 
+        # This controls whether to keep the downloaded source files after processing and reorganizing them.
+        # It's generally a good idea to keep them around in case the reorganization step of the workflow needs
+        # to be run again. (*Note that this flag means something different for GoogleCloud-sourced AlphaFold models!)
         self.__keepSource = True
-        self.__fetchModelArchive = True
-        self.__fetchAlphaFold = True
+
+        self.__fetchAndReorganizeAlphaFoldFtp = False  # Set to False (Feb 2024)--will be switching to using GoogleCloud instead
+
         self.__startTime = time.time()
         logger.info("Starting %s at %s", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()))
 
@@ -59,23 +62,9 @@ class ModelProviderWorkflowTests(unittest.TestCase):
         endTime = time.time()
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
-    @unittest.skipUnless(runEntireWorkflowForAllProviderSources, "Skip running the entire workflow")
+    @unittest.skipUnless(runEntireWorkflow, "Skip running the entire workflow")
     def runModelProviderWorkflow(self):
         if self.__workPath and self.__cachePath:
-            if self.__fetchModelArchive:
-                mPWf = ModelProviderWorkflow(
-                    srcDir=self.__workPath,
-                    destDir=self.__cachePath,
-                    modelProviders=["ModelArchive"],
-                    useCache=True,
-                    numProc=8,
-                    chunkSize=100,
-                )
-                ok = mPWf.download()
-                self.assertTrue(ok)
-                ok = mPWf.reorganize(keepSource=self.__keepSource)
-                self.assertTrue(ok)
-
             alphaFoldSpeciesList = [
                 "Helicobacter pylori",  # 1538,
                 "Staphylococcus aureus",  # 2888,
@@ -128,7 +117,7 @@ class ModelProviderWorkflowTests(unittest.TestCase):
                 "Swiss-Prot (CIF files)",  # 542380; This sometimes slows down significantly after only a few GBs (out of 36 GB) are downloaded, so may not finish
                 "Overlap with MANE",  # 17334 (3,844 are unique)
             ]
-            if self.__fetchAlphaFold and len(alphaFoldSpeciesList) > 0:
+            if self.__fetchAndReorganizeAlphaFoldFtp and len(alphaFoldSpeciesList) > 0:
                 for species in alphaFoldSpeciesList:
                     mPWf = ModelProviderWorkflow(
                         srcDir=self.__workPath,
@@ -147,7 +136,7 @@ class ModelProviderWorkflowTests(unittest.TestCase):
 
 def modelProviderSuite():
     suiteSelect = unittest.TestSuite()
-    suiteSelect.addTest(ModelProviderWorkflowTests("runModelProviderWorkflow"))
+    suiteSelect.addTest(ModelProviderWorkflowExec("runModelProviderWorkflow"))
     return suiteSelect
 
 
