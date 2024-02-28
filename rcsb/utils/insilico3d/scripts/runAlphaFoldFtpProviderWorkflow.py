@@ -124,8 +124,8 @@ class ModelProviderWorkflowExec(unittest.TestCase):
                         destDir=self.__cachePath,
                         modelProviders=["AlphaFold"],
                         useCache=True,
-                        numProc=8,
-                        chunkSize=100,
+                        numProc=16,
+                        chunkSize=8,
                         alphaFoldRequestedSpeciesList=[species],
                     )
                     ok = mPWf.download()

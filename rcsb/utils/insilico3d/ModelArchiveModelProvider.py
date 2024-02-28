@@ -63,7 +63,7 @@ class ModelArchiveModelProvider:
 
         self.__modelArchiveSummaryPageBaseApiUrl = "https://www.modelarchive.org/api/projects/"
         self.__modelArchiveBaseDownloadUrl = "https://www.modelarchive.org/doi/10.5452/"
-        # For direct gzipped file downloads (e.g., https://www.modelarchive.org/doi/10.5452/ma-bak-cepc-0001.cif.gz)
+        # Use above for direct gzipped file downloads (e.g., https://www.modelarchive.org/doi/10.5452/ma-bak-cepc-0001.cif.gz)
         self.__modelArchiveBulkDownloadUrlEnd = "?type=materials_procedures__accompanying_data_file_name"  # E.g., "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name"
 
         self.__mU = MarshalUtil(workPath=self.__workPath)

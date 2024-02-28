@@ -45,7 +45,7 @@ class ModelCacheProvider(StashableBase):
         super(ModelCacheProvider, self).__init__(self.__cachePath, [self.__dirName])
         self.__dirPath = os.path.join(self.__cachePath, self.__dirName)
         #
-        self.__holdingsRemotePath = kwargs.get("holdingsRemotePath", "http://computed-models-internal-west.rcsb.org/staging/holdings/computed-models-holdings.json.gz")
+        self.__holdingsRemotePath = kwargs.get("holdingsRemotePath", "http://computed-models-internal-coast.rcsb.org/staging/holdings/computed-models-holdings.json.gz")
         self.__fallbackUrl = "https://raw.githubusercontent.com/rcsb/py-rcsb_exdb_assets_stash/testing/stash/computed-models/computed-models-holdings.json.gz"
         self.__holdingsLocalPath = os.path.join(self.__dirPath, "computed-models-holdings.json.gz")
         #

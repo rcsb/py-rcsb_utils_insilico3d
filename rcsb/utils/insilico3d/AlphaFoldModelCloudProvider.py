@@ -89,7 +89,6 @@ class AlphaFoldModelCloudProvider:
             startDateTime = datetime.datetime.now().isoformat()
 
             alphaFoldRequestedTaxIdPrefixList = kwargs.get("alphaFoldRequestedTaxIdPrefixList", [])
-            # alphaFoldRequestedTaxIdPrefixList = ["206033", "100000"]  # "408170"
 
             self.__fU.mkdir(self.__workPath)
 
@@ -241,6 +240,26 @@ class AlphaFoldModelCloudProvider:
         """Reorganize model files from organism-wide model listing to hashed directory structure and rename files
         to follow internal identifier naming convention.
 
+        The "model-download-cache.json" file (in the .../source-models/work-dir/...) used here has the following structure:
+        {
+          "data": {
+            "/mnt/vdb1/source-models/work-dir/AlphaFoldCloud/100": {    <--- directory of tar files
+              "0": {                                                    <--- subset of tar files (such that no single subset is > 64 GB)
+                "archive_files": {
+                  "proteome-tax_id-1000965-0_v4.tar": 95232,            <--- tar file name and size
+                  "proteome-tax_id-1000960-0_v4.tar": 88576,
+                  "proteome-tax_id-1000888-0_v4.tar": 128512,
+                  "proteome-tax_id-1000974-0_v4.tar": 96256,
+                  "proteome-tax_id-1007383-0_v4.tar": 40960,
+                  ...
+                "reorganized": False                                    <--- whether the subset has been reorganized yet; key is absent if not
+        ...}}
+
+        NOTE: This method does NOT delete the source archive TAR files--that task should be left up to the user to do manually,
+        and only when everything is assured to be reorganized correctly and there is absolutely no need to keep the source tar files.
+        Once they are deleted (e.g., all 100-999 taxId directories), the only way to get them back is to redownload them all again from GoogleCloud.
+        The "keepSource" argument has a different meaning in this provider class (see description below).
+
         Args:
             cachePath (str): Path to cache directory.
             useCache (bool): Whether to use the existing data cache or re-run entire model reorganization process.
@@ -249,6 +268,8 @@ class AlphaFoldModelCloudProvider:
                 numProc (int): number of processes to use; default 2.
                 chunkSize (int): incremental chunk size used for distributed work processes; default 20.
                 keepSource (bool): whether to copy files to new directory (instead of moving them); default False.
+                                   Note that this only impacts the CIF files extracted from the TAR files--the TAR files are
+                                   retained regardless. So, this should be set to False to prevent accumulation of many thousands of CIF files.
                 cacheFilePath (str): full filepath and name for cache file containing a dictionary of all reorganized models.
                 dictFilePathL (str, optional): List of dictionary files to use for BCIF encoding.
                 smallFileSizeCutoff (int): size in bytes to use a file size cutoff for separating out "small" vs. "big" tar files
@@ -266,20 +287,6 @@ class AlphaFoldModelCloudProvider:
             #
             cacheD = self.__mU.doImport(self.__aFCTaxIdDataCacheFile, fmt="json")
             cacheDataD = cacheD["data"]
-            # Has the following structure:
-            # {
-            #   "data": {
-            #     "/mnt/vdb1/source-models/work-dir/AlphaFoldCloud/100": {      <--- directory of tar files
-            #       "0": {                                                      <--- subset of tar files (such that no single subset is > 64 GB)
-            #         "archive_files": {
-            #           "proteome-tax_id-1000965-0_v4.tar": 95232,              <--- tar file name and size
-            #           "proteome-tax_id-1000960-0_v4.tar": 88576,
-            #           "proteome-tax_id-1000888-0_v4.tar": 128512,
-            #           "proteome-tax_id-1000974-0_v4.tar": 96256,
-            #           "proteome-tax_id-1007383-0_v4.tar": 40960,
-            #           ...
-            #         "reorganized": False                                      <--- whether the subset has been reorganized yet; key is absent if not
-            # ...}}
             #
             reorgDataD = {}
             for archiveDir, archiveD in cacheDataD.items():
@@ -358,10 +365,6 @@ class AlphaFoldModelCloudProvider:
                     if not ok:
                         logger.error("Exporting of holdings cache files failed for archive %s subset %r", archiveDir, archiveSubsetIdx)
                         break
-
-                    # NOTE: This script should NOT be used to delete the source archive files--that task should be left up to the user to do manually,
-                    #       and only when everything is assured to be reorganized correctly and there is absolutely no need to keep the source tar files.
-                    #       Once they are deleted (e.g., all 100-999 taxId directories), the only way to get them back is to redownload them all again from GoogleCloud.
 
                     # Update the cache file to indicate that the given species archive has been reorganized
                     if ok and not cacheD["data"][archiveDir][archiveSubsetIdx].get("reorganized", False):

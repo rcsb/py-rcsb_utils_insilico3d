@@ -68,8 +68,8 @@ class ModelProviderWorkflowExec(unittest.TestCase):
                     destDir=self.__cachePath,
                     modelProviders=["ModelArchive"],
                     useCache=True,
-                    numProc=8,
-                    chunkSize=100,
+                    numProc=16,
+                    chunkSize=16,
                 )
                 ok = mPWf.download()
                 self.assertTrue(ok)
