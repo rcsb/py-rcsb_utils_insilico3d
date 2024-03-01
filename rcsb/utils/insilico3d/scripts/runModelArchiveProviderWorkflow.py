@@ -48,8 +48,7 @@ class ModelProviderWorkflowExec(unittest.TestCase):
         # to be run again. (*Note that this flag means something different for GoogleCloud-sourced AlphaFold models!)
         self.__keepSource = True
 
-        self.__fetchAndReorganizeModelArchive = False  # Set to False until ready to run
-
+        self.__fetchAndReorganizeModelArchive = True
         self.__startTime = time.time()
         logger.info("Starting %s at %s", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()))
 
@@ -70,6 +69,7 @@ class ModelProviderWorkflowExec(unittest.TestCase):
                     useCache=True,
                     numProc=16,
                     chunkSize=16,
+                    # modelArchiveRequestedDatasetD={"ma-bak-cepc": {}, "ma-ornl-sphdiv": {}, "ma-coffe-slac": {}, "ma-asfv-asfvg": {}, "ma-t3vr3": {}}
                 )
                 ok = mPWf.download()
                 self.assertTrue(ok)

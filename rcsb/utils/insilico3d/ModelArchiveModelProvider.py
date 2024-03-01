@@ -238,7 +238,7 @@ class ModelArchiveModelProvider:
             modelIdList.append(data["id"])
         return modelIdList
 
-    async def downloadIndividualModelFiles(self, modelSetName=None, destDir=None, limit=100, breakTime=5, numModels=None):
+    async def downloadIndividualModelFiles(self, modelSetName=None, destDir=None, limit=100, breakTime=3, numModels=None):
         """Download model files individually, in case bulk download not available or want to avoid downloading (currently) unnecessary associated metdata.
 
         Args:
@@ -247,7 +247,7 @@ class ModelArchiveModelProvider:
             numModels (int): number of models to download from model set.
             limit (int, optional): max number of models to download asynchronously at once. Splits the total set into batches of size(limit),
                                    and forces sleep(breakTime) between batches to spare traffic load on ModelArchive server). Defaults to 100.
-            breakTime (int, optional): seconds to wait between subsequent batches of asynchronous requests. Defaults to 5.
+            breakTime (int, optional): seconds to wait between subsequent batches of asynchronous requests. Defaults to 3.
 
         Returns:
             (bool): True if successful; False otherwise.

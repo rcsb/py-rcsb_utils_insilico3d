@@ -151,7 +151,11 @@ class ModelWorker(object):
                 modelPathFromPrefixDir = os.path.join(modelSourcePrefix, firstDir, secondDir, internalModelName)
                 destModelDir = os.path.join(destBaseDir, modelSourcePrefix, firstDir, secondDir)
                 if not self.__fU.exists(destModelDir):
-                    self.__fU.mkdir(destModelDir)
+                    try:
+                        self.__fU.mkdir(destModelDir)
+                    except Exception as e:
+                        dirExists = self.__fU.exists(destModelDir)
+                        logger.exception("Failed to create directory %s (exists %r) with exception %r", destModelDir, dirExists, e)
                 modelFileOut = os.path.join(destModelDir, internalModelName)
                 modelFileOutUnzip = modelFileOut.split(".gz")[0]
                 #
