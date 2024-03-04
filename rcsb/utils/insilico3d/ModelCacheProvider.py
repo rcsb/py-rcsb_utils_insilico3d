@@ -45,12 +45,12 @@ class ModelCacheProvider(StashableBase):
         super(ModelCacheProvider, self).__init__(self.__cachePath, [self.__dirName])
         self.__dirPath = os.path.join(self.__cachePath, self.__dirName)
         #
-        self.__holdingsRemotePath = kwargs.get("holdingsRemotePath", "http://computed-models-internal-west.rcsb.org/holdings/computed-models-holdings.json.gz")
+        self.__holdingsRemotePath = kwargs.get("holdingsRemotePath", "http://computed-models-internal-coast.rcsb.org/staging/holdings/computed-models-holdings.json.gz")
         self.__fallbackUrl = "https://raw.githubusercontent.com/rcsb/py-rcsb_exdb_assets_stash/testing/stash/computed-models/computed-models-holdings.json.gz"
         self.__holdingsLocalPath = os.path.join(self.__dirPath, "computed-models-holdings.json.gz")
         #
         self.__mU = MarshalUtil(workPath=self.__dirPath)
-        self.__mD, self.__idMapD = self.__reload(self.__dirPath, useCache)
+        self.__mD = self.__reload(self.__dirPath, useCache)
         #
 
     def reload(self):
@@ -67,7 +67,7 @@ class ModelCacheProvider(StashableBase):
         ok = False
         #
         logger.info("useCache %r holdingsPath %r", useCache, self.__holdingsLocalPath)
-        mD, idMapD = {}, {}
+        mD = {}
         try:
             if useCache and self.__mU.exists(self.__holdingsLocalPath):
                 mD = self.__mU.doImport(self.__holdingsLocalPath, fmt="json")
@@ -78,19 +78,19 @@ class ModelCacheProvider(StashableBase):
                 ok = fU.get(self.__holdingsRemotePath, self.__holdingsLocalPath)
                 logger.info("Computed-model cache fetch status is %r", ok)
                 if not ok:
-                    logger.info("Refetching computed-models holdings cache fallback file from %r to %r", self.__holdingsRemotePath, self.__holdingsLocalPath)
+                    logger.info("Refetching computed-models holdings cache fallback file from %r to %r", self.__fallbackUrl, self.__holdingsLocalPath)
                     ok = fU.get(self.__fallbackUrl, self.__holdingsLocalPath)
                     logger.info("Computed-model cache fallback fetch status is %r", ok)
                 mD = self.__mU.doImport(self.__holdingsLocalPath, fmt="json")
-            idMapD = self.getCompModelIdMap(modelCacheD=mD)
-            if mD and idMapD:
+            # idMapD = self.getCompModelIdMap(modelCacheD=mD)
+            if mD:
                 ok = True
         except Exception as e:
             logger.exception("Failing with %s", str(e))
 
         logger.info("Completed reload (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
 
-        return mD, idMapD
+        return mD
 
     def testCache(self, minCount=1):
         logger.info("computed-model cache count %d", len(self.__mD))
@@ -102,40 +102,40 @@ class ModelCacheProvider(StashableBase):
     def getModelCacheDict(self):
         return self.__mD
 
-    def getCompModelIdMap(self, modelCacheD=None):
-        return self.__fetchCompModelIdMap(modelCacheD=modelCacheD)
+    # def getCompModelIdMap(self, modelCacheD=None):
+    #     return self.__fetchCompModelIdMap(modelCacheD=modelCacheD)
 
-    def __fetchCompModelIdMap(self, modelCacheD=None):
-        """Get the ID mapping between the source model IDs and internal model identifiers for computational models.
-        """
-        #
-        modelCacheD = modelCacheD if modelCacheD else self.__mD
-        compModelIdMapD = {}
-        try:
-            for internalModelId, modelD in modelCacheD.items():
-                compModelIdMapD.update({modelD["sourceId"]: internalModelId})
-            logger.info("Computed-models mapped ID length: %d", len(compModelIdMapD))
-            #
-        except Exception as e:
-            logger.exception("Failing with %s", str(e))
-        return compModelIdMapD
+    # def __fetchCompModelIdMap(self, modelCacheD=None):
+    #     """Get the ID mapping between the source model IDs and internal model identifiers for computational models.
+    #     """
+    #     #
+    #     modelCacheD = modelCacheD if modelCacheD else self.__mD
+    #     compModelIdMapD = {}
+    #     try:
+    #         for internalModelId, modelD in modelCacheD.items():
+    #             compModelIdMapD.update({modelD["sourceId"]: internalModelId})
+    #         logger.info("Computed-models mapped ID length: %d", len(compModelIdMapD))
+    #         #
+    #     except Exception as e:
+    #         logger.exception("Failing with %s", str(e))
+    #     return compModelIdMapD
 
-    def getInternalCompModelId(self, sourceId):
-        """Get the mapped internal ID of computed model provided the original source ID.
+    # def getInternalCompModelId(self, sourceId):
+    #     """Get the mapped internal ID of computed model provided the original source ID.
 
-        Args:
-            sourceId (str): entry.id of computed model (e.g., "AF-P96541-F1")
-        """
-        compModelInternalId = None
-        compModelIdMapD = self.__idMapD if self.__idMapD else self.getCompModelIdMap()
-        #
-        try:
-            compModelInternalId = compModelIdMapD.get(sourceId, None)
-            logger.debug("Computed-model sourceId (%s) mapped to internalId (%r)", sourceId, compModelInternalId)
-        except Exception as e:
-            logger.exception("Failing with %s", str(e))
-        #
-        return compModelInternalId
+    #     Args:
+    #         sourceId (str): entry.id of computed model (e.g., "AF-P96541-F1")
+    #     """
+    #     compModelInternalId = None
+    #     compModelIdMapD = self.__idMapD if self.__idMapD else self.getCompModelIdMap()
+    #     #
+    #     try:
+    #         compModelInternalId = compModelIdMapD.get(sourceId, None)
+    #         logger.debug("Computed-model sourceId (%s) mapped to internalId (%r)", sourceId, compModelInternalId)
+    #     except Exception as e:
+    #         logger.exception("Failing with %s", str(e))
+    #     #
+    #     return compModelInternalId
 
     def getCompModelData(self, compModelInternalId):
         """Get the associated metadata dict for a specific computed model.

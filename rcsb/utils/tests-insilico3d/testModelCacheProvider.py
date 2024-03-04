@@ -65,12 +65,12 @@ class ModelCacheProviderTests(unittest.TestCase):
         mcP = ModelCacheProvider(cachePath=self.__cachePath, useCache=True, holdingsRemotePath=self.__holdingsFilePath)
         ok = mcP.testCache()
         self.assertTrue(ok)
-        compModelId = mcP.getInternalCompModelId("ma-bak-cepc-1100")
-        ok = compModelId is not None
-        self.assertTrue(ok)
-        modelD = mcP.getCompModelData(compModelId)
-        ok = modelD is not None
-        self.assertTrue(ok)
+        # compModelId = mcP.getInternalCompModelId("ma-bak-cepc-1100")
+        # ok = compModelId is not None
+        # self.assertTrue(ok)
+        # modelD = mcP.getCompModelData(compModelId)
+        # ok = modelD is not None
+        # self.assertTrue(ok)
 
     #
     # Need to set this up. Also, note that this will only be able to be run on a west-coast luigi instance

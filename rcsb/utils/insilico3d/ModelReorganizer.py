@@ -11,6 +11,7 @@
 #                    (currently the case for ModelArchive model files);
 #                    Add the PAE access url to the holdings cache file for models with associated PAE data files (currently only AF models)
 #   20-Mar-2023  dwp Assign NCBI ID to ma-ornl-sphdiv files to enable organism metadata population
+#    2-Jan-2024  dwp Modify reorganization method to export models as gzipped BCIF files
 #
 # To Do:
 # - pylint: disable=fixme
@@ -30,9 +31,12 @@ import logging
 import os.path
 import copy
 from datetime import datetime
+import tarfile
 import pytz
 
+from mmcif.api.DictionaryApi import DictionaryApi
 from mmcif.api.DataCategory import DataCategory
+from mmcif.io.IoAdapterPy import IoAdapterPy as IoAdapter
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.multiproc.MultiProcUtil import MultiProcUtil
@@ -53,7 +57,7 @@ class ModelWorker(object):
         self.__mU = MarshalUtil(workPath=self.__workPath)
 
     def reorganize(self, dataList, procName, optionsD, workingDir):
-        """Enumerate and reorganize and rename model files.
+        """Enumerate and reorganize and rename model files, provided a list of individual CIF model file paths as input.
 
         Args:
             dataList (list): list of model files to work on
@@ -67,7 +71,6 @@ class ModelWorker(object):
             diagList (list): list of unique diagnostics
         """
         _ = workingDir
-        _ = optionsD
         successList = []
         failList = []
         retList = []
@@ -77,9 +80,10 @@ class ModelWorker(object):
             modelSourcePrefix = optionsD.get("modelSourcePrefix")  # e.g., "AF" or "MA"
             modelSourceDbMap = optionsD.get("modelSourceDbMap")
             destBaseDir = optionsD.get("destBaseDir")  # base path for all computed models (i.e., "computed-models"); Or will be root path at HTTP endpoint
-            keepSource = optionsD.get("keepSource", False)  # whether to copy files over (instead of moving them)
+            keepSource = optionsD.get("keepSource", False)  # whether to keep the original model CIF files in the working directory
             reorganizeDate = optionsD.get("reorganizeDate", None)  # reorganization date
             sourceArchiveReleaseDate = optionsD.get("sourceArchiveReleaseDate", None)  # externally-obtained release date (i.e., not from CIF); as is case for ModelArchive models
+            dictionaryApi = optionsD.get("dictionaryApi", None)
             #
             for modelFileIn in dataList:
                 modelD = {}
@@ -140,14 +144,18 @@ class ModelWorker(object):
                     if not ok:
                         logger.warning("Failed to gzip input model file: %s", modelFileIn)
                 #
-                internalModelName = internalModelId + ".cif.gz"
+                internalModelName = internalModelId + ".bcif.gz"
                 #
                 # Use last six to last two characters for second-level hashed directory
                 firstDir, secondDir = modelEntryId[-6:-4], modelEntryId[-4:-2]
                 modelPathFromPrefixDir = os.path.join(modelSourcePrefix, firstDir, secondDir, internalModelName)
                 destModelDir = os.path.join(destBaseDir, modelSourcePrefix, firstDir, secondDir)
                 if not self.__fU.exists(destModelDir):
-                    self.__fU.mkdir(destModelDir)
+                    try:
+                        self.__fU.mkdir(destModelDir)
+                    except Exception as e:
+                        dirExists = self.__fU.exists(destModelDir)
+                        logger.exception("Failed to create directory %s (exists %r) with exception %r", destModelDir, dirExists, e)
                 modelFileOut = os.path.join(destModelDir, internalModelName)
                 modelFileOutUnzip = modelFileOut.split(".gz")[0]
                 #
@@ -165,7 +173,8 @@ class ModelWorker(object):
                 modelD["lastModifiedDate"] = lastModifiedDate
                 #
                 try:
-                    self.__mU.doExport(modelFileOutUnzip, containerList, fmt="mmcif")
+                    ok = self.__mU.doExport(modelFileOutUnzip, containerList, fmt="bcif", dictionaryApi=dictionaryApi)
+                    # logger.debug("export status %r for %s", ok, modelFileOutUnzip)
                     self.__fU.compress(modelFileOutUnzip, modelFileOut)
                     self.__mU.remove(modelFileOutUnzip)
                     if not keepSource:
@@ -188,6 +197,172 @@ class ModelWorker(object):
             logger.exception("Failing %s for %d data items %s", procName, len(dataList), str(e))
 
         return successList, retList, diagList
+
+    def reorganizeCloud(self, dataList, procName, optionsD, workingDir):
+        """Enumerate and reorganize and rename model files, provided a list of tarred archive files as input (from AlphaFold GoogleCloud).
+        Useful over the above 'reorganize' method when dealing with a lot of very small tar files with only a few models per tar file.
+
+        Args:
+            dataList (list): list of model files to work on
+            procName (str): worker process name
+            optionsD (dict): dictionary of additional options that worker can access
+            workingDir (str): path to working directory
+
+        Returns:
+            successList (list): list of input data items that were successfully processed
+            retList (list): list of processed results
+            diagList (list): list of unique diagnostics
+        """
+        _ = workingDir
+        successList = []
+        failList = []
+        retList = []
+        diagList = []
+
+        try:
+            modelSourcePrefix = optionsD.get("modelSourcePrefix")  # e.g., "AF" or "MA"
+            modelSourceDbMap = optionsD.get("modelSourceDbMap")
+            destBaseDir = optionsD.get("destBaseDir")  # base path for all computed models (i.e., "computed-models"); Or will be root path at HTTP endpoint
+            reorganizeDate = optionsD.get("reorganizeDate", None)  # reorganization date
+            sourceArchiveReleaseDate = optionsD.get("sourceArchiveReleaseDate", None)  # externally-obtained release date (i.e., not from CIF); as is case for ModelArchive models
+            dictionaryApi = optionsD.get("dictionaryApi", None)
+            #
+            for archiveFile in dataList:
+                successModelList = []
+                with tarfile.open(archiveFile, "r") as tF:
+                    tfL = tF.getnames()  # Get a list of items (files and directories) in the tar file
+                    logger.debug("tarFile items: %r", tfL)
+                #
+                cifFiles = [file for file in tfL if file.endswith(".cif.gz")]  # only extract model files (not PAE and pLDDT files)
+                logger.info("Working on reorganizing %s (%d models)", archiveFile, len(cifFiles))
+                modelPathL = []
+                for cifFile in cifFiles:
+                    fOutputPath = os.path.join(workingDir, cifFile)
+                    ok = self.__extractTarMember(archiveFile, cifFile, fOutputPath)
+                    modelPathL.append(fOutputPath)
+                    if not ok:
+                        logger.error("Failed to extract member %r from archiveFile %r", cifFile, archiveFile)
+                        ok = False
+                        break
+                #
+                for modelPath in modelPathL:
+                    modelD = {}
+                    success = False
+                    modelFileOut = None
+                    modelFileNameIn = self.__fU.getFileName(modelPath)
+                    modelSourceDb = modelSourceDbMap[modelSourcePrefix]
+                    #
+                    containerList = self.__mU.doImport(modelPath, fmt="mmcif")
+                    if len(containerList) > 1:
+                        # Expecting all computed models to have one container per file. When this becomes no longer the case, update this to handle it accordingly.
+                        logger.error("Skipping - model file %s has more than one container (%d)", modelFileNameIn, len(containerList))
+                        continue
+                    #
+                    dataContainer = containerList[0]
+                    #
+                    # Create internal model ID using entry.id and strip away all punctuation and make ALL CAPS
+                    tObj = dataContainer.getObj("entry")
+                    sourceModelEntryId = tObj.getValue("id", 0)
+                    modelEntryId = "".join(char for char in sourceModelEntryId if char.isalnum()).upper()
+                    internalModelId = modelSourcePrefix + "_" + modelEntryId
+                    #
+                    if sourceArchiveReleaseDate:
+                        dataContainer = self.__rebuildDateDetails(
+                            dataContainer=dataContainer,
+                            sourceModelEntryId=sourceModelEntryId,
+                            sourceArchiveReleaseDate=sourceArchiveReleaseDate,
+                        )
+                    #
+                    dataContainer = self.__rebuildEntryIds(
+                        dataContainer=dataContainer,
+                        sourceModelEntryId=sourceModelEntryId,
+                        sourceModelDb=modelSourceDb,
+                        internalModelId=internalModelId
+                    )
+                    #
+                    # Get the revision date if it exists
+                    if dataContainer.exists("pdbx_audit_revision_history"):
+                        lastModifiedDate = dataContainer.getObj("pdbx_audit_revision_history").getValue("revision_date", -1)
+                        lastModifiedDate = datetime.strptime(lastModifiedDate, '%Y-%m-%d').replace(microsecond=0).replace(tzinfo=pytz.UTC).isoformat()
+                    else:
+                        lastModifiedDate = reorganizeDate
+                    #
+                    # Insert default deposited pdbx_assembly information into CIF
+                    dataContainer = self.__addDepositedAssembly(dataContainer=dataContainer)
+                    #
+                    # Gzip the original file if not already (as the case for ModelArchive model files)
+                    if modelPath.endswith(".gz"):
+                        modelFileInGzip = modelPath
+                    else:
+                        modelFileInGzip = modelPath + ".gz"
+                        logger.debug("Compressing model file %s --> %s", modelPath, modelFileInGzip)
+                        ok = self.__fU.compress(modelPath, modelFileInGzip)
+                        if not ok:
+                            logger.warning("Failed to gzip input model file: %s", modelPath)
+                    #
+                    internalModelName = internalModelId + ".bcif.gz"
+                    #
+                    # Use last six to last two characters for second-level hashed directory
+                    firstDir, secondDir = modelEntryId[-6:-4], modelEntryId[-4:-2]
+                    modelPathFromPrefixDir = os.path.join(modelSourcePrefix, firstDir, secondDir, internalModelName)
+                    destModelDir = os.path.join(destBaseDir, modelSourcePrefix, firstDir, secondDir)
+                    if not self.__fU.exists(destModelDir):
+                        self.__fU.mkdir(destModelDir)
+                    modelFileOut = os.path.join(destModelDir, internalModelName)
+                    modelFileOutUnzip = modelFileOut.split(".gz")[0]
+                    #
+                    sourceModelUrl, sourceModelPaeUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, sourceModelEntryId)
+                    #
+                    modelD["modelId"] = internalModelId
+                    modelD["modelPath"] = modelPathFromPrefixDir  # Starts at prefix (e.g., "AF/XJ/E6/AF_AFA0A385XJE6F1.cif.gz"); needed like this by RepositoryProvider
+                    modelD["sourceId"] = sourceModelEntryId
+                    modelD["sourceDb"] = modelSourceDb
+                    modelD["sourceModelFileName"] = modelFileNameIn
+                    if sourceModelUrl:
+                        modelD["sourceModelUrl"] = sourceModelUrl
+                    if sourceModelPaeUrl:
+                        modelD["sourceModelPaeUrl"] = sourceModelPaeUrl
+                    modelD["lastModifiedDate"] = lastModifiedDate
+                    #
+                    try:
+                        ok = self.__mU.doExport(modelFileOutUnzip, containerList, fmt="bcif", dictionaryApi=dictionaryApi)
+                        logger.debug("export status %r for %s", ok, modelFileOutUnzip)
+                        self.__fU.compress(modelFileOutUnzip, modelFileOut)
+                        self.__mU.remove(modelFileOutUnzip)
+                        self.__mU.remove(modelFileInGzip)  # Remove original file
+                        if self.__mU.exists(modelPath):   # Remove unzipped file too if it exists
+                            self.__mU.remove(modelPath)
+                        success = True
+                        successModelList.append(success)
+                    except Exception as e:
+                        logger.debug("Failing to reorganize %s --> %s, with %s", modelPath, modelFileOut, str(e))
+                    #
+                    retList.append((modelPath, modelD, success))
+                    #
+                if len(successModelList) > 0 and all(successModelList):
+                    successList.append(archiveFile)
+            #
+            failList = sorted(set(dataList) - set(successList))
+            if failList:
+                logger.info("%s returns %d definitions with failures: %r", procName, len(failList), failList)
+            #
+            logger.debug("%s processed %d/%d models, failures %d", procName, len(retList), len(dataList), len(failList))
+        except Exception as e:
+            logger.exception("Failing %s for %d data items %s", procName, len(dataList), str(e))
+
+        return successList, retList, diagList
+
+    def __extractTarMember(self, tarFilePath, memberName, memberPath):
+        ret = True
+        try:
+            with tarfile.open(tarFilePath) as tar:
+                fIn = tar.extractfile(memberName)
+                with open(memberPath, "wb") as ofh:
+                    ofh.write(fIn.read())
+        except Exception as e:
+            logger.exception("Failing with %s", str(e))
+            ret = False
+        return ret
 
     def __getSourceUrl(self, modelSourcePrefix, sourceModelFileName, sourceModelEntryId):
         """Construct model accession URL for each model source.
@@ -482,12 +657,15 @@ class ModelReorganizer(object):
         Args:
             cachePath (str): directory path for storing cache file containing a dictionary of all reorganized models.
             useCache (bool): whether to use the existing data cache or re-run entire model reorganization process.
-            cacheFile (str, optional): filename for cache file; default "computed-models-holdings.json.gz".
-            cacheFilePath (str, optional): full filepath and name for cache file (will override "cachePath" and "cacheFile" if provided).
+            cacheFile (str, optional): filename for individual holdings file; default "computed-models-holdings.json.gz".
+            cacheFilePath (str, optional): full filepath and name for individual holdings file (will override "cachePath" and "cacheFile" if provided).
+            cacheFileList (str, optional): filename for holdings file list (contains list of all holdings files); default "computed-models-holdings-list.json.gz".
+            cacheFileListPath (str, optional): full filepath and name for holdings file list (will override "cachePath" and "cacheFileList" if provided).
             numProc (int, optional): number of processes to use; default 2.
-            chunkSize (int, optional): incremental chunk size used for distribute work processes; default 20.
+            chunkSize (int, optional): incremental chunk size used for distributed work processes; default 20.
             workPath (str, optional): directory path for workers to operate in; default is cachePath.
             keepSource (bool, optional): whether to copy model files to new directory instead of moving them; default False.
+            dictFilePathL (str, optional): List of dictionary files to use for BCIF encoding.
         """
 
         try:
@@ -506,13 +684,35 @@ class ModelReorganizer(object):
             cacheExt = "pic" if self.__cacheFormat == "pickle" else "json"
             cacheFile = kwargs.get("cacheFile", "computed-models-holdings." + cacheExt + ".gz")
             cacheFilePath = kwargs.get("cacheFilePath", os.path.join(self.__cachePath, "holdings", cacheFile))
+            cacheFileList = kwargs.get("cacheFileList", "computed-models-holdings-list.json")
+            self.__cacheFileListPath = kwargs.get("cacheFileListPath", os.path.join(self.__cachePath, "holdings", cacheFileList))
+
+            # Create DictionaryApi instance to use in exporting of BCIF files by mpu workers
+            dictFilePathL = kwargs.get("dictFilePathL", None)
+            defaultDictFileL = [
+                "https://raw.githubusercontent.com/wwpdb-dictionaries/mmcif_pdbx/master/dist/mmcif_pdbx_v5_next.dic",
+                "https://raw.githubusercontent.com/ihmwg/ModelCIF/master/dist/mmcif_ma_ext.dic",
+                "https://raw.githubusercontent.com/rcsb/py-rcsb_exdb_assets/master/dictionary_files/dist/rcsb_mmcif_ext.dic",
+            ]
+            self.__dictFilePathL = dictFilePathL if dictFilePathL else defaultDictFileL
+            logger.info("Instantiating DictionaryApi object with dictionary file(s) self.__dictFilePathL: %r", self.__dictFilePathL)
+            try:
+                myIo = IoAdapter(raiseExceptions=True)
+                dApiContainerList = []
+                for dictFilePath in self.__dictFilePathL:
+                    dApiContainerList += myIo.readFile(inputFilePath=dictFilePath)
+                self.__dictionaryApi = DictionaryApi(containerList=dApiContainerList, consolidate=True)
+            except Exception as e:
+                self.__dictionaryApi = None
+                logger.error("Failed to create DictionaryApi instance with exception %s", str(e))
+
             if not cacheFilePath.lower().endswith(".gz"):
                 logger.error("Holdings cache file must be gzipped, %s", cacheFilePath)
                 raise ValueError("Error: Holdings cache file must be gzipped.")
             self.__cacheFilePath = cacheFilePath  # self.__cacheFilePath is full path to gzipped cache file
             self.__cacheFilePathUnzip = cacheFilePath[0:-3]
 
-            logger.info("Reorganizing models using cachePath %s, cacheFilePath %s, cacheFilePathUnzip %s", self.__cachePath, self.__cacheFilePath, self.__cacheFilePathUnzip)
+            logger.info("Reorganizing models using workPath %s, cachePath %s, cacheFilePath (holdings file) %s", self.__workPath, self.__cachePath, self.__cacheFilePath)
 
             self.__mD = self.__reload(cacheFilePath=self.__cacheFilePath, useCache=useCache)
 
@@ -538,12 +738,12 @@ class ModelReorganizer(object):
         """Reload from the current cache file."""
         try:
             mD = {}
-            logger.info("useCache %r cacheFilePath %r", useCache, cacheFilePath)
+            logger.debug("useCache %r cacheFilePath %r", useCache, cacheFilePath)
             if useCache and self.__mU.exists(cacheFilePath):
                 if cacheFilePath != self.__cacheFilePath:
                     self.__cacheFilePath = cacheFilePath
                 mD = self.__mU.doImport(cacheFilePath, fmt=self.__cacheFormat)
-                logger.info("Reorganized models (%d) in cacheFilePath %r", len(mD), cacheFilePath)
+                logger.debug("Reorganized models (%d) in cacheFilePath %r", len(mD), cacheFilePath)
         except Exception as e:
             logger.exception("Failing with %s", str(e))
         #
@@ -555,7 +755,7 @@ class ModelReorganizer(object):
     def getCacheFilePath(self):
         return self.__cacheFilePath
 
-    def reorganize(self, inputModelList, modelSource, destBaseDir, useCache=True, **kwargs):
+    def reorganize(self, inputModelList, modelSource, destBaseDir, useCache=True, inputModelD=None, writeCache=True, **kwargs):
         """Move model files from organism-wide model listing to hashed directory structure and rename files
         to follow internal identifier naming convention.
 
@@ -563,6 +763,8 @@ class ModelReorganizer(object):
             inputModelList (list): List of input model filepaths to reorganize.
             modelSource (str): Source of model files ("AlphaFold", "ModBase", "ModelArchive", or "SwissModel")
             destBaseDir (str): Base destination directory into which to reorganize model files (e.g., "computed-models")
+            inputModelD (dict): Input mD dictionary, onto which to append the given set of newly reorganized models; defaults to re-reading in cache file (if useCache True)
+            writeCache (bool): Whether to write out the cache holdings file or not; default True
 
         Returns:
             bool: True for success or False otherwise
@@ -581,24 +783,23 @@ class ModelReorganizer(object):
             )
             if len(failD) > 0:
                 logger.error("Failed to process %d model files.", len(failD))
-            kwargs = {"indent": 4} if self.__cacheFormat == "json" else {"pickleProtocol": 4}
+            #
             if useCache:
-                self.__mD = self.__reload(cacheFilePath=self.__cacheFilePath, useCache=useCache)
+                self.__mD = inputModelD if inputModelD else self.__reload(cacheFilePath=self.__cacheFilePath, useCache=useCache)
                 for modelId, modelD in mD.items():
                     self.__mD.update({modelId: modelD})
             else:
                 self.__mD = copy.deepcopy(mD)
-            ok = self.__mU.doExport(self.__cacheFilePathUnzip, self.__mD, fmt=self.__cacheFormat, **kwargs)
-            logger.info("Wrote %r status %r", self.__cacheFilePathUnzip, ok)
-            if ok:
-                ok2 = self.__fU.compress(self.__cacheFilePathUnzip, self.__cacheFilePath)
-                logger.info("Compressed %r status %r", self.__cacheFilePath, ok2)
-                if ok2:
-                    ok3 = self.__fU.remove(self.__cacheFilePathUnzip)
-                    logger.info("Removing uncompressed holdings cache file %s status %r", self.__cacheFilePathUnzip, ok3)
+            #
+            ok = len(self.__mD) > 0
+            #
+            if writeCache:
+                ok = self.writeCacheFiles(self.__mD) and ok
+        #
         except Exception as e:
             logger.exception("Failing with %s", str(e))
-        return ok
+        #
+        return self.__mD, ok
 
     def __reorganizeModels(self, inputModelList, modelSource, destBaseDir, numProc=2, chunkSize=20, **kwargs):
         """Prepare multiprocessor queue and workers for generating input:output map for model files, to use in reorganizing
@@ -609,7 +810,7 @@ class ModelReorganizer(object):
             modelSource (str): Source of model files ("AlphaFold", "ModBase", "ModelArchive", or "SwissModel")
             destBaseDir (str): Base destination directory into which to reorganize model files (e.g., "computed-models")
             numProc (int, optional): number of processes to use; default 2.
-            chunkSize (int, optional): incremental chunk size used for distribute work processes; default 20.
+            chunkSize (int, optional): incremental chunk size used for distributed work processes; default 20.
 
         Returns:
             mD (dict): dictionary of successfully processed models, in the following structure:
@@ -630,31 +831,38 @@ class ModelReorganizer(object):
         sourceArchiveReleaseDate = kwargs.get("sourceArchiveReleaseDate", None)  # Use for ModelArchive files which are currently missing revision date information
         tS = datetime.now().replace(microsecond=0).replace(tzinfo=pytz.UTC).isoformat()  # Desired format:  2022-04-15T12:00:00+00:00
         #
-        logger.info("Starting with %d models, numProc %d at %r", len(inputModelList), numProc, tS)
+        logger.debug("Starting with %d models, numProc %d at %r", len(inputModelList), numProc, tS)
         #
         # Create the base destination directory if it doesn't exist
         if not self.__fU.exists(destBaseDir):
             logger.info("Creating base destination directory for model file reorganization, %s", destBaseDir)
             self.__fU.mkdir(destBaseDir)
         #
-        modelSourcePrefixD = {"AlphaFold": "AF", "ModBase": "MB", "ModelArchive": "MA", "SwissModelRepository": "SMR"}
+        modelSourcePrefixD = {"AlphaFold": "AF", "AlphaFoldCloud": "AF", "ModBase": "MB", "ModelArchive": "MA", "SwissModelRepository": "SMR"}
         modelSourceDbMap = {"AF": "AlphaFoldDB", "MB": "MODBASE", "MA": "ModelArchive", "SMR": "SWISS-MODEL_REPOSITORY"}
         # Database name values correspond to _database_2.database_id enumerations (https://mmcif.wwpdb.org/dictionaries/mmcif_pdbx_v50.dic/Items/_database_2.database_id.html)
         modelSourcePrefix = modelSourcePrefixD[modelSource]
         #
         rWorker = ModelWorker(workPath=self.__workPath)
+        #
         mpu = MultiProcUtil(verbose=True)
         optD = {
             "modelSourcePrefix": modelSourcePrefix,
             "modelSourceDbMap": modelSourceDbMap,
             "destBaseDir": destBaseDir,
             "keepSource": self.__keepSource,
-            "reorganizeDate": tS
+            "reorganizeDate": tS,
+            "dictionaryApi": self.__dictionaryApi,
         }
         if sourceArchiveReleaseDate:
             optD.update({"sourceArchiveReleaseDate": sourceArchiveReleaseDate})
+        #
         mpu.setOptions(optD)
-        mpu.set(workerObj=rWorker, workerMethod="reorganize")
+        logger.debug("Running multiproc method on inputModelList length %r with numProc %r, chunkSize %r", len(inputModelList), numProc, chunkSize)
+        if modelSource in ["AlphaFold", "ModelArchive"]:
+            mpu.set(workerObj=rWorker, workerMethod="reorganize")
+        elif modelSource in ["AlphaFoldCloud"]:
+            mpu.set(workerObj=rWorker, workerMethod="reorganizeCloud")
         mpu.setWorkingDir(workingDir=self.__workPath)
         ok, failList, resultList, _ = mpu.runMulti(dataList=inputModelList, numProc=numProc, numResults=1, chunkSize=chunkSize)
         if failList:
@@ -670,3 +878,36 @@ class ModelReorganizer(object):
         #
         logger.info("Completed with multi-proc status %r, failures %r, total models with data (%d)", ok, len(failList), len(mD))
         return mD, failD
+
+    def writeCacheFiles(self, mD):
+        ok = False
+        #
+        try:
+            kwargsExport = {"indent": 4} if self.__cacheFormat == "json" else {"pickleProtocol": 4}
+            #
+            ok = self.__mU.doExport(self.__cacheFilePathUnzip, mD, fmt=self.__cacheFormat, **kwargsExport)
+            logger.debug("Wrote %r status %r", self.__cacheFilePathUnzip, ok)
+            if ok:
+                ok2 = self.__fU.compress(self.__cacheFilePathUnzip, self.__cacheFilePath)
+                logger.info("Wrote and compressed holdings file %r (%r models) status %r", self.__cacheFilePath, len(mD), ok2)
+                if ok2:
+                    ok3 = self.__fU.remove(self.__cacheFilePathUnzip)
+                    logger.debug("Removed uncompressed holdings cache file %s status %r", self.__cacheFilePathUnzip, ok3)
+            #
+            # Update the holdings file list (i.e., the file containing the list of all holdings files)
+            if os.path.exists(self.__cacheFileListPath):
+                holdingsFileListD = self.__mU.doImport(self.__cacheFileListPath, fmt="json")
+                holdingsFileListD = holdingsFileListD if holdingsFileListD else {}
+            else:
+                holdingsFileListD = {}
+            holdingsFilePathRelative = "/".join(self.__cacheFilePath.split("/")[-2:])
+            holdingsFileListD.update({holdingsFilePathRelative: len(mD)})
+            ok4 = self.__mU.doExport(self.__cacheFileListPath, holdingsFileListD, fmt="json", indent=4)
+            logger.info("Wrote holdings file list %r status %r", self.__cacheFileListPath, ok4)
+            #
+            ok = ok and ok2 and ok3 and ok4
+        #
+        except Exception as e:
+            logger.exception("Failing with %s", str(e))
+        #
+        return ok

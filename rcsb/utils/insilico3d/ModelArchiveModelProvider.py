@@ -8,6 +8,7 @@
 #                    (to use for data loading in case model mmCIF file doesn't contain this information already)
 #   16-Nov-2022  dwp Add new default functionality to fetch model files individually instead of the full bulk download
 #    9-Jan-2023  dwp Fetch data set model IDs directly (don't try to construct them here), and add more ModelArchive data sets
+#    7-Dec-2023  dwp Update base URL for individual model file downloads, which are now served as .cif.gz when using aiohttp
 ##
 """
 Accessors for ModelArchive 3D In Silico Models (mmCIF).
@@ -26,8 +27,8 @@ import time
 import json
 from pathlib import Path
 import glob
-import requests
 import asyncio
+import requests
 import aiohttp
 import aiofiles
 
@@ -58,7 +59,11 @@ class ModelArchiveModelProvider:
         self.__baseWorkPath = baseWorkPath if baseWorkPath else self.__cachePath
         self.__workPath = os.path.join(self.__baseWorkPath, "work-dir", "ModelArchive")  # Directory where model files will be downloaded (also contains MA-specific cache file)
         self.__dataSetCacheFile = os.path.join(self.__workPath, "model-download-cache.json")
+        self.__dataSetHoldingsFileName = "modelarchive-holdings.json.gz"
+
         self.__modelArchiveSummaryPageBaseApiUrl = "https://www.modelarchive.org/api/projects/"
+        self.__modelArchiveBaseDownloadUrl = "https://www.modelarchive.org/doi/10.5452/"
+        # Use above for direct gzipped file downloads (e.g., https://www.modelarchive.org/doi/10.5452/ma-bak-cepc-0001.cif.gz)
         self.__modelArchiveBulkDownloadUrlEnd = "?type=materials_procedures__accompanying_data_file_name"  # E.g., "ma-bak-cepc?type=materials_procedures__accompanying_data_file_name"
 
         self.__mU = MarshalUtil(workPath=self.__workPath)
@@ -233,7 +238,7 @@ class ModelArchiveModelProvider:
             modelIdList.append(data["id"])
         return modelIdList
 
-    async def downloadIndividualModelFiles(self, modelSetName=None, destDir=None, limit=100, breakTime=5, numModels=None):
+    async def downloadIndividualModelFiles(self, modelSetName=None, destDir=None, limit=100, breakTime=3, numModels=None):
         """Download model files individually, in case bulk download not available or want to avoid downloading (currently) unnecessary associated metdata.
 
         Args:
@@ -242,7 +247,7 @@ class ModelArchiveModelProvider:
             numModels (int): number of models to download from model set.
             limit (int, optional): max number of models to download asynchronously at once. Splits the total set into batches of size(limit),
                                    and forces sleep(breakTime) between batches to spare traffic load on ModelArchive server). Defaults to 100.
-            breakTime (int, optional): seconds to wait between subsequent batches of asynchronous requests. Defaults to 5.
+            breakTime (int, optional): seconds to wait between subsequent batches of asynchronous requests. Defaults to 3.
 
         Returns:
             (bool): True if successful; False otherwise.
@@ -258,7 +263,7 @@ class ModelArchiveModelProvider:
 
         modelUrlList = []
         for mId in modelSetIdL:
-            mUrl = os.path.join(self.__modelArchiveSummaryPageBaseApiUrl, f"{mId}?type=basic__model_file_name")
+            mUrl = os.path.join(self.__modelArchiveBaseDownloadUrl, f"{mId}.cif.gz")
             modelUrlList.append(mUrl)
         logger.info("First few items in modelUrlList %r", modelUrlList[0:5])
 
@@ -266,8 +271,9 @@ class ModelArchiveModelProvider:
 
         async def fetchFile(url, session):
             try:
-                fname = url.split("/")[-1].split("?")[0] + ".cif"
-                async with sema, session.get(url) as resp:
+                fname = url.split("/")[-1]
+                # fname = url.split("/")[-1].split("?")[0] + ".cif.gz"
+                async with sema, session.get(url, timeout=10) as resp:
                     assert resp.status == 200
                     data = await resp.read()
                 async with aiofiles.open(os.path.join(destDir, fname), "wb") as outfile:
@@ -340,7 +346,7 @@ class ModelArchiveModelProvider:
 
         for modelDir in inputPathList:
             try:
-                modelFiles = glob.glob(os.path.join(modelDir, "*.cif"))
+                modelFiles = glob.glob(os.path.join(modelDir, "*.cif.gz"))  # may need to be ".cif" for bulk downloads, but need to check
                 modelFileList = [os.path.abspath(f) for f in modelFiles]
             except Exception as e:
                 logger.exception("Failing with %s", str(e))
@@ -359,7 +365,9 @@ class ModelArchiveModelProvider:
     def getModelReorganizer(self, cachePath=None, useCache=True, workPath=None, **kwargs):
         cachePath = cachePath if cachePath else self.__cachePath
         workPath = workPath if workPath else self.__workPath
-        return ModelReorganizer(cachePath=cachePath, useCache=useCache, workPath=workPath, **kwargs)
+        cacheFile = kwargs.get("cacheFile", self.__dataSetHoldingsFileName)
+        cacheFormat = kwargs.get("cacheFormat", "json")
+        return ModelReorganizer(cachePath=cachePath, useCache=useCache, workPath=workPath, cacheFile=cacheFile, cacheFormat=cacheFormat, **kwargs)
 
     def getComputedModelsDataPath(self):
         return self.__cachePath
@@ -387,7 +395,7 @@ class ModelArchiveModelProvider:
             mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
             #
             if inputModelList:  # Only reorganize given list of model files
-                ok = mR.reorganize(
+                _, ok = mR.reorganize(
                     inputModelList=inputModelList,
                     modelSource="ModelArchive",
                     destBaseDir=self.__cachePath,
@@ -418,7 +426,7 @@ class ModelArchiveModelProvider:
                         raise ValueError("Failed to get release date for archive dataset.")
                     #
                     inputModelList = self.getModelFileList(inputPathList=[archiveDir])
-                    ok = mR.reorganize(
+                    _, ok = mR.reorganize(
                         inputModelList=inputModelList,
                         modelSource="ModelArchive",
                         destBaseDir=self.__cachePath,

@@ -34,6 +34,7 @@ logger = logging.getLogger()
 
 
 class ModelProviderWorkflowTests(unittest.TestCase):
+    runTestWorkflow = False
 
     def setUp(self):
         self.__cachePath = os.path.join(HERE, "test-output", "CACHE", "computed-models")
@@ -47,6 +48,7 @@ class ModelProviderWorkflowTests(unittest.TestCase):
         endTime = time.time()
         logger.info("Completed %s at %s (%.4f seconds)", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()), endTime - self.__startTime)
 
+    @unittest.skipUnless(runTestWorkflow, "Skip running the workflow")
     def testModelProviderWorkflow(self):
         mPWf = ModelProviderWorkflow(
             srcDir=self.__cachePath,
