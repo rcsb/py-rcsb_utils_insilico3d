@@ -45,3 +45,4 @@
   20-Mar-2023  - V0.36 Assign NCBI ID to ma-ornl-sphdiv files to enable organism metadata population
   27-Feb-2024  - V0.37 Update AlphaFoldModelCloudProvider and ModelArchiveProvider;
                        Adjust ModelReorganizer to handle bulk cloud datasets and write out models as BCIF.gz
+   5-Mar-2024  - V0.38 Renamed ModelCacheProvider to ModelHoldingsProvider; Added support for CSM scaling (use of multiple holdings files)
