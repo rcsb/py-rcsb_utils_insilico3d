@@ -48,7 +48,7 @@ class ModelHoldingsProvider(StashableBase):
         self.__dirPath = os.path.join(self.__cachePath, self.__dirName)
         #
         self.__csmRemoteDirPath = kwargs.get("csmRemoteDirPath", "http://computed-models-internal-coast.rcsb.org/staging/")
-        self.__holdingsListRemotePath = kwargs.get("holdingsListRemotePath", "http://computed-models-internal-coast.rcsb.org/staging/holdings/computed-models-holdings-list.json")        
+        self.__holdingsListRemotePath = kwargs.get("holdingsListRemotePath", "http://computed-models-internal-coast.rcsb.org/staging/holdings/computed-models-holdings-list.json")
         self.__holdingsListLocalPath = os.path.join(self.__dirPath, os.path.basename(self.__holdingsListRemotePath))
         #
         # Remove these when done switching to 200 million BCIF load, since only applicable for original ~1 million AF load
