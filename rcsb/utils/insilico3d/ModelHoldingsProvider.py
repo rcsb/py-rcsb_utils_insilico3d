@@ -166,7 +166,7 @@ class ModelHoldingsProvider(StashableBase):
         fD = {}
         modelD = modelD if modelD else self.__mD
         fxL = [i for i in modelD if i.startswith("AF") and not i.endswith("F1")]
-        f1L = [i[0:-2]+"F1" for i in fxL if i.endswith("F2")]
+        f1L = [i[0:-2] + "F1" for i in fxL if i.endswith("F2")]
         fxL += f1L
         fxL.sort()
         fD = {k: None for k in fxL}
