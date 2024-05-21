@@ -160,6 +160,7 @@ class ModelArchiveModelProvider:
                         sD = {}
                         numModelsToDownload = pathD.get("numModels", None)  # Used for testing purposes, defaults to total number of models
                         bulkFileName = pathD.get("bulkFileName", None)
+                        numModelsDownloaded = 0
                         if bulkFileName:
                             # Download bulk model archive file (contains associated local pairwise quality data and a3m files)
                             sD.update({"downloadMethod": "bulk"})
@@ -180,6 +181,7 @@ class ModelArchiveModelProvider:
                                 nonModelFile.unlink()
                             for nonModelFile in Path(dataSetDataDumpDir).glob("*_local_pairwise_qa.cif"):
                                 nonModelFile.unlink()
+                            numModelsDownloaded = len(list(Path(dataSetDataDumpDir).glob("*.cif*")))
                         else:
                             # Download model files individually
                             sD.update({"downloadMethod": "individual"})
