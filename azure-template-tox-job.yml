@@ -18,9 +18,9 @@ jobs:
     timeoutInMinutes: 0
     pool:
       ${{ if eq(parameters.os, 'macos') }}:
-        vmImage: "macOS-12"
+        vmImage: "macOS-latest"
       ${{ if eq(parameters.os, 'linux') }}:
-        vmImage: "ubuntu-20.04"
+        vmImage: "ubuntu-latest"
 
     variables:
       - group: py-shared-variables
@@ -41,7 +41,7 @@ jobs:
           - bash: |
               set -e
               ls -la /Applications/Xcode*
-              sudo xcode-select --switch /Applications/Xcode_14.2.app/Contents/Developer
+              sudo xcode-select --switch /Applications/Xcode_16.app/Contents/Developer
               which g++
               c++ --version
             displayName: "setup Xcode"
@@ -94,30 +94,18 @@ jobs:
               export CONFIG_SUPPORT_TOKEN_ENV=$(VAR_CONFIG_SUPPORT_TOKEN_ENV)
               ${{ format('python -m tox -e {0}', parameters.tox) }}
             displayName: "Running tox task"
+      - ? ${{ if and(not(startsWith(parameters.tox, 'py')), startsWith(parameters.python, '3.10')) }}
+        : - script: |
+              export GOOGLE_APPLICATION_CREDENTIALS=$(googlecloudkey.secureFilePath)
+              export CONFIG_SUPPORT_TOKEN_ENV=$(VAR_CONFIG_SUPPORT_TOKEN_ENV)
+              ${{ format('python -m tox -e {0}-py310', parameters.tox) }}
+            displayName: "Running tox task"
       - ? ${{ if and(not(startsWith(parameters.tox, 'py')), startsWith(parameters.python, '3.9')) }}
         : - script: |
               export GOOGLE_APPLICATION_CREDENTIALS=$(googlecloudkey.secureFilePath)
               export CONFIG_SUPPORT_TOKEN_ENV=$(VAR_CONFIG_SUPPORT_TOKEN_ENV)
               ${{ format('python -m tox -e {0}-py39', parameters.tox) }}
             displayName: "Running tox task"
-      - ? ${{ if and(not(startsWith(parameters.tox, 'py')), startsWith(parameters.python, '3.8')) }}
-        : - script: |
-              export GOOGLE_APPLICATION_CREDENTIALS=$(googlecloudkey.secureFilePath)
-              export CONFIG_SUPPORT_TOKEN_ENV=$(VAR_CONFIG_SUPPORT_TOKEN_ENV)
-              ${{ format('python -m tox -e {0}-py38', parameters.tox) }}
-            displayName: "Running tox task"
-      - ? ${{ if and(not(startsWith(parameters.tox, 'py')), startsWith(parameters.python, '3.7')) }}
-        : - script: |
-              export GOOGLE_APPLICATION_CREDENTIALS=$(googlecloudkey.secureFilePath)
-              export CONFIG_SUPPORT_TOKEN_ENV=$(VAR_CONFIG_SUPPORT_TOKEN_ENV)
-              ${{ format('python -m tox -e {0}-py37', parameters.tox) }}
-            displayName: "Running tox task"
-      - ? ${{ if and(not(startsWith(parameters.tox, 'py')), startsWith(parameters.python, '2.7')) }}
-        : - script: |
-              export GOOGLE_APPLICATION_CREDENTIALS=$(googlecloudkey.secureFilePath)
-              export CONFIG_SUPPORT_TOKEN_ENV=$(VAR_CONFIG_SUPPORT_TOKEN_ENV)
-              ${{ format('python -m tox -e {0}-py27', parameters.tox) }}
-            displayName: "Runing tox task"
       #
       #  Build artifacts if this is a test target (i.e. labeled as py##)
       #
