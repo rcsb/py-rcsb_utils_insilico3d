@@ -797,6 +797,14 @@ class ModelReorganizer(object):
         sourceArchiveReleaseDate = kwargs.get("sourceArchiveReleaseDate", None)  # Use for ModelArchive files which are currently missing revision date information
         #
         try:
+            logger.info(
+                "Running reorganization workflow for inputModelList (%r) modelSource (%r) with numProc (%r), chunkSize (%r) to destBaseDir (%r)",
+                len(inputModelList),
+                modelSource,
+                self.__numProc,
+                self.__chunkSize,
+                destBaseDir
+            )
             mD, failD = self.__reorganizeModels(
                 inputModelList=inputModelList,
                 modelSource=modelSource,
