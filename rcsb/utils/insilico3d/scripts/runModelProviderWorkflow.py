@@ -86,50 +86,50 @@ class ModelProviderWorkflowExec(unittest.TestCase):
     def runModelProviderWorkflow(self):
         if self.__workPath and self.__cachePath:
             alphaFoldSpeciesList = [
-                "Helicobacter pylori",  # 1540,
-                "Staphylococcus aureus",  # 2888,
+                "Helicobacter pylori",  # 1540
+                "Staphylococcus aureus",  # 2888
                 "Arabidopsis thaliana",  # 27402
                 "Caenorhabditis elegans",  # 19700
-                "Candida albicans",  # 5973,
+                "Candida albicans",  # 5973
                 "Danio rerio",  # 26290
                 "Dictyostelium discoideum",  # 12612
                 "Drosophila melanogaster",  # 13461
                 "Escherichia coli",  # 4370,
                 "Glycine max",  # 55796
                 "Homo sapiens",  # 23586
-                "Methanocaldococcus jannaschii",  # 1773,
+                "Methanocaldococcus jannaschii",  # 1773
                 "Mus musculus",  # 21452
                 "Oryza sativa",  # 43645
                 "Rattus norvegicus",  # 22152
-                "Saccharomyces cerevisiae",  # 6055,
-                "Schizosaccharomyces pombe",  # 5196,
+                "Saccharomyces cerevisiae",  # 6055
+                "Schizosaccharomyces pombe",  # 5196
                 "Zea mays",  # 39139
-                "Ajellomyces capsulatus",  # 9199,
-                "Brugia malayi",  # 10972,
-                "Campylobacter jejuni",  # 1620,
+                "Ajellomyces capsulatus",  # 9199
+                "Brugia malayi",  # 10972
+                "Campylobacter jejuni",  # 1620
                 "Cladophialophora carrionii",  # 11170
                 "Dracunculus medinensis",  # 10834
                 "Fonsecaea pedrosoi",  # 12509
-                "Haemophilus influenzae",  # 1660,
-                "Klebsiella pneumoniae",  # 5727,
+                "Haemophilus influenzae",  # 1660
+                "Klebsiella pneumoniae",  # 5727
                 "Leishmania infantum",  # 7924,
-                "Madurella mycetomatis",  # 9561,
-                "Mycobacterium leprae",  # 1602,
-                "Mycobacterium tuberculosis",  # 3991,
-                "Neisseria gonorrhoeae",  # 2106,
-                "Nocardia brasiliensis",  # 8398,
+                "Madurella mycetomatis",  # 9561
+                "Mycobacterium leprae",  # 1602
+                "Mycobacterium tuberculosis",  # 3991
+                "Neisseria gonorrhoeae",  # 2106
+                "Nocardia brasiliensis",  # 8398
                 "Onchocerca volvulus",  # 12039
-                "Paracoccidioides lutzii",  # 8794,
-                "Plasmodium falciparum",  # 5168,
-                "Pseudomonas aeruginosa",  # 5555,
-                "Salmonella typhimurium",  # 4526,
+                "Paracoccidioides lutzii",  # 8794
+                "Plasmodium falciparum",  # 5168
+                "Pseudomonas aeruginosa",  # 5555
+                "Salmonella typhimurium",  # 4526
                 "Schistosoma mansoni",  # 9735
-                "Shigella dysenteriae",  # 3893,
-                "Sporothrix schenckii",  # 8652,
-                "Streptococcus pneumoniae",  # 2031,
+                "Shigella dysenteriae",  # 3893
+                "Sporothrix schenckii",  # 8652
+                "Streptococcus pneumoniae",  # 2031
                 "Strongyloides stercoralis",  # 15335
-                "Trichuris trichiura",  # 9563,
-                "Trypanosoma brucei",  # 8491,
+                "Trichuris trichiura",  # 9563
+                "Trypanosoma brucei",  # 8491
                 "Trypanosoma cruzi",  # 19036
                 "Wuchereria bancrofti",  # 12725
                 "Swiss-Prot (CIF files)",  # 550122; This sometimes slows down significantly after only a few GBs (out of 36 GB) are downloaded, so may not finish
