@@ -120,6 +120,9 @@ class ModelWorker(object):
                     internalModelId=internalModelId
                 )
                 #
+                # Fix revision detail information
+                dataContainer = self.__fixRevDetails(dataContainer=dataContainer)
+                #
                 # Get the revision date if it exists
                 if dataContainer.exists("pdbx_audit_revision_history"):
                     lastModifiedDate = dataContainer.getObj("pdbx_audit_revision_history").getValue("revision_date", -1)
@@ -279,6 +282,7 @@ class ModelWorker(object):
                         sourceModelDb=modelSourceDb,
                         internalModelId=internalModelId
                     )
+                    #
                     # Fix revision detail information
                     dataContainer = self.__fixRevDetails(dataContainer=dataContainer)
                     #
