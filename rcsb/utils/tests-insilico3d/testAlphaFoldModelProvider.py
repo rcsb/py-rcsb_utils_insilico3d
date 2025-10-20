@@ -38,6 +38,7 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
     def setUp(self):
         self.__cachePath = os.path.join(HERE, "test-output", "CACHE", "computed-models")
         self.__startTime = time.time()
+        self.__currentAFVersion = 6
         logger.info("Starting %s at %s", self.id(), time.strftime("%Y %m %d %H:%M:%S", time.localtime()))
 
     def tearDown(self):
@@ -70,6 +71,13 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
             chunkSize=20,
             alphaFoldRequestedSpeciesList=["Helicobacter pylori"]
         )
+        #
+        # Check latest version
+        latestVersion = aFMP.getAlphaFoldVersion()
+        logger.info("Latest AlphaFold version (%r) vs. current version (%r)", latestVersion, self.__currentAFVersion)
+        ok = latestVersion == self.__currentAFVersion
+        self.assertTrue(ok)
+        #
         speciesDirList = aFMP.getArchiveDirList()
         ok = True if len(speciesDirList) > 0 else False
         self.assertTrue(ok)

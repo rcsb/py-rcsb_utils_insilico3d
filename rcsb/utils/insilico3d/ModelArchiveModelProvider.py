@@ -44,7 +44,7 @@ class ModelArchiveModelProvider:
     """Accessors for ModelArchive 3D in silico models (mmCIF)."""
 
     def __init__(self, cachePath, baseWorkPath=None, useCache=False, reload=True, **kwargs):
-        """Initialize AlphaFoldModelProvider class.
+        """Initialize ModelArchiveModelProvider class.
 
         Args:
             cachePath (str): Path to directory where model files will be reorganized and stored permanently (also contains computed-model-cache.json file)  (i.e., 'computed-models'),

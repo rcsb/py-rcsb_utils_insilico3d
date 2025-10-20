@@ -22,7 +22,7 @@ To run:
     3. Configure the settings in `setUp()` to desired values (note that it's recommeded to first run this
        for ModelArchive--if needed--and then AlphaFold)
     4. If you only want to download certain species or data sets from each source, comment in the relevant lines
-       in `runModelProviderWorkflow()`. (Note that the list of AF species below only controls which to DOWNLOAD; the 
+       in `runModelProviderWorkflow()`. (Note that the list of AF species below only controls which to DOWNLOAD; the
        REORGANIZATION is controlled by the source model cache file `/mnt/vdb1/source-models/work-dir/AlphaFold/model-download-cache.json`,
        in that the workflow will always try to reorganize every species in there with `"reogranized": false`)
     5. Run the script in the background and save log output with:
