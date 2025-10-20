@@ -531,6 +531,11 @@ class ModelWorker(object):
                 )
             )
 
+        # Now replace occurrences of "_pdbx_audit_revision_details.type" value "Release" to be "Remediation"
+        # (to make AF v5 and v6 compliant with PDBx/mmCIF)
+        revDetailsObj = dataContainer.getObj("pdbx_audit_revision_details")
+        _ = revDetailsObj.replaceValue("Release", "Remediation", "type")
+
         return dataContainer
 
     def __addDepositedAssembly(self, dataContainer):
