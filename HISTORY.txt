@@ -48,3 +48,4 @@
    5-Mar-2024  - V0.38 Renamed ModelCacheProvider to ModelHoldingsProvider; Added support for CSM scaling (use of multiple holdings files)
   21-May-2024  - V0.39 Fix pylinting
    9-Dec-2024  - V0.40 Update Azure pipelines to use latest macOS, Ubuntu, and python 3.10
+  20-Oct-2025  - V0.41 Update ModelReorganizer to fix data issues with AF v5 and v6 models (in `_pdbx_audit_revision_details.type`)

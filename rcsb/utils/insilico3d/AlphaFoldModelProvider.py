@@ -70,7 +70,7 @@ class AlphaFoldModelProvider:
         self.__ftpU = FtpUtil(workPath=self.__workPath)
 
         if reload:
-            self.__oD, self.__createdDate = self.__reload(useCache=useCache, **kwargs)
+            self.__oD, self.__createdDate, self.__version = self.__reload(useCache=useCache, **kwargs)
 
     def testCache(self, minCount=0):  # Increase minCount once we are consistently downloading more than one species data set
         if self.__oD and len(self.__oD) > minCount:
@@ -82,7 +82,10 @@ class AlphaFoldModelProvider:
         return self.__workPath
 
     def reload(self, useCache, **kwargs):
-        self.__oD, self.__createdDate = self.__reload(useCache=useCache, **kwargs)
+        self.__oD, self.__createdDate, self.__version = self.__reload(useCache=useCache, **kwargs)
+
+    def getAlphaFoldVersion(self):
+        return self.__version
 
     def __reload(self, **kwargs):
         """Reload cached list of species-specific AlphaFold model data files and check FTP server for updated data sets,
@@ -111,6 +114,11 @@ class AlphaFoldModelProvider:
             latestDataListDumpPath = os.path.join(self.__workPath, self.__fU.getFileName(alphaFoldLatestDataList))
             ok = self.__ftpU.get(alphaFoldLatestDataList, latestDataListDumpPath)
             lDL = self.__mU.doImport(latestDataListDumpPath, fmt="json")
+
+            # Get the latest version number, using the Arabidopsis thaliana dataset as the example
+            # Example string to parse: "archive_name": "UP000006548_3702_ARATH_v6.tar"
+            exampleArchiveName = [exD["archive_name"] for exD in lDL if exD.get("species", None) == "Arabidopsis thaliana"][0]
+            latestAlphaFoldVersion = int(re.search(r"_v(\d+)\.tar$", exampleArchiveName).group(1))
 
             # Exclude undesired archives (defined in excludeArchiveFileRegexList)
             lDL = [s for s in lDL if not re.match(excludeArchiveFileRegexListCombined, s["archive_name"])]
@@ -180,7 +188,7 @@ class AlphaFoldModelProvider:
         except Exception as e:
             logger.exception("Failing with %s", str(e))
 
-        return oD, createdDate
+        return oD, createdDate, latestAlphaFoldVersion
 
     def fetchSpeciesArchive(self, archiveD, cacheD):
         try:

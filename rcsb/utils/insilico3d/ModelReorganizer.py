@@ -120,6 +120,9 @@ class ModelWorker(object):
                     internalModelId=internalModelId
                 )
                 #
+                # Fix revision detail information
+                dataContainer = self.__fixRevDetails(dataContainer=dataContainer)
+                #
                 # Get the revision date if it exists
                 if dataContainer.exists("pdbx_audit_revision_history"):
                     lastModifiedDate = dataContainer.getObj("pdbx_audit_revision_history").getValue("revision_date", -1)
@@ -279,6 +282,9 @@ class ModelWorker(object):
                         sourceModelDb=modelSourceDb,
                         internalModelId=internalModelId
                     )
+                    #
+                    # Fix revision detail information
+                    dataContainer = self.__fixRevDetails(dataContainer=dataContainer)
                     #
                     # Get the revision date if it exists
                     if dataContainer.exists("pdbx_audit_revision_history"):
@@ -533,6 +539,24 @@ class ModelWorker(object):
 
         return dataContainer
 
+    def __fixRevDetails(self, dataContainer):
+        """Fix '_pdbx_audit_revision_details'.
+
+        Replace occurrences of "_pdbx_audit_revision_details.type" value "Release" to be "Remediation"
+        (to make AF v5 and v6 compliant with PDBx/mmCIF)
+
+        Args:
+            dataContainer (object): mmcif.api.DataContainer object instance
+
+        Returns:
+            dataContainer: updated dataContainer object
+        """
+        if dataContainer.exists("pdbx_audit_revision_details"):
+            revDetailsObj = dataContainer.getObj("pdbx_audit_revision_details")
+            _ = revDetailsObj.replaceValue("Release", "Remediation", "type")
+
+        return dataContainer
+
     def __addDepositedAssembly(self, dataContainer):
         """Add the deposited coordinates as an additional separate assembly labeled as 'deposited'
         to categories, pdbx_struct_assembly and pdb_struct_assembly_gen.
@@ -773,6 +797,14 @@ class ModelReorganizer(object):
         sourceArchiveReleaseDate = kwargs.get("sourceArchiveReleaseDate", None)  # Use for ModelArchive files which are currently missing revision date information
         #
         try:
+            logger.info(
+                "Running reorganization workflow for inputModelList (%r) modelSource (%r) with numProc (%r), chunkSize (%r) to destBaseDir (%r)",
+                len(inputModelList),
+                modelSource,
+                self.__numProc,
+                self.__chunkSize,
+                destBaseDir
+            )
             mD, failD = self.__reorganizeModels(
                 inputModelList=inputModelList,
                 modelSource=modelSource,
