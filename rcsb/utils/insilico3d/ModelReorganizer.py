@@ -279,6 +279,8 @@ class ModelWorker(object):
                         sourceModelDb=modelSourceDb,
                         internalModelId=internalModelId
                     )
+                    # Fix revision detail information
+                    dataContainer = self.__fixRevDetails(dataContainer=dataContainer)
                     #
                     # Get the revision date if it exists
                     if dataContainer.exists("pdbx_audit_revision_history"):
@@ -531,10 +533,23 @@ class ModelWorker(object):
                 )
             )
 
-        # Now replace occurrences of "_pdbx_audit_revision_details.type" value "Release" to be "Remediation"
-        # (to make AF v5 and v6 compliant with PDBx/mmCIF)
-        revDetailsObj = dataContainer.getObj("pdbx_audit_revision_details")
-        _ = revDetailsObj.replaceValue("Release", "Remediation", "type")
+        return dataContainer
+
+    def __fixRevDetails(self, dataContainer):
+        """Fix '_pdbx_audit_revision_details'.
+
+        Replace occurrences of "_pdbx_audit_revision_details.type" value "Release" to be "Remediation"
+        (to make AF v5 and v6 compliant with PDBx/mmCIF)
+
+        Args:
+            dataContainer (object): mmcif.api.DataContainer object instance
+
+        Returns:
+            dataContainer: updated dataContainer object
+        """
+        if dataContainer.exists("pdbx_audit_revision_details"):
+            revDetailsObj = dataContainer.getObj("pdbx_audit_revision_details")
+            _ = revDetailsObj.replaceValue("Release", "Remediation", "type")
 
         return dataContainer
 
