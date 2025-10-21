@@ -9,6 +9,8 @@
 #                  During reorganizing process, also rename the file to use an internal identifier instead of the original source filename;
 #                  Change cache file to record new internal identifier, original filename, and accession URL for each model file;
 #                  Add usage of config file object for specifying location for storing model files
+#  21-Oct-2025 dwp Add version checking support;
+#                  Re-establish FTP connection for each archive file download
 #
 # To Do:
 # - Add check that converted files are consistent with mmCIF dictionaries
@@ -64,6 +66,7 @@ class AlphaFoldModelProvider:
 
         self.__ftpHost = kwargs.get("ftpHost", "ftp.ebi.ac.uk")
         self.__ftpDataPath = kwargs.get("ftpDataPath", "/pub/databases/alphafold/")
+        self.__alphaFoldLatestDataListUrl = "https://ftp.ebi.ac.uk/pub/databases/alphafold/download_metadata.json"
 
         self.__mU = MarshalUtil(workPath=self.__workPath)
         self.__fU = FileUtil(workPath=self.__workPath)
@@ -102,22 +105,22 @@ class AlphaFoldModelProvider:
             startDateTime = datetime.datetime.now().isoformat()
             useCache = kwargs.get("useCache", True)
 
-            # alphaFoldLatestDataList = "https://ftp.ebi.ac.uk/pub/databases/alphafold/download_metadata.json"
-            alphaFoldLatestDataList = "pub/databases/alphafold/download_metadata.json"
             alphaFoldRequestedSpeciesList = kwargs.get("alphaFoldRequestedSpeciesList", [])
             excludeArchiveFileRegexList = ["swissprot_pdb_v[0-9]+.tar"]
             excludeArchiveFileRegexListCombined = "(?:% s)" % "|".join(excludeArchiveFileRegexList)
 
-            self.__ftpU.connect(self.__ftpHost)
             self.__fU.mkdir(self.__workPath)
 
-            latestDataListDumpPath = os.path.join(self.__workPath, self.__fU.getFileName(alphaFoldLatestDataList))
-            ok = self.__ftpU.get(alphaFoldLatestDataList, latestDataListDumpPath)
+            latestDataListDumpPath = os.path.join(self.__workPath, self.__fU.getFileName(self.__alphaFoldLatestDataListUrl))
+            ok = self.__fU.get(self.__alphaFoldLatestDataListUrl, latestDataListDumpPath)
+            logger.info("Fetched latest AlphaFold data list %r to %r (status %r)", self.__alphaFoldLatestDataListUrl, latestDataListDumpPath, ok)
             lDL = self.__mU.doImport(latestDataListDumpPath, fmt="json")
+            if len(lDL) == 0:
+                raise Exception(f"Failed to fetch and/or import latest AlphaFold data list from {self.__alphaFoldLatestDataListUrl} to {latestDataListDumpPath}")
 
             # Get the latest version number, using the Arabidopsis thaliana dataset as the example
             # Example string to parse: "archive_name": "UP000006548_3702_ARATH_v6.tar"
-            exampleArchiveName = [exD["archive_name"] for exD in lDL if exD.get("species", None) == "Arabidopsis thaliana"][0]
+            exampleArchiveName = lDL[0]["archive_name"]
             latestAlphaFoldVersion = int(re.search(r"_v(\d+)\.tar$", exampleArchiveName).group(1))
 
             # Exclude undesired archives (defined in excludeArchiveFileRegexList)
@@ -203,6 +206,7 @@ class AlphaFoldModelProvider:
             sD.update({"data_directory": speciesDataDumpDir, "archive_file_path": archiveFileDumpPath})
 
             logger.info("Fetching file %s from FTP server to local path %s", archiveFilePath, archiveFileDumpPath)
+            self.__ftpU.connect(self.__ftpHost)
             ok = self.__ftpU.get(archiveFilePath, archiveFileDumpPath)
             ok = self.__fU.unbundleTarfile(archiveFileDumpPath, dirPath=speciesDataDumpDir)
             logger.info("Completed fetch (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)

@@ -394,11 +394,6 @@ class ModelWorker(object):
                 sourceModelUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelFileNameInUrl)
                 modelPaeFileNameInUrl = modelFileNameInUrl.split("-model_")[0] + "-predicted_aligned_error_" + modelFileNameInUrl.split("-model_")[1].split(".cif")[0] + ".json"
                 sourceModelPaeUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelPaeFileNameInUrl)
-            elif modelSourcePrefix == "MB":
-                modbaseInternalId = sourceModelEntryId.split("model_")[-1]
-                # sourceModelUrl = "https://salilab.org/modbase/searchbyid?modelID=" + modbaseInternalId + "&displaymode=moddetail"  # Directs to entry page
-                sourceModelUrl = "https://salilab.org/modbase/retrieve/modbase/?modelID=" + modbaseInternalId + "&format=mmcif"  # Directs to mmCIF file displayed in web browser
-                # E.g.: https://salilab.org/modbase/retrieve/modbase/?modelID=ecac68b60ee6877ccde36af05cdeac58&format=mmcif
             elif modelSourcePrefix == "MA":
                 modelFileNameInUrl = sourceModelFileName.split(".cif")[0]
                 sourceModelUrl = "https://www.modelarchive.org/api/projects/" + modelFileNameInUrl + "?type=basic__model_file_name"
@@ -785,7 +780,7 @@ class ModelReorganizer(object):
 
         Args:
             inputModelList (list): List of input model filepaths to reorganize.
-            modelSource (str): Source of model files ("AlphaFold", "ModBase", "ModelArchive", or "SwissModel")
+            modelSource (str): Source of model files ("AlphaFold" or "ModelArchive")
             destBaseDir (str): Base destination directory into which to reorganize model files (e.g., "computed-models")
             inputModelD (dict): Input mD dictionary, onto which to append the given set of newly reorganized models; defaults to re-reading in cache file (if useCache True)
             writeCache (bool): Whether to write out the cache holdings file or not; default True
@@ -839,7 +834,7 @@ class ModelReorganizer(object):
 
         Args:
             inputModelList (list): List of input model filepaths to reorganize.
-            modelSource (str): Source of model files ("AlphaFold", "ModBase", "ModelArchive", or "SwissModel")
+            modelSource (str): Source of model files ("AlphaFold" or "ModelArchive")
             destBaseDir (str): Base destination directory into which to reorganize model files (e.g., "computed-models")
             numProc (int, optional): number of processes to use; default 2.
             chunkSize (int, optional): incremental chunk size used for distributed work processes; default 20.
@@ -870,8 +865,8 @@ class ModelReorganizer(object):
             logger.info("Creating base destination directory for model file reorganization, %s", destBaseDir)
             self.__fU.mkdir(destBaseDir)
         #
-        modelSourcePrefixD = {"AlphaFold": "AF", "AlphaFoldCloud": "AF", "ModBase": "MB", "ModelArchive": "MA", "SwissModelRepository": "SMR"}
-        modelSourceDbMap = {"AF": "AlphaFoldDB", "MB": "MODBASE", "MA": "ModelArchive", "SMR": "SWISS-MODEL_REPOSITORY"}
+        modelSourcePrefixD = {"AlphaFold": "AF", "AlphaFoldCloud": "AF", "ModelArchive": "MA"}
+        modelSourceDbMap = {"AF": "AlphaFoldDB", "MA": "ModelArchive"}
         # Database name values correspond to _database_2.database_id enumerations (https://mmcif.wwpdb.org/dictionaries/mmcif_pdbx_v50.dic/Items/_database_2.database_id.html)
         modelSourcePrefix = modelSourcePrefixD[modelSource]
         #

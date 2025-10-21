@@ -1,5 +1,8 @@
 # File: azure-pipelines.yml
-# Date: 12-Sep-2021 jdw Created pipeline
+# Date: 4-Jul-2019 jdw Created pipeline
+#       8-Jul-2019 jdw add macos test/publish
+#       8-Jul-2019 jdw templatize
+#       9-Jul-2019 jdw add publish jobs
 #
 name: $(BuildDefinitionName)_$(Date:yyyyMMdd)$(Rev:.rr)
 
@@ -19,18 +22,18 @@ schedules:
 
 jobs:
   - template: azure-template-tox-job.yml
-    parameters: { tox: "format_pep8", python: "3.10", os: "linux" }
+    parameters: { tox: "format_pep8", python: "3.13", os: "linux" }
   - template: azure-template-tox-job.yml
-    parameters: { tox: "lint_pylint", python: "3.10", os: "linux" }
+    parameters: { tox: "lint_pylint", python: "3.13", os: "linux" }
   - template: azure-template-tox-job.yml
-    parameters: { tox: "test_coverage", python: "3.10", os: "linux" }
+    parameters: { tox: "test_coverage", python: "3.13", os: "linux" }
     #
   - template: azure-template-tox-job.yml
-    parameters: { tox: "py310", python: "3.10", os: "linux" }
+    parameters: { tox: "py313", python: "3.13", os: "linux" }
   #
   - template: azure-template-tox-job.yml
-    parameters: { tox: "py310", python: "3.10", os: "macos" }
+    parameters: { tox: "py313", python: "3.13", os: "macos" }
   #
   - template: azure-template-publish-job.yml
-    parameters: { tox: "py310", python: "3.10", os: "linux" }
+    parameters: { tox: "py313", python: "3.13", os: "linux" }
   #

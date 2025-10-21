@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rcsb.utils.insilico3d"
+description = "RCSB Python In Silico Model Access Utilities"
+readme = "README.md"
+authors = [
+    { name="Dennis Piehl", email="dennis.piehl@rcsb.org" }
+]
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.9"
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = [
+    "rcsb.utils.io >= 1.52",
+    "rcsb.utils.multiproc >= 0.21",
+    "asyncio >= 3.4.3",
+    "aiohttp >= 3.12.7",
+    "aiofiles >= 24.1.0",
+]
+dynamic = ["version"]
+
+[project.optional-dependencies]
+cloud = [
+    "gsutil >= 5.14",
+    "google-cloud-storage >= 2.5.0",
+]
+dev = ["check-manifest"]
+tests = ["tox", "pylint", "black>=21.5b1", "flake8", "coverage"]
+
+[project.urls]
+Homepage = "https://github.com/rcsb/py-rcsb_utils_insilico3d"
+
+[tool.setuptools.packages.find]
+include = ["rcsb*"]  # must leave at "rcsb*" and not "rcsb.*", else the 'rcsb/__init__.py' file is dropped
+exclude = ["rcsb.utils.test*", "rcsb.mock-*", "test*", "rcsb.utils.insilico3d.scripts*", "rcsb.utils.modbase*"]
+namespaces = false
+
+[tool.setuptools.dynamic]
+version = {attr = "rcsb.utils.insilico3d.__version__"}
+
+# # Add this to prevent uv from automatically creating venvs within individual packages when running 'uv run ...' from within the package directory
+[tool.uv]
+managed = false
