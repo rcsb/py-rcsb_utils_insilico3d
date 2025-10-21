@@ -117,7 +117,7 @@ class AlphaFoldModelProvider:
 
             # Get the latest version number, using the Arabidopsis thaliana dataset as the example
             # Example string to parse: "archive_name": "UP000006548_3702_ARATH_v6.tar"
-            exampleArchiveName = [exD["archive_name"] for exD in lDL if exD.get("species", None) == "Arabidopsis thaliana"][0]
+            exampleArchiveName = lDL[0]["archive_name"]
             latestAlphaFoldVersion = int(re.search(r"_v(\d+)\.tar$", exampleArchiveName).group(1))
 
             # Exclude undesired archives (defined in excludeArchiveFileRegexList)
