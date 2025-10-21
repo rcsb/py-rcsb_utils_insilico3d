@@ -94,17 +94,11 @@ jobs:
               export CONFIG_SUPPORT_TOKEN_ENV=$(VAR_CONFIG_SUPPORT_TOKEN_ENV)
               ${{ format('python -m tox -e {0}', parameters.tox) }}
             displayName: "Running tox task"
-      - ? ${{ if and(not(startsWith(parameters.tox, 'py')), startsWith(parameters.python, '3.10')) }}
+      - ? ${{ if and(not(startsWith(parameters.tox, 'py')), startsWith(parameters.python, '3.13')) }}
         : - script: |
               export GOOGLE_APPLICATION_CREDENTIALS=$(googlecloudkey.secureFilePath)
               export CONFIG_SUPPORT_TOKEN_ENV=$(VAR_CONFIG_SUPPORT_TOKEN_ENV)
-              ${{ format('python -m tox -e {0}-py310', parameters.tox) }}
-            displayName: "Running tox task"
-      - ? ${{ if and(not(startsWith(parameters.tox, 'py')), startsWith(parameters.python, '3.9')) }}
-        : - script: |
-              export GOOGLE_APPLICATION_CREDENTIALS=$(googlecloudkey.secureFilePath)
-              export CONFIG_SUPPORT_TOKEN_ENV=$(VAR_CONFIG_SUPPORT_TOKEN_ENV)
-              ${{ format('python -m tox -e {0}-py39', parameters.tox) }}
+              ${{ format('python -m tox -e {0}-py313', parameters.tox) }}
             displayName: "Running tox task"
       #
       #  Build artifacts if this is a test target (i.e. labeled as py##)
