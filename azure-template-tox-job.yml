@@ -36,6 +36,7 @@ jobs:
       #
       - checkout: self
         submodules: true
+        fetchDepth: 1
       #
       - ${{ if startsWith(parameters.os, 'macos') }}:
           - bash: |
