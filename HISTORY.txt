@@ -51,4 +51,4 @@
   20-Oct-2025  - V0.41 Update ModelReorganizer to fix data issues with AF v5 and v6 models (in `_pdbx_audit_revision_details.type`)
   21-Oct-2025  - V0.42 Switch to 'pyproject.toml' file and update test pipelines to python 3.13;
                        Separate out Google Cloud dependencies to be extra installs;
-                       Remove 'modbase_utils' submodule
+                       Remove 'modbase_utils' submodule and references to ModBase and SwissModel Repository

@@ -44,8 +44,5 @@ pip install .
 1. [AlphaFold](https://alphafold.ebi.ac.uk/)
     * Jumper, J et al. Highly accurate protein structure prediction with AlphaFold. Nature (2021)
     * Varadi, M et al. AlphaFold Protein Structure Database: massively expanding the structural coverage of protein-sequence space with high-accuracy models. Nucleic Acids Research (2021).
-1. [ModBase](https://modbase.compbio.ucsf.edu/)
-    * MODBASE, a database of annotated comparative protein structure models and associated resources. Ursula Pieper, Benjamin M. Webb, Guang Qiang Dong, Dina Schneidman-Duhovny, Hao Fan, Seung Joong Kim, Natalia Khuri, Yannick G. Spill, Patrick Weinkam, Michal Hammel, John A. Tainer, Michael Nilges, Andrej Sali Nucleic Acids Research 42, D336-46, 2014.
-1. [SWISS-MODEL Repository](https://swissmodel.expasy.org/)
-    * Bienert, S., Waterhouse, A., de Beer, T.A.P., Tauriello, G., Studer, G., Bordoli, L., Schwede, T. The SWISS-MODEL Repository - new features and functionality. Nucleic Acids Res. 45, D313-D319 (2017). 
-    * Waterhouse, A., Bertoni, M., Bienert, S., Studer, G., Tauriello, G., Gumienny, R., Heer, F.T., de Beer, T.A.P., Rempfer, C., Bordoli, L., Lepore, R., Schwede, T. SWISS-MODEL: homology modelling of protein structures and complexes. Nucleic Acids Res. 46(W1), W296-W303 (2018). 
+1. [ModelArchive](https://modelarchive.org/)
+    * ModelArchive: A Deposition Database for Computational Macromolecular Structural Models. Gerardo Tauriello, Andrew M. Waterhouse, Juergen Haas, Dario Behringer, Stefan Bienert, Thomas Garello, Torsten Schwede. Journal of Molecular Biology (2025). https://doi.org/10.1016/j.jmb.2025.168996
