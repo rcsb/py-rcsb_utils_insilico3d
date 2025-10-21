@@ -19,14 +19,9 @@ git clone --recurse-submodules https://github.com/rcsb/py-rcsb_utils_insilico3d.
 **Important:** Setup will require an up-to-date version of [cmake](https://cmake.org/install/) to be installed on the machine and the executable to be in the system's PATH.
 
 Optionally, run test suite (Python versions 3.9) using
-[setuptools](https://setuptools.readthedocs.io/en/latest/) or
 [tox](http://tox.readthedocs.io/en/latest/example/platform.html):
 
 ```bash
-python setup.py test
-
-or simply run
-
 tox
 ```
 
