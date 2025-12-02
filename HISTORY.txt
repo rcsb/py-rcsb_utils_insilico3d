@@ -54,3 +54,4 @@
                        Remove 'modbase_utils' submodule and references to ModBase and SwissModel Repository;
                        Add version checking for AlphaFold FTP models, to stay up-to-date with the latest version available;
                        Re-establish FTP connection for each archive file download to ensure connection remains alive
+   2-Dec-2025  - V0.43 Switch from setuptools to hatch build system

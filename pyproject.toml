@@ -1,12 +1,16 @@
 [build-system]
-requires = ["setuptools>=61", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "rcsb.utils.insilico3d"
 description = "RCSB Python In Silico Model Access Utilities"
+version = "0.43"
 readme = "README.md"
 authors = [
+    { name="Dennis Piehl", email="dennis.piehl@rcsb.org" }
+]
+maintainers = [
     { name="Dennis Piehl", email="dennis.piehl@rcsb.org" }
 ]
 license = "Apache-2.0"
@@ -27,27 +31,50 @@ dependencies = [
     "aiohttp >= 3.12.7",
     "aiofiles >= 24.1.0",
 ]
-dynamic = ["version"]
 
 [project.optional-dependencies]
 cloud = [
     "gsutil >= 5.14",
     "google-cloud-storage >= 2.5.0",
 ]
-dev = ["check-manifest"]
-tests = ["tox", "pylint", "black>=21.5b1", "flake8", "coverage"]
+tests = ["tox", "pylint", "black>=21.5b1", "flake8", "coverage", "check-manifest"]
 
 [project.urls]
 Homepage = "https://github.com/rcsb/py-rcsb_utils_insilico3d"
 
-[tool.setuptools.packages.find]
-include = ["rcsb*"]  # must leave at "rcsb*" and not "rcsb.*", else the 'rcsb/__init__.py' file is dropped
-exclude = ["rcsb.utils.test*", "rcsb.mock-*", "test*", "rcsb.utils.insilico3d.scripts*", "rcsb.utils.modbase*"]
-namespaces = false
+# ----------------  hatch configuration ----------------
+[tool.hatch.build.targets.sdist]
+include = [
+    "/rcsb/**",
+    "/README.md",
+    "/LICENSE",
+    "/HISTORY.txt",
+    "/pyproject.toml",
+]
+exclude = [
+    "/rcsb/utils/test*/test*-*",
+    "/rcsb/mock-*",
+]
 
-[tool.setuptools.dynamic]
-version = {attr = "rcsb.utils.insilico3d.__version__"}
+[tool.hatch.build.targets.wheel]
+packages = ["rcsb"]
+exclude = [
+    "/rcsb/utils/test*",
+    "/rcsb/mock-*",
+    "/rcsb/utils/insilico3d/scripts*",
+]
 
-# # Add this to prevent uv from automatically creating venvs within individual packages when running 'uv run ...' from within the package directory
+[tool.hatch.envs.default]
+skip-install = true
+
+# ----------------  test configuration ----------------
+[tool.hatch.envs.hatch-test]
+dependencies = ["tox"]
+
+[tool.hatch.envs.hatch-test.scripts]
+run = ["tox"]
+
+# ----------------  UV configuration ----------------
+# Add this to prevent uv from automatically creating venvs within individual packages when running 'uv run ...' from within the package directory
 [tool.uv]
 managed = false
