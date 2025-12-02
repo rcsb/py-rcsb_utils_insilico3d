@@ -37,7 +37,7 @@ cloud = [
     "gsutil >= 5.14",
     "google-cloud-storage >= 2.5.0",
 ]
-tests = ["tox", "pylint", "black>=21.5b1", "flake8", "coverage", "check-manifest"]
+tests = ["tox", "pylint", "black>=21.5b1", "flake8", "coverage", "check-manifest", "rcsb.utils.config>=0.40"]
 
 [project.urls]
 Homepage = "https://github.com/rcsb/py-rcsb_utils_insilico3d"
