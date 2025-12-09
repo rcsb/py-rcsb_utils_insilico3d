@@ -126,12 +126,13 @@ class ModelProviderWorkflow:
         smallFileSizeCutoff = kwargs.get("smallFileSizeCutoff", self.__smallFileSizeCutoff)
         inputDirList = kwargs.get("inputDirList", [])
         dictFilePathL = kwargs.get("dictFilePathL", None)
+        outputModelFormat = kwargs.get("outputModelFormat", None)
 
         ok = False
         try:
             for provider in modelProviders:
                 if provider == "AlphaFold":
-                    ok = self.__aFMP.reorganizeModelFiles(useCache=self.__useCache, numProc=numProc, chunkSize=chunkSize, keepSource=keepSource)
+                    ok = self.__aFMP.reorganizeModelFiles(useCache=self.__useCache, numProc=numProc, chunkSize=chunkSize, keepSource=keepSource, outputModelFormat=outputModelFormat)
                 if provider == "AlphaFoldCloud":
                     ok = self.__aFMCP.reorganizeModelFiles(
                         cachePath=self.__destDir,
@@ -142,9 +143,10 @@ class ModelProviderWorkflow:
                         smallFileSizeCutoff=smallFileSizeCutoff,
                         keepSource=keepSource,
                         dictFilePathL=dictFilePathL,
+                        outputModelFormat=outputModelFormat,
                     )
                 if provider == "ModelArchive":
-                    ok = self.__mAMP.reorganizeModelFiles(useCache=self.__useCache, numProc=numProc, chunkSize=chunkSize, keepSource=keepSource)
+                    ok = self.__mAMP.reorganizeModelFiles(useCache=self.__useCache, numProc=numProc, chunkSize=chunkSize, keepSource=keepSource, outputModelFormat=outputModelFormat)
                 if not ok:
                     logger.info("Failed to reorganize models for provider, %s", provider)
                     return False

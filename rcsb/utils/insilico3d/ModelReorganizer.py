@@ -12,6 +12,8 @@
 #                    Add the PAE access url to the holdings cache file for models with associated PAE data files (currently only AF models)
 #   20-Mar-2023  dwp Assign NCBI ID to ma-ornl-sphdiv files to enable organism metadata population
 #    2-Jan-2024  dwp Modify reorganization method to export models as gzipped BCIF files
+#    9-Dec-2025  dwp Revert default export format from BCIF back to CIF, and add option 'outputModelFormat' to control this (default "mmcif");
+#                    Remove 'source_url' and 'source_pae_url' from holdings file output (no longer shared publicly, and can be constructed from components)
 #
 # To Do:
 # - pylint: disable=fixme
@@ -84,6 +86,8 @@ class ModelWorker(object):
             reorganizeDate = optionsD.get("reorganizeDate", None)  # reorganization date
             sourceArchiveReleaseDate = optionsD.get("sourceArchiveReleaseDate", None)  # externally-obtained release date (i.e., not from CIF); as is case for ModelArchive models
             dictionaryApi = optionsD.get("dictionaryApi", None)
+            outputModelFormat = optionsD.get("outputModelFormat")
+            outputModelFormatExt = optionsD.get("outputModelFormatExt")
             #
             for modelFileIn in dataList:
                 modelD = {}
@@ -147,7 +151,7 @@ class ModelWorker(object):
                     if not ok:
                         logger.warning("Failed to gzip input model file: %s", modelFileIn)
                 #
-                internalModelName = internalModelId + ".bcif.gz"
+                internalModelName = internalModelId + f".{outputModelFormatExt}.gz"
                 #
                 # Use last six to last two characters for second-level hashed directory
                 firstDir, secondDir = modelEntryId[-6:-4], modelEntryId[-4:-2]
@@ -162,21 +166,21 @@ class ModelWorker(object):
                 modelFileOut = os.path.join(destModelDir, internalModelName)
                 modelFileOutUnzip = modelFileOut.split(".gz")[0]
                 #
-                sourceModelUrl, sourceModelPaeUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, sourceModelEntryId)
+                # sourceModelUrl, sourceModelPaeUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, sourceModelEntryId)
                 #
                 modelD["modelId"] = internalModelId
-                modelD["modelPath"] = modelPathFromPrefixDir  # Starts at prefix (e.g., "AF/XJ/E6/AF_AFA0A385XJE6F1.cif.gz"); needed like this by RepositoryProvider
+                modelD["modelPath"] = modelPathFromPrefixDir  # Starts at prefix (e.g., "AF/XJ/E6/AF_AFA0A385XJE6F1.cif.gz"); may be needed by downstream tasks
                 modelD["sourceId"] = sourceModelEntryId
                 modelD["sourceDb"] = modelSourceDb
                 modelD["sourceModelFileName"] = modelFileNameIn
-                if sourceModelUrl:
-                    modelD["sourceModelUrl"] = sourceModelUrl
-                if sourceModelPaeUrl:
-                    modelD["sourceModelPaeUrl"] = sourceModelPaeUrl
+                # if sourceModelUrl:
+                #     modelD["sourceModelUrl"] = sourceModelUrl
+                # if sourceModelPaeUrl:
+                #     modelD["sourceModelPaeUrl"] = sourceModelPaeUrl
                 modelD["lastModifiedDate"] = lastModifiedDate
                 #
                 try:
-                    ok = self.__mU.doExport(modelFileOutUnzip, containerList, fmt="bcif", dictionaryApi=dictionaryApi)
+                    ok = self.__mU.doExport(modelFileOutUnzip, containerList, fmt=outputModelFormat, dictionaryApi=dictionaryApi)
                     # logger.debug("export status %r for %s", ok, modelFileOutUnzip)
                     self.__fU.compress(modelFileOutUnzip, modelFileOut)
                     self.__mU.remove(modelFileOutUnzip)
@@ -229,6 +233,8 @@ class ModelWorker(object):
             reorganizeDate = optionsD.get("reorganizeDate", None)  # reorganization date
             sourceArchiveReleaseDate = optionsD.get("sourceArchiveReleaseDate", None)  # externally-obtained release date (i.e., not from CIF); as is case for ModelArchive models
             dictionaryApi = optionsD.get("dictionaryApi", None)
+            outputModelFormat = optionsD.get("outputModelFormat")
+            outputModelFormatExt = optionsD.get("outputModelFormatExt")
             #
             for archiveFile in dataList:
                 successModelList = []
@@ -306,7 +312,7 @@ class ModelWorker(object):
                         if not ok:
                             logger.warning("Failed to gzip input model file: %s", modelPath)
                     #
-                    internalModelName = internalModelId + ".bcif.gz"
+                    internalModelName = internalModelId + f".{outputModelFormatExt}.gz"
                     #
                     # Use last six to last two characters for second-level hashed directory
                     firstDir, secondDir = modelEntryId[-6:-4], modelEntryId[-4:-2]
@@ -317,21 +323,21 @@ class ModelWorker(object):
                     modelFileOut = os.path.join(destModelDir, internalModelName)
                     modelFileOutUnzip = modelFileOut.split(".gz")[0]
                     #
-                    sourceModelUrl, sourceModelPaeUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, sourceModelEntryId)
+                    # sourceModelUrl, sourceModelPaeUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, sourceModelEntryId)
                     #
                     modelD["modelId"] = internalModelId
                     modelD["modelPath"] = modelPathFromPrefixDir  # Starts at prefix (e.g., "AF/XJ/E6/AF_AFA0A385XJE6F1.cif.gz"); needed like this by RepositoryProvider
                     modelD["sourceId"] = sourceModelEntryId
                     modelD["sourceDb"] = modelSourceDb
                     modelD["sourceModelFileName"] = modelFileNameIn
-                    if sourceModelUrl:
-                        modelD["sourceModelUrl"] = sourceModelUrl
-                    if sourceModelPaeUrl:
-                        modelD["sourceModelPaeUrl"] = sourceModelPaeUrl
+                    # if sourceModelUrl:
+                    #     modelD["sourceModelUrl"] = sourceModelUrl
+                    # if sourceModelPaeUrl:
+                    #     modelD["sourceModelPaeUrl"] = sourceModelPaeUrl
                     modelD["lastModifiedDate"] = lastModifiedDate
                     #
                     try:
-                        ok = self.__mU.doExport(modelFileOutUnzip, containerList, fmt="bcif", dictionaryApi=dictionaryApi)
+                        ok = self.__mU.doExport(modelFileOutUnzip, containerList, fmt=outputModelFormat, dictionaryApi=dictionaryApi)
                         logger.debug("export status %r for %s", ok, modelFileOutUnzip)
                         self.__fU.compress(modelFileOutUnzip, modelFileOut)
                         self.__mU.remove(modelFileOutUnzip)
@@ -370,39 +376,39 @@ class ModelWorker(object):
             ret = False
         return ret
 
-    def __getSourceUrl(self, modelSourcePrefix, sourceModelFileName, sourceModelEntryId):
-        """Construct model accession URL for each model source.
+    # def __getSourceUrl(self, modelSourcePrefix, sourceModelFileName, sourceModelEntryId):
+    #     """Construct model accession URL for each model source.
 
-        Args:
-            modelSourcePrefix (str): Prefix for given model source (e.g., "AF" or "MA").
-            sourceModelFileName (str): filename of model as provided by the source.
-            sourceModelEntryId (str): model entry.id value as in the provided mmCIF file
+    #     Args:
+    #         modelSourcePrefix (str): Prefix for given model source (e.g., "AF" or "MA").
+    #         sourceModelFileName (str): filename of model as provided by the source.
+    #         sourceModelEntryId (str): model entry.id value as in the provided mmCIF file
 
-        Returns:
-            sourceModelUrl (str): Accession URL for the specified model file and source.
-                                  Note that file-specific downloads aren't gzipped, unlike model files in species tarball.
-                                  E.g., "https://alphafold.ebi.ac.uk/files/AF-Q9RQP8-F1-model_v2.cif"
-            sourceModelPaeUrl (str): Accession URL for the PAE file of the specified model if available, else None.
-        """
-        sourceModelUrl = None
-        sourceModelPaeUrl = None
-        try:
-            if modelSourcePrefix == "AF":
-                if not sourceModelEntryId.upper().endswith("F1"):
-                    return None, None
-                modelFileNameInUrl = sourceModelFileName.split(".gz")[0]
-                sourceModelUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelFileNameInUrl)
-                modelPaeFileNameInUrl = modelFileNameInUrl.split("-model_")[0] + "-predicted_aligned_error_" + modelFileNameInUrl.split("-model_")[1].split(".cif")[0] + ".json"
-                sourceModelPaeUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelPaeFileNameInUrl)
-            elif modelSourcePrefix == "MA":
-                modelFileNameInUrl = sourceModelFileName.split(".cif")[0]
-                sourceModelUrl = "https://www.modelarchive.org/api/projects/" + modelFileNameInUrl + "?type=basic__model_file_name"
-            else:
-                logger.error("URL generation process not ready yet for %s", modelSourcePrefix)
-        except Exception as e:
-            logger.exception("Failing with %s", str(e))
+    #     Returns:
+    #         sourceModelUrl (str): Accession URL for the specified model file and source.
+    #                               Note that file-specific downloads aren't gzipped, unlike model files in species tarball.
+    #                               E.g., "https://alphafold.ebi.ac.uk/files/AF-Q9RQP8-F1-model_v2.cif"
+    #         sourceModelPaeUrl (str): Accession URL for the PAE file of the specified model if available, else None.
+    #     """
+    #     sourceModelUrl = None
+    #     sourceModelPaeUrl = None
+    #     try:
+    #         if modelSourcePrefix == "AF":
+    #             if not sourceModelEntryId.upper().endswith("F1"):
+    #                 return None, None
+    #             modelFileNameInUrl = sourceModelFileName.split(".gz")[0]
+    #             sourceModelUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelFileNameInUrl)
+    #             modelPaeFileNameInUrl = modelFileNameInUrl.split("-model_")[0] + "-predicted_aligned_error_" + modelFileNameInUrl.split("-model_")[1].split(".cif")[0] + ".json"
+    #             sourceModelPaeUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelPaeFileNameInUrl)
+    #         elif modelSourcePrefix == "MA":
+    #             modelFileNameInUrl = sourceModelFileName.split(".cif")[0]
+    #             sourceModelUrl = "https://www.modelarchive.org/api/projects/" + modelFileNameInUrl + "?type=basic__model_file_name"
+    #         else:
+    #             logger.error("URL generation process not ready yet for %s", modelSourcePrefix)
+    #     except Exception as e:
+    #         logger.exception("Failing with %s", str(e))
 
-        return sourceModelUrl, sourceModelPaeUrl
+    #     return sourceModelUrl, sourceModelPaeUrl
 
     def __rebuildEntryIds(self, dataContainer, sourceModelEntryId, sourceModelDb, internalModelId):
         """Replace or remove occurrences of source entry ID with internal ID
@@ -774,7 +780,7 @@ class ModelReorganizer(object):
     def getCacheFilePath(self):
         return self.__cacheFilePath
 
-    def reorganize(self, inputModelList, modelSource, destBaseDir, useCache=True, inputModelD=None, writeCache=True, **kwargs):
+    def reorganize(self, inputModelList, modelSource, destBaseDir, useCache=True, inputModelD=None, writeCache=True, outputModelFormat=None, **kwargs):
         """Move model files from organism-wide model listing to hashed directory structure and rename files
         to follow internal identifier naming convention.
 
@@ -784,18 +790,23 @@ class ModelReorganizer(object):
             destBaseDir (str): Base destination directory into which to reorganize model files (e.g., "computed-models")
             inputModelD (dict): Input mD dictionary, onto which to append the given set of newly reorganized models; defaults to re-reading in cache file (if useCache True)
             writeCache (bool): Whether to write out the cache holdings file or not; default True
+            outputModelFormat (str, optional): format in which to export model files ("mmcif" or "bcif"); default None, which becomes "mmcif"
 
         Returns:
             bool: True for success or False otherwise
         """
         ok = False
         sourceArchiveReleaseDate = kwargs.get("sourceArchiveReleaseDate", None)  # Use for ModelArchive files which are currently missing revision date information
+        outputModelFormat = outputModelFormat if outputModelFormat is not None else "mmcif"
+        if outputModelFormat not in ["mmcif", "bcif"]:
+            raise ValueError("Keyword argument 'outputModelFormat' must be either 'mmcif' or 'bcif'")
         #
         try:
             logger.info(
-                "Running reorganization workflow for inputModelList (%r) modelSource (%r) with numProc (%r), chunkSize (%r) to destBaseDir (%r)",
+                "Running reorganization workflow for inputModelList (%r) modelSource (%r) to outputModelFormat (%r) with numProc (%r), chunkSize (%r) to destBaseDir (%r)",
                 len(inputModelList),
                 modelSource,
+                outputModelFormat,
                 self.__numProc,
                 self.__chunkSize,
                 destBaseDir
@@ -806,6 +817,7 @@ class ModelReorganizer(object):
                 destBaseDir=destBaseDir,
                 numProc=self.__numProc,
                 chunkSize=self.__chunkSize,
+                outputModelFormat=outputModelFormat,
                 sourceArchiveReleaseDate=sourceArchiveReleaseDate,
             )
             if len(failD) > 0:
@@ -841,17 +853,16 @@ class ModelReorganizer(object):
 
         Returns:
             mD (dict): dictionary of successfully processed models, in the following structure:
-                        { internalModelId_1 : {"sourceModelFileName": ..., "modelPath": ..., "sourceModelUrl": ...},
+                        { internalModelId_1 : {"sourceModelFileName": ..., "modelPath": ..., ...},
                           internalModelId_2 : {...}, ...}
                 E.g:    { "AF_AFO25670F1" : {
                             "sourceModelFileName": "AF-O25670-F1-model_v2.cif.gz",
-                            "modelPath": "./AF/56/70/AF_AFO25670F1.cif.gz",
-                            "sourceModelUrl": "https://alphafold.ebi.ac.uk/files/AF-O25670-F1-model_v2.cif"},
+                            "modelPath": "./AF/56/70/AF_AFO25670F1.cif.gz"},
                           "AF_AFO24939F1" : {...},
                         ...}
             failD (dict): dictionary of models for which processing failed and the associated output file path and source details
                           that were attempted, in the following structure:
-                          {inputModelFilePath:  {"sourceModelFileName": ..., "modelPath": ..., "sourceModelUrl": ...}, ...}
+                          {inputModelFilePath:  {"sourceModelFileName": ..., "modelPath": ..., ...}, ...}
         """
         mD = {}
         failD = {}
@@ -859,6 +870,10 @@ class ModelReorganizer(object):
         tS = datetime.now().replace(microsecond=0).replace(tzinfo=pytz.UTC).isoformat()  # Desired format:  2022-04-15T12:00:00+00:00
         #
         logger.debug("Starting with %d models, numProc %d at %r", len(inputModelList), numProc, tS)
+        #
+        outputModelFormat = kwargs.get("outputModelFormat")
+        outputModelFormatExtMap = {"mmcif": "cif", "bcif": "bcif"}
+        outputModelFormatExt = outputModelFormatExtMap[outputModelFormat]
         #
         # Create the base destination directory if it doesn't exist
         if not self.__fU.exists(destBaseDir):
@@ -880,6 +895,8 @@ class ModelReorganizer(object):
             "keepSource": self.__keepSource,
             "reorganizeDate": tS,
             "dictionaryApi": self.__dictionaryApi,
+            "outputModelFormat": outputModelFormat,
+            "outputModelFormatExt": outputModelFormatExt,
         }
         if sourceArchiveReleaseDate:
             optD.update({"sourceArchiveReleaseDate": sourceArchiveReleaseDate})

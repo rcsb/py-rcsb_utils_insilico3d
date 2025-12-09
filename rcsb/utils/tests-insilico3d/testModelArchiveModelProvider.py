@@ -109,10 +109,22 @@ class ModelArchiveModelProviderTests(unittest.TestCase):
             destBaseDir=destBaseDir,
             useCache=True,
             sourceArchiveReleaseDate="2021-11-11",
+            outputModelFormat="mmcif"
         )
         self.assertTrue(ok)
         ok = mAMR.testCache()
         self.assertTrue(ok)  # Confirm that testCache SUCCEEDED (>= 20 in cache)
+        #
+        # Now test the conversion to BCIF
+        logger.info("Testing reorganization into BCIF")
+        ok = mAMR.reorganize(
+            inputModelList=archiveModelFileList[30:40],
+            modelSource="ModelArchive",
+            destBaseDir=destBaseDir,
+            useCache=True,
+            outputModelFormat="bcif",
+        )
+        self.assertTrue(ok)
 
 
 def fetchModelArchiveModels():

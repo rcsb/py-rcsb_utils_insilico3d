@@ -300,7 +300,7 @@ class AlphaFoldModelProvider:
             mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
             #
             if inputModelList:  # Only reorganize given list of model files
-                _, ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
+                _, ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache, **kwargs)
                 if not ok:
                     logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputModelList[0])
             #
@@ -320,7 +320,7 @@ class AlphaFoldModelProvider:
                                 continue
                     # Proceed with reorganization
                     inputModelList = self.getModelFileList(inputPathList=[archiveDir])
-                    _, ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
+                    _, ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache, **kwargs)
                     if not ok:
                         logger.error("Reorganization of model files failed for species archive %s", archiveDir)
                         break

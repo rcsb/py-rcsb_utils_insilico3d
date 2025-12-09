@@ -55,3 +55,5 @@
                        Add version checking for AlphaFold FTP models, to stay up-to-date with the latest version available;
                        Re-establish FTP connection for each archive file download to ensure connection remains alive
    2-Dec-2025  - V0.43 Switch from setuptools to hatch build system
+   9-Dec-2025  - V0.44 Add option to control output format for ModelReorganizer (set default to "mmcif");
+                       Remove 'source_url' and 'source_pae_url' from holdings file output

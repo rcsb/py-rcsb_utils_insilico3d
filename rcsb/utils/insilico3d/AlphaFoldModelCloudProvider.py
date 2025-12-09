@@ -335,7 +335,8 @@ class AlphaFoldModelCloudProvider:
                             destBaseDir=self.__cachePath,
                             useCache=useCache,
                             inputModelD=outputModelD,
-                            writeCache=False
+                            writeCache=False,
+                            **kwargs
                         )
                         if not ok:
                             logger.error("Reorganization of model files failed for archive %s subset %r", archiveDir, archiveSubsetIdx)
@@ -354,7 +355,8 @@ class AlphaFoldModelCloudProvider:
                                     destBaseDir=self.__cachePath,
                                     useCache=useCache,
                                     inputModelD=outputModelD,
-                                    writeCache=False
+                                    writeCache=False,
+                                    **kwargs
                                 )
                                 if not ok:
                                     logger.error("Reorganization of model files failed for archive %s subset %r", archiveDir, archiveSubsetIdx)
