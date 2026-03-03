@@ -24,7 +24,6 @@ from rcsb.utils.insilico3d.AlphaFoldModelProvider import AlphaFoldModelProvider
 from rcsb.utils.insilico3d.AlphaFoldModelCloudProvider import AlphaFoldModelCloudProvider
 from rcsb.utils.insilico3d.ModelArchiveModelProvider import ModelArchiveModelProvider
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
