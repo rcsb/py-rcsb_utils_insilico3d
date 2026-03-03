@@ -166,17 +166,11 @@ class ModelWorker(object):
                 modelFileOut = os.path.join(destModelDir, internalModelName)
                 modelFileOutUnzip = modelFileOut.split(".gz")[0]
                 #
-                # sourceModelUrl, sourceModelPaeUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, sourceModelEntryId)
-                #
                 modelD["modelId"] = internalModelId
                 modelD["modelPath"] = modelPathFromPrefixDir  # Starts at prefix (e.g., "AF/XJ/E6/AF_AFA0A385XJE6F1.cif.gz"); may be needed by downstream tasks
                 modelD["sourceId"] = sourceModelEntryId
                 modelD["sourceDb"] = modelSourceDb
                 modelD["sourceModelFileName"] = modelFileNameIn
-                # if sourceModelUrl:
-                #     modelD["sourceModelUrl"] = sourceModelUrl
-                # if sourceModelPaeUrl:
-                #     modelD["sourceModelPaeUrl"] = sourceModelPaeUrl
                 modelD["lastModifiedDate"] = lastModifiedDate
                 #
                 try:
@@ -323,17 +317,11 @@ class ModelWorker(object):
                     modelFileOut = os.path.join(destModelDir, internalModelName)
                     modelFileOutUnzip = modelFileOut.split(".gz")[0]
                     #
-                    # sourceModelUrl, sourceModelPaeUrl = self.__getSourceUrl(modelSourcePrefix, modelFileNameIn, sourceModelEntryId)
-                    #
                     modelD["modelId"] = internalModelId
                     modelD["modelPath"] = modelPathFromPrefixDir  # Starts at prefix (e.g., "AF/XJ/E6/AF_AFA0A385XJE6F1.cif.gz"); needed like this by RepositoryProvider
                     modelD["sourceId"] = sourceModelEntryId
                     modelD["sourceDb"] = modelSourceDb
                     modelD["sourceModelFileName"] = modelFileNameIn
-                    # if sourceModelUrl:
-                    #     modelD["sourceModelUrl"] = sourceModelUrl
-                    # if sourceModelPaeUrl:
-                    #     modelD["sourceModelPaeUrl"] = sourceModelPaeUrl
                     modelD["lastModifiedDate"] = lastModifiedDate
                     #
                     try:
@@ -375,40 +363,6 @@ class ModelWorker(object):
             logger.exception("Failing with %s", str(e))
             ret = False
         return ret
-
-    # def __getSourceUrl(self, modelSourcePrefix, sourceModelFileName, sourceModelEntryId):
-    #     """Construct model accession URL for each model source.
-
-    #     Args:
-    #         modelSourcePrefix (str): Prefix for given model source (e.g., "AF" or "MA").
-    #         sourceModelFileName (str): filename of model as provided by the source.
-    #         sourceModelEntryId (str): model entry.id value as in the provided mmCIF file
-
-    #     Returns:
-    #         sourceModelUrl (str): Accession URL for the specified model file and source.
-    #                               Note that file-specific downloads aren't gzipped, unlike model files in species tarball.
-    #                               E.g., "https://alphafold.ebi.ac.uk/files/AF-Q9RQP8-F1-model_v2.cif"
-    #         sourceModelPaeUrl (str): Accession URL for the PAE file of the specified model if available, else None.
-    #     """
-    #     sourceModelUrl = None
-    #     sourceModelPaeUrl = None
-    #     try:
-    #         if modelSourcePrefix == "AF":
-    #             if not sourceModelEntryId.upper().endswith("F1"):
-    #                 return None, None
-    #             modelFileNameInUrl = sourceModelFileName.split(".gz")[0]
-    #             sourceModelUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelFileNameInUrl)
-    #             modelPaeFileNameInUrl = modelFileNameInUrl.split("-model_")[0] + "-predicted_aligned_error_" + modelFileNameInUrl.split("-model_")[1].split(".cif")[0] + ".json"
-    #             sourceModelPaeUrl = os.path.join("https://alphafold.ebi.ac.uk/files/", modelPaeFileNameInUrl)
-    #         elif modelSourcePrefix == "MA":
-    #             modelFileNameInUrl = sourceModelFileName.split(".cif")[0]
-    #             sourceModelUrl = "https://www.modelarchive.org/api/projects/" + modelFileNameInUrl + "?type=basic__model_file_name"
-    #         else:
-    #             logger.error("URL generation process not ready yet for %s", modelSourcePrefix)
-    #     except Exception as e:
-    #         logger.exception("Failing with %s", str(e))
-
-    #     return sourceModelUrl, sourceModelPaeUrl
 
     def __rebuildEntryIds(self, dataContainer, sourceModelEntryId, sourceModelDb, internalModelId):
         """Replace or remove occurrences of source entry ID with internal ID

@@ -1,4 +1,6 @@
 ##
+# TODO: DELETE THIS FILE AND REMOVE REFERENCES ELSEWHERE - NO LONGER NEEDED WHEN SWITCHING TO 200M
+#
 # File:    ModelHoldingsProvider.py
 # Author:  Dennis Piehl
 # Date:    27-Apr-2022
@@ -58,7 +60,7 @@ class ModelHoldingsProvider(StashableBase):
         self.__mU = MarshalUtil(workPath=self.__dirPath)
         self.__fU = FileUtil(workPath=self.__dirPath)
         #
-        self.__hD, self.__mD, self.__fD = {}, {}, {}
+        self.__hD, self.__mD = {}, {}
         #
         self.__hD = self.__reload(useCache)
         #
@@ -96,7 +98,7 @@ class ModelHoldingsProvider(StashableBase):
                 holdingsFileTmpL = [hF for hF in hD if self.__holdingsFileToImport in hF]
                 holdingsFile = holdingsFileTmpL[0] if holdingsFileTmpL else None
                 if holdingsFile:
-                    self.__mD, self.__fD = self.__reloadHoldingsFile(holdingsFile)
+                    self.__mD = self.__reloadHoldingsFile(holdingsFile)
 
         except Exception as e:
             logger.exception("Failing with %s", str(e))
@@ -135,7 +137,7 @@ class ModelHoldingsProvider(StashableBase):
         localHoldingsFilePath = os.path.join(self.__dirPath, os.path.basename(holdingsFile))
         #
         logger.info("Loading localHoldingsFilePath into memory %r", localHoldingsFilePath)
-        mD, fD = {}, {}
+        mD = {}
         try:
             if not self.__mU.exists(localHoldingsFilePath):
                 ok = self.__fetchHoldingsFile(holdingsFile)
@@ -143,34 +145,31 @@ class ModelHoldingsProvider(StashableBase):
             if mD:
                 ok = True
                 logger.info("Imported computed-model holdings file into memory (as self.__mD) %r length %r", localHoldingsFilePath, len(mD))
-            fD = self.__getFragmentedModelIds(mD)
-            if fD:
-                logger.info("Fragmented computed-model ID list length %r", len(fD))
         except Exception as e:
             logger.exception("Failing with %s", str(e))
 
         logger.info("Completed reload (%r) at %s (%.4f seconds)", ok, time.strftime("%Y %m %d %H:%M:%S", time.localtime()), time.time() - startTime)
 
-        return mD, fD
+        return mD
 
-    def getFragmentedModelIds(self, modelD=None):
-        self.__fD = self.__getFragmentedModelIds(modelD=modelD)
-        return True
+    # def getFragmentedModelIds(self, modelD=None):
+    #     self.__fD = self.__getFragmentedModelIds(modelD=modelD)
+    #     return True
 
-    def __getFragmentedModelIds(self, modelD=None):
-        """Gather list of fragmented AF computed-model files.
+    # def __getFragmentedModelIds(self, modelD=None):
+    #     """Gather list of fragmented AF computed-model files.
 
-        Returns:
-            (dict): dictionary of fragmented computed-model IDs
-        """
-        fD = {}
-        modelD = modelD if modelD else self.__mD
-        fxL = [i for i in modelD if i.startswith("AF") and not i.endswith("F1")]
-        f1L = [i[0:-2] + "F1" for i in fxL if i.endswith("F2")]
-        fxL += f1L
-        fxL.sort()
-        fD = {k: None for k in fxL}
-        return fD
+    #     Returns:
+    #         (dict): dictionary of fragmented computed-model IDs
+    #     """
+    #     fD = {}
+    #     modelD = modelD if modelD else self.__mD
+    #     fxL = [i for i in modelD if i.startswith("AF") and not i.endswith("F1")]
+    #     f1L = [i[0:-2] + "F1" for i in fxL if i.endswith("F2")]
+    #     fxL += f1L
+    #     fxL.sort()
+    #     fD = {k: None for k in fxL}
+    #     return fD
 
     def testCache(self, minCount=1):
         logger.info("computed-model holdings files count %d", len(self.__hD))
@@ -185,11 +184,11 @@ class ModelHoldingsProvider(StashableBase):
     def getModelHoldingsDict(self):
         return self.__mD
 
-    def getModelFragmentsDict(self):
-        return self.__fD
+    # def getModelFragmentsDict(self):
+    #     return self.__fD
 
-    def checkIfFragmentedModel(self, compModelInternalId):
-        return compModelInternalId in self.__fD
+    # def checkIfFragmentedModel(self, compModelInternalId):
+    #     return compModelInternalId in self.__fD
 
     # def getCompModelIdMap(self, modelCacheD=None):
     #     return self.__fetchCompModelIdMap(modelCacheD=modelCacheD)
