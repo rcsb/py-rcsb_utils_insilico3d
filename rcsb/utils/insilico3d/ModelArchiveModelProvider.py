@@ -36,7 +36,6 @@ from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.insilico3d.ModelReorganizer import ModelReorganizer
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -392,7 +391,6 @@ class ModelArchiveModelProvider:
         """
         try:
             ok = False
-            sourceArchiveReleaseDate = kwargs.get("sourceArchiveReleaseDate", None)  # Use for ModelArchive files until revision date information is available in mmCIF files
             #
             mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
             #
@@ -402,7 +400,7 @@ class ModelArchiveModelProvider:
                     modelSource="ModelArchive",
                     destBaseDir=self.__cachePath,
                     useCache=useCache,
-                    sourceArchiveReleaseDate=sourceArchiveReleaseDate,
+                    **kwargs
                 )
                 if not ok:
                     logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputModelList[0])
@@ -416,8 +414,8 @@ class ModelArchiveModelProvider:
                     archiveSummaryPageApiUrl = os.path.join(self.__modelArchiveSummaryPageBaseApiUrl, archiveName)
                     response = requests.get(archiveSummaryPageApiUrl, timeout=600)
                     try:
-                        sourceArchiveReleaseDate = response.json()["release_date"]  # e.g., '2022-09-28'
-                        logger.info("Dataset archive %s: release date %s", archiveName, sourceArchiveReleaseDate)
+                        sourceArchiveReleaseDateFallback = response.json()["release_date"]  # e.g., '2022-09-28'
+                        logger.info("Dataset archive %s: release date %s", archiveName, sourceArchiveReleaseDateFallback)
                     except Exception as e:
                         logger.exception(
                             "Failing to get release date for archive dataset %s from ModelArchive site (returned status code %r), with exception %s",
@@ -433,7 +431,8 @@ class ModelArchiveModelProvider:
                         modelSource="ModelArchive",
                         destBaseDir=self.__cachePath,
                         useCache=useCache,
-                        sourceArchiveReleaseDate=sourceArchiveReleaseDate,
+                        sourceArchiveReleaseDate=sourceArchiveReleaseDateFallback,
+                        **kwargs
                     )
                     if not ok:
                         logger.error("Reorganization of model files failed for dataset archive %s", archiveDir)

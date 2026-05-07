@@ -34,7 +34,6 @@ from rcsb.utils.io.FileUtil import FileUtil
 from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.insilico3d.ModelReorganizer import ModelReorganizer
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -335,7 +334,8 @@ class AlphaFoldModelCloudProvider:
                             destBaseDir=self.__cachePath,
                             useCache=useCache,
                             inputModelD=outputModelD,
-                            writeCache=False
+                            writeCache=False,
+                            **kwargs
                         )
                         if not ok:
                             logger.error("Reorganization of model files failed for archive %s subset %r", archiveDir, archiveSubsetIdx)
@@ -354,7 +354,8 @@ class AlphaFoldModelCloudProvider:
                                     destBaseDir=self.__cachePath,
                                     useCache=useCache,
                                     inputModelD=outputModelD,
-                                    writeCache=False
+                                    writeCache=False,
+                                    **kwargs
                                 )
                                 if not ok:
                                     logger.error("Reorganization of model files failed for archive %s subset %r", archiveDir, archiveSubsetIdx)

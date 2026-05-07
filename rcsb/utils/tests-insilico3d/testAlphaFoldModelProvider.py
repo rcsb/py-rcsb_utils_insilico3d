@@ -89,16 +89,20 @@ class AlphaFoldModelProviderTests(unittest.TestCase):
         self.assertTrue(ok)
         #
         # Next test reorganizing model file directory structure
-        ok = aFMP.reorganizeModelFiles(useCache=False, inputModelList=speciesModelFileList[0:10], numProc=4, chunkSize=20, keepSource=True)
+        ok = aFMP.reorganizeModelFiles(useCache=False, inputModelList=speciesModelFileList[0:10], numProc=4, chunkSize=20, keepSource=True, outputModelFormat="mmcif")
+        self.assertTrue(ok)
+        # Now test the conversion to BCIF
+        logger.info("Testing reorganization into BCIF")
+        ok = aFMP.reorganizeModelFiles(useCache=False, inputModelList=speciesModelFileList[10:20], numProc=4, chunkSize=20, keepSource=True, outputModelFormat="bcif")
         self.assertTrue(ok)
         # Now test using the reorganizer object directly
         aFMR = aFMP.getModelReorganizer(useCache=False, numProc=4, chunkSize=20, keepSource=True)
         destBaseDir = aFMP.getComputedModelsDataPath()
-        ok = aFMR.reorganize(inputModelList=speciesModelFileList[10:20], modelSource="AlphaFold", destBaseDir=destBaseDir, useCache=False)
+        ok = aFMR.reorganize(inputModelList=speciesModelFileList[20:30], modelSource="AlphaFold", destBaseDir=destBaseDir, useCache=False)
         self.assertTrue(ok)
         ok = aFMR.testCache()
         self.assertFalse(ok)  # Confirm that testCache FAILED (< 20 in cache)
-        ok = aFMR.reorganize(inputModelList=speciesModelFileList[20:30], modelSource="AlphaFold", destBaseDir=destBaseDir, useCache=True)
+        ok = aFMR.reorganize(inputModelList=speciesModelFileList[30:40], modelSource="AlphaFold", destBaseDir=destBaseDir, useCache=True)
         self.assertTrue(ok)
         ok = aFMR.testCache()
         self.assertTrue(ok)  # Confirm that testCache SUCCEEDED (>= 20 in cache)

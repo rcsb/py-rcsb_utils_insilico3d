@@ -25,11 +25,13 @@ To run:
        in `runModelProviderWorkflow()`. (Note that the list of AF species below only controls which to DOWNLOAD; the
        REORGANIZATION is controlled by the source model cache file `/mnt/vdb1/source-models/work-dir/AlphaFold/model-download-cache.json`,
        in that the workflow will always try to reorganize every species in there with `"reogranized": false`)
-    5. Run the script in the background and save log output with:
+    5. Specify the desired output file format in the '.reorganize()' call ("mmcif" or "bcif")
+    6. Run the script in the background and save log output with:
            python3 runModelProviderWorkflow.py >& log.1 &
-    6. Once you run the workflow for both AF and MA, it will create two separate holdings files for each
+    7. Once you run the workflow for both AF and MA, it will create two separate holdings files for each
        These should be merged, which you can do with the separate script, `mergeHoldingsFiles.py`
-    7. Update the symlink for `/mnt/vdb1/computed-models/staging`
+       (*Note that this should only be used for the 1 million CSM set, not for 200 million.)
+    8. Update the symlink for `/mnt/vdb1/computed-models/staging`
 """
 
 __docformat__ = "google en"
@@ -152,7 +154,7 @@ class ModelProviderWorkflowExec(unittest.TestCase):
                     )
                     ok = mPWf.download()
                     self.assertTrue(ok)
-                    ok = mPWf.reorganize(keepSource=self.__keepSource)
+                    ok = mPWf.reorganize(keepSource=self.__keepSource, outputModelFormat="mmcif")
                     self.assertTrue(ok)
 
             if self.__fetchAndReorganizeModelArchive:
@@ -167,7 +169,7 @@ class ModelProviderWorkflowExec(unittest.TestCase):
                 )
                 ok = mPWf.download()
                 self.assertTrue(ok)
-                ok = mPWf.reorganize(keepSource=self.__keepSource)
+                ok = mPWf.reorganize(keepSource=self.__keepSource, outputModelFormat="mmcif")
                 self.assertTrue(ok)
 
 

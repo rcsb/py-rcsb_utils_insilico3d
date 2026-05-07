@@ -39,7 +39,6 @@ from rcsb.utils.io.MarshalUtil import MarshalUtil
 from rcsb.utils.io.FtpUtil import FtpUtil
 from rcsb.utils.insilico3d.ModelReorganizer import ModelReorganizer
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s]-%(module)s.%(funcName)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -300,7 +299,7 @@ class AlphaFoldModelProvider:
             mR = self.getModelReorganizer(cachePath=cachePath, useCache=useCache, **kwargs)
             #
             if inputModelList:  # Only reorganize given list of model files
-                _, ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
+                _, ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache, **kwargs)
                 if not ok:
                     logger.error("Reorganization of model files failed for inputModelList starting with item, %s", inputModelList[0])
             #
@@ -320,7 +319,8 @@ class AlphaFoldModelProvider:
                                 continue
                     # Proceed with reorganization
                     inputModelList = self.getModelFileList(inputPathList=[archiveDir])
-                    _, ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache)
+                    logger.info("Will reorganize %r models from archiveDir %r", len(inputModelList), archiveDir)
+                    _, ok = mR.reorganize(inputModelList=inputModelList, modelSource="AlphaFold", destBaseDir=self.__cachePath, useCache=useCache, **kwargs)
                     if not ok:
                         logger.error("Reorganization of model files failed for species archive %s", archiveDir)
                         break
